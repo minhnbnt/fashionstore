@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./config/postgresql:/docker-entrypoint-initdb.d/
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.25.1-p0
+
+    ports:
+      - "6432:6432"
+
+    volumes:
+      - ./config/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./config/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  gotrue:
+    image: ghcr.io/supabase/gotrue:v2.193.0
+
+    env_file:
+      - ./config/gotrue.env
+
+    ports:
+      - "9999:9999"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
