@@ -32,11 +32,10 @@ services:
         condition: service_healthy
 
   gotrue:
-    image: ghcr.io/supabase/gotrue:v2.193.0
+    image: ghcr.io/supabase/gotrue:v2.195.0
 
     env_file:
       - ./config/gotrue.env
-      - ./.env
 
     ports:
       - "9999:9999"

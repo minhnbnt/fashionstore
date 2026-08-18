@@ -1,4 +1,4 @@
-/config/
+# Keep real secrets (e.g. .env with private JWT keys) out of the repo
 .env*
 
 HELP.md

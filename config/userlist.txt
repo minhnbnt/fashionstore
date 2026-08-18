@@ -1,0 +1,2 @@
+"postgres" "postgres"
+"supabase_auth_admin" "root"
