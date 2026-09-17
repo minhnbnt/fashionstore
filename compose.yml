@@ -1,11 +1,14 @@
 services:
   postgres:
-    image: registry.access.redhat.com/hi/postgresql:18
+    image: ghcr.io/minhnbnt/postgresql:latest
 
     environment:
       POSTGRES_DB: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_USER: postgres
+
+    ports:
+      - "5432:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -18,7 +21,7 @@ services:
       retries: 5
 
   pgbouncer:
-    image: edoburu/pgbouncer:v1.25.1-p0
+    image: registry.access.redhat.com/hi/pgbouncer:1.25
 
     ports:
       - "6432:6432"
@@ -32,7 +35,7 @@ services:
         condition: service_healthy
 
   gotrue:
-    image: ghcr.io/supabase/gotrue:v2.195.0
+    image: ghcr.io/supabase/gotrue:v2.197.0
 
     env_file:
       - ./config/gotrue.env
@@ -45,7 +48,7 @@ services:
         condition: service_healthy
 
   mailpit:
-    image: ghcr.io/axllent/mailpit:v1.30.4
+    image: ghcr.io/axllent/mailpit:v1.31.1
 
     ports:
       - 8025:8025
@@ -58,6 +61,32 @@ services:
       MAIL_FROM_ADDRESS: no-reply@test.local
       MAIL_FROM_NAME: My App
 
+  garage:
+    image: ghcr.io/minhnbnt/garage:latest
+    command: ["server", "--single-node", "--default-bucket"]
+
+    ports:
+      - "3900:3900"
+      - "3902:3902"
+      - "3903:3903"
+
+    volumes:
+      - garage_data:/var/lib/garage
+      - ./config/garage.toml:/etc/garage.toml:ro
+
+    environment:
+      GARAGE_DEFAULT_ACCESS_KEY: GKd44959a54214a28492750765e375479f
+      GARAGE_DEFAULT_SECRET_KEY: passwordpassword
+      GARAGE_DEFAULT_BUCKET: fashionstore
+
+    healthcheck:
+      test: ["CMD", "/usr/bin/garage", "health", "-q"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
 volumes:
+  garage_data:
   mailpit_data:
   postgres_data:
