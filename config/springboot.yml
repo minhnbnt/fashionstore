@@ -13,3 +13,10 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: http://localhost:9999
+
+s3:
+  endpoint: http://localhost:3900
+  region: garage
+  bucket: fashionstore
+  access-key: GKd44959a54214a28492750765e375479f
+  secret-key: passwordpassword

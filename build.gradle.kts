@@ -18,9 +18,10 @@ repositories {
 dependencies {
 
     implementation("org.flywaydb:flyway-database-postgresql")
+	implementation("software.amazon.awssdk:s3:2.55.7")
 
     implementation("org.springframework.boot:spring-boot-starter-flyway")
-    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
 
