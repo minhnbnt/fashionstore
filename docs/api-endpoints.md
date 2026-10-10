@@ -1,0 +1,49 @@
+# API Endpoints — Fashionstore Marketplace
+
+Thứ tự triển khai theo luồng, luồng sau dựa luồng trước.
+Base: `com.minhnbnt.fashionstore` — shop | catalog | order | identity (mỗi domain có `controller/` + `service/` + `repository/`), `model/` + `dto/` chung ở ngoài.
+
+## Flow 1 — Identity
+
+| Xong | # | Method | Path | Mô tả |
+|------|---|--------|------|-------|
+| [ ] | 1 | POST | `/api/users` | Mirror GoTrue user vào `user_profile` (public, đã permitAll) |
+| [ ] | 2 | GET | `/api/users/me` | Profile của user đang login |
+
+## Flow 2 — Shop (đăng ký + duyệt)
+
+| Xong | # | Method | Path | Mô tả |
+|------|---|--------|------|-------|
+| [x] | 3 | POST | `/api/shops` | Đăng ký shop → `PENDING` |
+| [x] | 4 | GET | `/api/shops/mine` | Shop của tôi (dựa `shop_member`) |
+| [x] | 5 | GET | `/api/shops/{slug}` | Public xem shop |
+| [x] | 6 | GET | `/api/admin/shops?status=` | Liệt kê shop theo trạng thái (mặc định PENDING) |
+| [x] | 7 | PATCH | `/api/admin/shops/{id}/approve` | Admin duyệt → `APPROVED` |
+| [x] | 8 | PATCH | `/api/admin/shops/{id}/reject` | Admin từ chối → `REJECTED` |
+| [x] | 9 | PUT | `/api/shops/{id}` | Sửa thông tin shop (OWNER/STAFF) |
+
+> Quyết định còn mở: admin xác định bằng cách nào — đọc role từ GoTrue `app_metadata`, hay thêm cột `is_admin` vào `user_profile` (migration V3).
+
+## Flow 3 — Catalog (hàng hóa + search)
+
+| Xong | # | Method | Path | Mô tả |
+|------|---|--------|------|-------|
+| [ ] | 10 | GET | `/api/categories` | Public danh mục (admin seed tay, chưa cần CRUD) |
+| [ ] | 11 | POST | `/api/shops/{shopId}/products` | Tạo product kèm variants (OWNER/STAFF, shop đã `APPROVED`) |
+| [ ] | 12 | PUT | `/api/shops/{shopId}/products/{id}` | Sửa product / variant / tồn kho |
+| [ ] | 13 | POST | `/api/uploads/presign` | Xin URL upload ảnh (`S3Storage` có sẵn) |
+| [ ] | 14 | POST | `/api/shops/{shopId}/products/{id}/images` | Gắn `s3_key` vào product |
+| [ ] | 15 | GET | `/api/products/{id}` | Public chi tiết sản phẩm |
+| [ ] | 16 | GET | `/api/search/products?q=...` | Search BM25 (`idx_product_bm25`, bắt buộc `to_bm25query` + `status='ACTIVE'`) |
+
+## Flow 4 — Order COD (1 checkout 1 shop)
+
+| Xong | # | Method | Path | Mô tả |
+|------|---|--------|------|-------|
+| [ ] | 17 | POST | `/api/orders` | Checkout, 1 đơn đúng 1 shop |
+| [ ] | 18 | GET | `/api/orders/mine` | Buyer xem đơn của mình |
+| [ ] | 19 | GET | `/api/orders/{id}` | Buyer xem chi tiết / cancel (chỉ khi `PENDING`) |
+| [ ] | 20 | GET | `/api/seller/orders` | Seller xem đơn của shop mình |
+| [ ] | 21 | PATCH | `/api/seller/orders/{id}/confirm` | Confirm + trừ kho nguyên tử (`UPDATE ... WHERE stock >= qty`) |
+| [ ] | 22 | PATCH | `/api/seller/orders/{id}/ship` | Chuyển sang `SHIPPING` |
+| [ ] | 23 | PATCH | `/api/seller/orders/{id}/deliver` | `DELIVERED` = thu COD (`payment_status='COLLECTED'`) |
