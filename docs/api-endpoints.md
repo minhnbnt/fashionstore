@@ -22,19 +22,21 @@ Base: `com.minhnbnt.fashionstore` — shop | catalog | order | identity (mỗi d
 | [x] | 8 | PATCH | `/api/admin/shops/{id}/reject` | Admin từ chối → `REJECTED` |
 | [x] | 9 | PUT | `/api/shops/{id}` | Sửa thông tin shop (OWNER/STAFF) |
 
-> Quyết định còn mở: admin xác định bằng cách nào — đọc role từ GoTrue `app_metadata`, hay thêm cột `is_admin` vào `user_profile` (migration V3).
+> Quyết định còn mở: admin xác định bằng cách nào — đọc role từ GoTrue `app_metadata`, hay thêm cột `is_admin` vào `user_profile` (migration V4 — V3 đã dùng để bỏ product DRAFT).
 
 ## Flow 3 — Catalog (hàng hóa + search)
 
 | Xong | # | Method | Path | Mô tả |
 |------|---|--------|------|-------|
-| [ ] | 10 | GET | `/api/categories` | Public danh mục (admin seed tay, chưa cần CRUD) |
-| [ ] | 11 | POST | `/api/shops/{shopId}/products` | Tạo product kèm variants (OWNER/STAFF, shop đã `APPROVED`) |
-| [ ] | 12 | PUT | `/api/shops/{shopId}/products/{id}` | Sửa product / variant / tồn kho |
-| [ ] | 13 | POST | `/api/uploads/presign` | Xin URL upload ảnh (`S3Storage` có sẵn) |
-| [ ] | 14 | POST | `/api/shops/{shopId}/products/{id}/images` | Gắn `s3_key` vào product |
-| [ ] | 15 | GET | `/api/products/{id}` | Public chi tiết sản phẩm |
-| [ ] | 16 | GET | `/api/search/products?q=...` | Search BM25 (`idx_product_bm25`, bắt buộc `to_bm25query` + `status='ACTIVE'`) |
+| [x] | 10 | GET | `/api/categories` | Public danh mục (admin seed tay, chưa cần CRUD) |
+| [x] | 11 | POST | `/api/shops/{shopId}/products` | Tạo product kèm variants (OWNER/STAFF, shop đã `APPROVED`) |
+| [x] | 12 | PUT | `/api/shops/{shopId}/products/{id}` | Sửa product / variant / tồn kho |
+| [x] | 13 | POST | `/api/uploads/presign` | Xin URL upload ảnh (`S3Storage` có sẵn) |
+| [x] | 14 | POST | `/api/shops/{shopId}/products/{id}/images` | Gắn `s3_key` vào product |
+| [x] | 15 | GET | `/api/products/{id}` | Public chi tiết sản phẩm |
+| [x] | 16 | GET | `/api/search/products?q=...` | Search BM25 (`idx_product_bm25`, bắt buộc `to_bm25query` + `status='ACTIVE'`) |
+
+Chi tiết luồng này xem `docs/catalog.md`.
 
 ## Flow 4 — Order COD (1 checkout 1 shop)
 
