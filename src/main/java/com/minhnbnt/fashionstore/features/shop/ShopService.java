@@ -107,6 +107,15 @@ public class ShopService {
             .toList();
     }
 
+    @Transactional(readOnly = true)
+    public boolean isShopApproved(@NonNull UUID shopId) {
+        var shop = shops.findById(shopId).orElse(null);
+        if (shop == null) {
+            return false;
+        }
+        return shop.getStatus() == ShopStatus.APPROVED;
+    }
+
     private static String descriptionOf(@Nullable String description) {
         if (description == null) {
             return "";
