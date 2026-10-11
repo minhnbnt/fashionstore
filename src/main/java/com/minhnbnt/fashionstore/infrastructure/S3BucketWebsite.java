@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.IndexDocument;
 import software.amazon.awssdk.services.s3.model.PutBucketWebsiteRequest;
-import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.WebsiteConfiguration;
 
 @Component
@@ -35,7 +34,7 @@ public class S3BucketWebsite implements ApplicationRunner {
         try {
             s3.putBucketWebsite(request);
             log.info("Exposed bucket {} as website", bucket);
-        } catch (S3Exception e) {
+        } catch (RuntimeException e) {
             log.warn("Could not expose bucket {} as website: {}", bucket, e.getMessage());
         }
     }

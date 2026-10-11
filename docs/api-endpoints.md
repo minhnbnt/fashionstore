@@ -7,8 +7,8 @@ Base: `com.minhnbnt.fashionstore` — shop | catalog | order | identity (mỗi d
 
 | Xong | # | Method | Path | Mô tả |
 |------|---|--------|------|-------|
-| [ ] | 1 | POST | `/api/users` | Mirror GoTrue user vào `user_profile` (public, đã permitAll) |
-| [ ] | 2 | GET | `/api/users/me` | Profile của user đang login |
+| [x] | 1 | POST | `/api/users` | Mirror GoTrue user vào `user_profile` (authenticated, id từ JWT sub) |
+| [x] | 2 | GET | `/api/users/me` | Profile của user đang login |
 
 ## Flow 2 — Shop (đăng ký + duyệt)
 
@@ -42,10 +42,11 @@ Chi tiết luồng này xem `docs/catalog.md`.
 
 | Xong | # | Method | Path | Mô tả |
 |------|---|--------|------|-------|
-| [ ] | 17 | POST | `/api/orders` | Checkout, 1 đơn đúng 1 shop |
-| [ ] | 18 | GET | `/api/orders/mine` | Buyer xem đơn của mình |
-| [ ] | 19 | GET | `/api/orders/{id}` | Buyer xem chi tiết / cancel (chỉ khi `PENDING`) |
-| [ ] | 20 | GET | `/api/seller/orders` | Seller xem đơn của shop mình |
-| [ ] | 21 | PATCH | `/api/seller/orders/{id}/confirm` | Confirm + trừ kho nguyên tử (`UPDATE ... WHERE stock >= qty`) |
-| [ ] | 22 | PATCH | `/api/seller/orders/{id}/ship` | Chuyển sang `SHIPPING` |
-| [ ] | 23 | PATCH | `/api/seller/orders/{id}/deliver` | `DELIVERED` = thu COD (`payment_status='COLLECTED'`) |
+| [x] | 17 | POST | `/api/orders` | Checkout, 1 đơn đúng 1 shop |
+| [x] | 18 | GET | `/api/orders/mine` | Buyer xem đơn của mình |
+| [x] | 19 | GET | `/api/orders/{id}` | Buyer xem chi tiết (chỉ khi `PENDING` mới cancel được) |
+| [x] | 19b | PATCH | `/api/orders/{id}/cancel` | Buyer hủy đơn (chỉ khi `PENDING`) |
+| [x] | 20 | GET | `/api/seller/orders` | Seller xem đơn mọi shop mình tham gia |
+| [x] | 21 | PATCH | `/api/seller/orders/{id}/confirm` | Confirm + trừ kho nguyên tử (`UPDATE ... WHERE stock >= qty`) |
+| [x] | 22 | PATCH | `/api/seller/orders/{id}/ship` | Chuyển sang `SHIPPING` |
+| [x] | 23 | PATCH | `/api/seller/orders/{id}/deliver` | `DELIVERED` = thu COD (`payment_status='COLLECTED'`) |
