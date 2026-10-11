@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -44,6 +45,8 @@ public class S3Config {
             .region(Region.of(region))
             .credentialsProvider(credentials())
             .serviceConfiguration(serviceConfiguration())
+            // Garage (S3-compatible) rejects the flexible checksums the SDK sends by default.
+            .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
             .build();
     }
 

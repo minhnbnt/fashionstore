@@ -2,6 +2,7 @@ package com.minhnbnt.fashionstore.model;
 
 import lombok.AccessLevel;
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.PersistenceCreator;
 import org.springframework.data.annotation.Transient;
@@ -22,7 +23,7 @@ public class UserProfile implements Persistable<UUID> {
 
     private String displayName;
 
-    private String avatarKey;
+    private @Nullable String avatarKey;
 
     private Instant createdAt;
 
@@ -35,7 +36,7 @@ public class UserProfile implements Persistable<UUID> {
         UUID id,
         String email,
         String displayName,
-        String avatarKey,
+        @Nullable String avatarKey,
         Instant createdAt
     ) {
         this.id = id;
@@ -46,7 +47,7 @@ public class UserProfile implements Persistable<UUID> {
         this.newRecord = false;
     }
 
-    public static UserProfile create(UUID id, String email, String displayName, String avatarKey) {
+    public static UserProfile create(UUID id, String email, String displayName, @Nullable String avatarKey) {
         var profile = new UserProfile(id, email, displayName, avatarKey, Instant.now());
         profile.newRecord = true;
         return profile;
@@ -60,7 +61,7 @@ public class UserProfile implements Persistable<UUID> {
         this.email = email;
     }
 
-    public void changeAvatar(String avatarKey) {
+    public void changeAvatar(@Nullable String avatarKey) {
         this.avatarKey = avatarKey;
     }
 

@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.jspecify.annotations.Nullable;
 
 public record CreateUserRequest(
     @Schema(description = "Email hiển thị của user", example = "an@t.local")
@@ -18,6 +19,7 @@ public record CreateUserRequest(
     String displayName,
 
     @Schema(description = "S3 key của avatar, null nếu chưa có", nullable = true)
+    @Nullable
     String avatarKey
 ) {
 }
