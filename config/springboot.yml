@@ -13,3 +13,14 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: http://localhost:9999
+
+s3:
+  endpoint: http://localhost:3900
+  region: garage
+  bucket: fashionstore
+  access-key: GKd44959a54214a28492750765e375479f
+  secret-key: passwordpassword
+  # Base URL public (Garage website endpoint). Không có trailing slash.
+  # Browser cần resolve được host này:
+  #   echo '127.0.0.1 fashionstore.web.garage.localhost' >> /etc/hosts
+  public-base-url: http://fashionstore.web.garage.localhost:3902
