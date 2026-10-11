@@ -3,6 +3,12 @@
 Thứ tự triển khai theo luồng, luồng sau dựa luồng trước.
 Base: `com.minhnbnt.fashionstore` — shop | catalog | order | identity (mỗi domain có `controller/` + `service/` + `repository/`), `model/` + `dto/` chung ở ngoài.
 
+## Hợp đồng lỗi
+
+- Mọi lỗi render theo RFC 9457 `ProblemDetail`, không DTO riêng (`ResponseStatusException` đã implement `ErrorResponse`).
+- `OpenApiProblemCustomizer` tự gắn body `application/problem+json` cho 400/401/403/404/409 của mọi endpoint trong spec.
+- 401/403 từ security filter body rỗng — UI chỉ dựa status code.
+
 ## Flow 1 — Identity
 
 | Xong | # | Method | Path | Mô tả |
@@ -28,7 +34,7 @@ Base: `com.minhnbnt.fashionstore` — shop | catalog | order | identity (mỗi d
 
 | Xong | # | Method | Path | Mô tả |
 |------|---|--------|------|-------|
-| [x] | 10 | GET | `/api/categories` | Public danh mục (admin seed tay, chưa cần CRUD) |
+| [x] | 10 | GET | `/api/categories` | Public danh mục (DemoSeeder seed sẵn, chưa cần CRUD) |
 | [x] | 11 | POST | `/api/shops/{shopId}/products` | Tạo product kèm variants (OWNER/STAFF, shop đã `APPROVED`) |
 | [x] | 12 | PUT | `/api/shops/{shopId}/products/{id}` | Sửa product / variant / tồn kho |
 | [x] | 13 | POST | `/api/uploads/presign` | Xin URL upload ảnh (`S3Storage` có sẵn) |

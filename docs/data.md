@@ -20,12 +20,22 @@
 - Index partial `WHERE status = 'ACTIVE'`, `text_config = 'simple'` (stock PG không có stemmer tiếng Việt).
 - Query bắt buộc `to_bm25query('...', 'idx_product_bm25')` với tên index tường minh + `WHERE status = 'ACTIVE'`, không thì planner bỏ qua index.
 - Lọc boolean kết hợp xếp hạng thì `SET LOCAL default_text_search_config = 'simple'` trước.
+- `simple` không unaccent: gõ "ao" không ra "áo". Search trả đủ kết quả xếp hạng, **không ngưỡng cắt** — frontend hiện theo đúng thứ tự rank.
+- Liệt kê sản phẩm trang chủ: chưa có endpoint list, UI dùng `search` với từ khóa mặc định.
 
 ## S3 / file
 
 - DB chỉ lưu **key** (`avatar_key`, `s3_key`), không lưu URL. Presign upload qua `S3Storage`, key sinh từ UUID + extension từ content-type.
 - Bucket public-read qua website endpoint (xem `S3BucketWebsite` tự gọi `PutBucketWebsite` lúc app start). Frontend tự ghép `{public-base-url}/{key}`, base URL xem `config/springboot.yml` (`s3.public-base-url`).
-- Browser muốn mở ảnh dev thì thêm `127.0.0.1 fashionstore.web.garage.localhost` vào hosts.
+- Garage web route theo hostname: `root_domain = ".web.localhost"` trong `config/garage.toml`, URL dạng `http://fashionstore.web.localhost:3902/{key}` (không prefix bucket). `*.localhost` browser tự resolve 127.0.0.1, khỏi sửa `/etc/hosts`.
+- SDK gửi checksum mặc định bị Garage từ chối (`Invalid payload signature`): `S3Client` cấu hình `requestChecksumCalculation(WHEN_REQUIRED)` — xem `S3Config.java`. Không đụng `S3Presigner`.
+
+## Demo seed (dev-only)
+
+- `infrastructure/DemoSeeder` chạy lúc boot khi `app.demo-seed=true` (bật trong `config/springboot.yml` local, mặc định tắt nên production không dính).
+- Idempotent: skip khi shop slug `net-lab` đã tồn tại. Reset: `DELETE FROM shop WHERE slug = 'net-lab';` (cascade kéo product/variant/image).
+- Nội dung: 1 shop APPROVED, 5 category, 9 product ACTIVE (giá/tồn thật, 1 món hết hàng demo), ảnh picsum tự tải + up Garage (lỗi thì warn + bỏ qua, UI rớt placeholder).
+- Search test tay gõ **có dấu** ("áo" là keyword mặc định của Home).
 
 ## Test DB
 
