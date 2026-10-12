@@ -38,3 +38,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# OpenCode local config
+opencode.json
