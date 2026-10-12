@@ -26,6 +26,7 @@ public final class CatalogMapper {
         return new ProductResponse(
             product.getId(),
             product.getShopId(),
+            product.getCategoryId(),
             product.getName(),
             product.getSlug(),
             product.getDescription(),

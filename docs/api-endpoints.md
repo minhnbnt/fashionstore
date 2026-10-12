@@ -40,7 +40,8 @@ Base: `com.minhnbnt.fashionstore` — shop | catalog | order | identity (mỗi d
 | [x] | 13 | POST | `/api/uploads/presign` | Xin URL upload ảnh (`S3Storage` có sẵn) |
 | [x] | 14 | POST | `/api/shops/{shopId}/products/{id}/images` | Gắn `s3_key` vào product |
 | [x] | 15 | GET | `/api/products/{id}` | Public chi tiết sản phẩm |
-| [x] | 16 | GET | `/api/search/products?q=...` | Search BM25 (`idx_product_bm25`, bắt buộc `to_bm25query` + `status='ACTIVE'`) |
+| [x] | 16 | GET | `/api/search/products?q=&category=&size=&color=&minPrice=&maxPrice=&sort=&page=` | Search BM25 + lọc danh mục/biến thể/giá + sắp xếp + phân trang (`idx_product_bm25`, bắt buộc `to_bm25query` + `status='ACTIVE'`) |
+| [x] | 16b | GET | `/api/search/facets?q=&category=` | Size/màu/khoảng giá có sẵn để dựng bộ lọc |
 
 Chi tiết luồng này xem `docs/catalog.md`.
 

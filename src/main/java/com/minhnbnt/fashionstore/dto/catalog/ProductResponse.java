@@ -10,6 +10,7 @@ import java.util.UUID;
 public record ProductResponse(
     @Schema UUID id,
     @Schema UUID shopId,
+    @Schema(description = "Danh mục, null nếu chưa gán", nullable = true) @Nullable UUID categoryId,
     @Schema String name,
     @Schema String slug,
     @Schema String description,

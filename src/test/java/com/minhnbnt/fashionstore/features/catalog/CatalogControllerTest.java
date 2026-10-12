@@ -4,7 +4,11 @@ import com.minhnbnt.fashionstore.config.SecurityConfig;
 import com.minhnbnt.fashionstore.dto.catalog.CategoryResponse;
 import com.minhnbnt.fashionstore.dto.catalog.PresignResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductResponse;
+import com.minhnbnt.fashionstore.dto.catalog.ProductSearchRequest;
+import com.minhnbnt.fashionstore.dto.catalog.ProductSearchResponse;
+import com.minhnbnt.fashionstore.dto.catalog.ProductSort;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSummaryResponse;
+import com.minhnbnt.fashionstore.dto.catalog.SearchFacetsResponse;
 import com.minhnbnt.fashionstore.features.catalog.controller.CategoryController;
 import com.minhnbnt.fashionstore.features.catalog.controller.PublicProductController;
 import com.minhnbnt.fashionstore.features.catalog.controller.SearchController;
@@ -12,6 +16,7 @@ import com.minhnbnt.fashionstore.features.catalog.controller.ShopProductControll
 import com.minhnbnt.fashionstore.features.catalog.controller.UploadController;
 import com.minhnbnt.fashionstore.infrastructure.S3Storage;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -24,9 +29,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -61,6 +65,7 @@ class CatalogControllerTest {
         return new ProductResponse(
             id,
             shopId,
+            null,
             "Áo thun",
             "ao-thun",
             "Mô tả",
@@ -149,30 +154,93 @@ class CatalogControllerTest {
             .andExpect(jsonPath("$.slug").value("ao-thun"));
     }
 
-    @Test
-    void searchIsPublic() throws Exception {
-        var id = UUID.randomUUID();
-        var shopId = UUID.randomUUID();
-        when(catalog.search(anyString(), anyInt()))
-            .thenReturn(List.of(new ProductSummaryResponse(
-                id,
-                shopId,
-                "Áo thun",
-                "ao-thun",
-                100000L,
-                null,
-                0.5
-            )));
-
-        mockMvc.perform(get("/api/search/products").param("q", "ao thun"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].slug").value("ao-thun"));
+    private static ProductSearchResponse searchPage() {
+        var summary = new ProductSummaryResponse(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "Áo thun",
+            "ao-thun",
+            100000L,
+            null,
+            0.5
+        );
+        return new ProductSearchResponse(List.of(summary), 1L, 0, 20);
     }
 
     @Test
-    void searchWithoutQueryIsBadRequest() throws Exception {
+    void searchIsPublic() throws Exception {
+        when(catalog.search(any())).thenReturn(searchPage());
+
+        mockMvc.perform(get("/api/search/products").param("q", "ao thun"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].slug").value("ao-thun"))
+            .andExpect(jsonPath("$.total").value(1));
+    }
+
+    @Test
+    void searchWithoutQueryBrowses() throws Exception {
+        when(catalog.search(any())).thenReturn(searchPage());
+
         mockMvc.perform(get("/api/search/products"))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void searchPassesFiltersToService() throws Exception {
+        var captor = ArgumentCaptor.forClass(ProductSearchRequest.class);
+        when(catalog.search(captor.capture())).thenReturn(searchPage());
+
+        mockMvc.perform(get("/api/search/products")
+                .param("q", "ao")
+                .param("category", "ao-khoac")
+                .param("minPrice", "100000")
+                .param("maxPrice", "500000")
+                .param("size", "M")
+                .param("color", "Đen")
+                .param("sort", "PRICE_ASC")
+                .param("page", "2")
+                .param("limit", "12"))
+            .andExpect(status().isOk());
+
+        var request = captor.getValue();
+        assertThat(request.q()).isEqualTo("ao");
+        assertThat(request.category()).isEqualTo("ao-khoac");
+        assertThat(request.minPrice()).isEqualTo(100000L);
+        assertThat(request.maxPrice()).isEqualTo(500000L);
+        assertThat(request.size()).isEqualTo("M");
+        assertThat(request.color()).isEqualTo("Đen");
+        assertThat(request.sort()).isEqualTo(ProductSort.PRICE_ASC);
+        assertThat(request.page()).isEqualTo(2);
+        assertThat(request.limit()).isEqualTo(12);
+    }
+
+    @Test
+    void searchWithUnknownSortIsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/search/products").param("sort", "CHEAPEST"))
             .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void searchWithNegativePriceIsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/search/products").param("minPrice", "-1"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void searchWithOversizedLimitIsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/search/products").param("limit", "101"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void facetsArePublic() throws Exception {
+        when(catalog.facets(any(), any()))
+            .thenReturn(new SearchFacetsResponse(List.of("S", "M"), List.of("Đen"), 100000L, 300000L));
+
+        mockMvc.perform(get("/api/search/facets").param("category", "ao"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sizes[1]").value("M"))
+            .andExpect(jsonPath("$.maxPrice").value(300000));
     }
 
     @Test
