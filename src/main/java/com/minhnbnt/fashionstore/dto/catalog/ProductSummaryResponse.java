@@ -13,6 +13,7 @@ public record ProductSummaryResponse(
     @Schema Long minPrice,
     @Schema(description = "S3 key ảnh đại diện, null nếu chưa có", nullable = true)
     @Nullable String defaultImageKey,
-    @Schema(description = "Điểm BM25") Double rank
+    @Schema(description = "Khoảng cách BM25, càng nhỏ càng khớp. Null khi không có từ khóa", nullable = true)
+    @Nullable Double rank
 ) {
 }

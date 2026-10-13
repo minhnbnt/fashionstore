@@ -6,7 +6,10 @@ import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ImageResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductResponse;
-import com.minhnbnt.fashionstore.dto.catalog.ProductSummaryResponse;
+import com.minhnbnt.fashionstore.dto.catalog.ProductSearchRequest;
+import com.minhnbnt.fashionstore.dto.catalog.ProductSearchResponse;
+import com.minhnbnt.fashionstore.dto.catalog.ProductSort;
+import com.minhnbnt.fashionstore.dto.catalog.SearchFacetsResponse;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateVariantRequest;
 import com.minhnbnt.fashionstore.features.catalog.repository.CategoryRepository;
@@ -190,16 +193,40 @@ public class CatalogService {
     }
 
     @Transactional(readOnly = true)
-    public List<ProductSummaryResponse> search(@NonNull String query, int limit) {
-        if (query.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Query must not be blank");
-        }
+    public ProductSearchResponse search(@NonNull ProductSearchRequest request) {
+        var criteria = toCriteria(request);
 
-        var safeLimit = Math.clamp(limit, 1, 100);
-
-        return search.search(query, safeLimit).stream()
+        var items = search.search(criteria).stream()
             .map(CatalogMapper::toSummary)
             .toList();
+        var total = search.count(criteria);
+
+        var page = Math.max(request.page(), 0);
+        return new ProductSearchResponse(items, total, page, criteria.limit());
+    }
+
+    @Transactional(readOnly = true)
+    public SearchFacetsResponse facets(@Nullable String query, @Nullable String categorySlug) {
+        var criteria = toCriteria(new ProductSearchRequest(
+            query,
+            categorySlug,
+            null,
+            null,
+            null,
+            null,
+            null,
+            0,
+            1
+        ));
+
+        var priceRange = search.priceRange(criteria);
+
+        return new SearchFacetsResponse(
+            search.sizes(criteria),
+            search.colors(criteria),
+            priceRange.min(),
+            priceRange.max()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -269,6 +296,59 @@ public class CatalogService {
         }
 
         return variant;
+    }
+
+    private static ProductSearchRepository.Criteria toCriteria(ProductSearchRequest request) {
+        var minPrice = request.minPrice();
+        var maxPrice = request.maxPrice();
+        if (minPrice != null && maxPrice != null && minPrice > maxPrice) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "minPrice must not be greater than maxPrice"
+            );
+        }
+
+        var query = blankToNull(request.q());
+        var limit = Math.clamp(request.limit(), 1, 100);
+        var page = Math.max(request.page(), 0);
+
+        return new ProductSearchRepository.Criteria(
+            query,
+            blankToNull(request.category()),
+            minPrice,
+            maxPrice,
+            blankToNull(request.size()),
+            blankToNull(request.color()),
+            resolveSort(request.sort(), query),
+            (long) page * limit,
+            limit
+        );
+    }
+
+    private static ProductSort resolveSort(@Nullable ProductSort requested, @Nullable String query) {
+        if (requested == null && query != null) {
+            return ProductSort.RELEVANCE;
+        }
+        if (requested == null) {
+            return ProductSort.NEWEST;
+        }
+        // Không có từ khóa thì không có điểm để xếp theo độ khớp.
+        if (requested == ProductSort.RELEVANCE && query == null) {
+            return ProductSort.NEWEST;
+        }
+
+        return requested;
+    }
+
+    private static @Nullable String blankToNull(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        if (value.isBlank()) {
+            return null;
+        }
+
+        return value.strip();
     }
 
     private void requireCategoryExists(@Nullable UUID categoryId) {

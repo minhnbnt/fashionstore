@@ -5,11 +5,16 @@ import com.minhnbnt.fashionstore.dto.catalog.AttachImagesRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ImageItemRequest;
+import com.minhnbnt.fashionstore.dto.catalog.ProductSearchRequest;
+import com.minhnbnt.fashionstore.dto.catalog.ProductSort;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
+import com.minhnbnt.fashionstore.features.catalog.repository.CategoryRepository;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.model.Category;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -17,6 +22,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,6 +41,9 @@ class CatalogServiceTest {
 
     @Autowired
     private UserService users;
+
+    @Autowired
+    private CategoryRepository categories;
 
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
@@ -124,8 +133,184 @@ class CatalogServiceTest {
         var created = catalog.createProduct(ownerId, shopId, productRequest("ao-search-hide-xyz"));
         catalog.updateProduct(ownerId, shopId, created.id(), new UpdateProductRequest(null, null, null, "HIDDEN", null));
 
-        var hits = catalog.search("ao-search-hide-xyz", 20);
+        var hits = catalog.search(keyword("ao-search-hide-xyz"));
 
-        assertThat(hits).extracting(h -> h.id()).doesNotContain(created.id());
+        assertThat(hits.items()).extracting(h -> h.id()).doesNotContain(created.id());
+    }
+
+    private UUID seededCategory(String slug) {
+        return categories.save(Category.seed("Cat " + slug, slug, 99)).getId();
+    }
+
+    private static CreateVariantRequest variant(String sku, String size, String color, long price) {
+        return new CreateVariantRequest(sku, size, color, price, null, 5, false);
+    }
+
+    private static CreateProductRequest productIn(
+        String slug,
+        String name,
+        @Nullable UUID categoryId,
+        List<CreateVariantRequest> variants
+    ) {
+        var withDefault = new ArrayList<CreateVariantRequest>();
+        for (int i = 0; i < variants.size(); i++) {
+            var v = variants.get(i);
+            withDefault.add(new CreateVariantRequest(
+                v.sku(),
+                v.size(),
+                v.color(),
+                v.price(),
+                v.compareAtPrice(),
+                v.stockQuantity(),
+                i == 0
+            ));
+        }
+        return new CreateProductRequest(name, slug, null, categoryId, withDefault);
+    }
+
+    private static ProductSearchRequest keyword(String q) {
+        return new ProductSearchRequest(q, null, null, null, null, null, null, 0, 20);
+    }
+
+    private static ProductSearchRequest inCategory(String category) {
+        return new ProductSearchRequest(null, category, null, null, null, null, null, 0, 20);
+    }
+
+    @Test
+    void keywordSearchReturnsOnlyMatches() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-kw-only");
+        var hit = catalog.createProduct(ownerId, shopId, productIn(
+            "kw-hit", "Quylmatch", null, List.of(variant("KW-HIT", "M", "Den", 100000))
+        ));
+        var miss = catalog.createProduct(ownerId, shopId, productIn(
+            "kw-miss", "Quylother", null, List.of(variant("KW-MISS", "M", "Den", 100000))
+        ));
+
+        var result = catalog.search(keyword("quylmatch"));
+
+        assertThat(result.items()).extracting(h -> h.id()).contains(hit.id());
+        assertThat(result.items()).extracting(h -> h.id()).doesNotContain(miss.id());
+        assertThat(result.items().getFirst().rank()).isNotNull();
+    }
+
+    @Test
+    void browseFiltersByCategoryWithoutKeyword() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-browse-cat");
+        var categoryId = seededCategory("cat-browse");
+        var inside = catalog.createProduct(ownerId, shopId, productIn(
+            "browse-in", "Ao trong", categoryId, List.of(variant("BR-IN", "M", "Den", 100000))
+        ));
+        catalog.createProduct(ownerId, shopId, productIn(
+            "browse-out", "Ao ngoai", null, List.of(variant("BR-OUT", "M", "Den", 100000))
+        ));
+
+        var result = catalog.search(inCategory("cat-browse"));
+
+        assertThat(result.total()).isEqualTo(1L);
+        assertThat(result.items()).extracting(h -> h.id()).containsExactly(inside.id());
+        assertThat(result.items().getFirst().rank()).isNull();
+    }
+
+    @Test
+    void sizeColorAndPriceMustMatchTheSameVariant() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-variant-f");
+        var categoryId = seededCategory("cat-variant");
+        var created = catalog.createProduct(ownerId, shopId, productIn(
+            "variant-f", "Ao bien the", categoryId, List.of(
+                variant("VF-S-DEN", "S", "Den", 100000),
+                variant("VF-L-TRANG", "L", "Trang", 300000)
+            )
+        ));
+
+        var sameVariant = catalog.search(new ProductSearchRequest(
+            null, "cat-variant", 200000L, null, "L", "Trang", null, 0, 20
+        ));
+        var mixedVariant = catalog.search(new ProductSearchRequest(
+            null, "cat-variant", null, null, "L", "Den", null, 0, 20
+        ));
+        var tooCheap = catalog.search(new ProductSearchRequest(
+            null, "cat-variant", null, 50000L, null, null, null, 0, 20
+        ));
+
+        assertThat(sameVariant.items()).extracting(h -> h.id()).containsExactly(created.id());
+        assertThat(mixedVariant.items()).isEmpty();
+        assertThat(tooCheap.items()).isEmpty();
+    }
+
+    @Test
+    void sortsByPriceAndPaginates() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-sort-p");
+        var categoryId = seededCategory("cat-sort");
+        var mid = catalog.createProduct(ownerId, shopId, productIn(
+            "sort-mid", "Ao mid", categoryId, List.of(variant("SORT-MID", "M", "Den", 200000))
+        ));
+        var cheap = catalog.createProduct(ownerId, shopId, productIn(
+            "sort-cheap", "Ao cheap", categoryId, List.of(variant("SORT-CHEAP", "M", "Den", 100000))
+        ));
+        var pricey = catalog.createProduct(ownerId, shopId, productIn(
+            "sort-pricey", "Ao pricey", categoryId, List.of(variant("SORT-PRICEY", "M", "Den", 300000))
+        ));
+
+        var ascending = catalog.search(new ProductSearchRequest(
+            null, "cat-sort", null, null, null, null, ProductSort.PRICE_ASC, 0, 20
+        ));
+        var descendingSecondPage = catalog.search(new ProductSearchRequest(
+            null, "cat-sort", null, null, null, null, ProductSort.PRICE_DESC, 1, 2
+        ));
+
+        assertThat(ascending.items()).extracting(h -> h.id())
+            .containsExactly(cheap.id(), mid.id(), pricey.id());
+        assertThat(descendingSecondPage.total()).isEqualTo(3L);
+        assertThat(descendingSecondPage.items()).extracting(h -> h.id()).containsExactly(cheap.id());
+    }
+
+    @Test
+    void searchWithInvertedPriceRangeIsBadRequest() {
+        var request = new ProductSearchRequest(null, null, 500000L, 100000L, null, null, null, 0, 20);
+
+        assertThatThrownBy(() -> catalog.search(request))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void facetsListSizesColorsAndPriceBounds() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-facets");
+        var categoryId = seededCategory("cat-facets");
+        catalog.createProduct(ownerId, shopId, productIn(
+            "facet-a", "Ao facet a", categoryId, List.of(
+                variant("FA-XL", "XL", "Trang", 300000),
+                variant("FA-S", "S", "Den", 100000)
+            )
+        ));
+        catalog.createProduct(ownerId, shopId, productIn(
+            "facet-b", "Ao facet b", categoryId, List.of(variant("FB-M", "M", "Den", 150000))
+        ));
+
+        var facets = catalog.facets(null, "cat-facets");
+
+        assertThat(facets.sizes()).containsExactly("S", "M", "XL");
+        assertThat(facets.colors()).containsExactly("Den", "Trang");
+        assertThat(facets.minPrice()).isEqualTo(100000L);
+        assertThat(facets.maxPrice()).isEqualTo(300000L);
+    }
+
+    @Test
+    void detailExposesCategory() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-detail-cat");
+        var categoryId = seededCategory("cat-detail");
+        var created = catalog.createProduct(ownerId, shopId, productIn(
+            "detail-cat", "Ao detail", categoryId, List.of(variant("DC-M", "M", "Den", 100000))
+        ));
+
+        var detail = catalog.getDetail(created.id());
+
+        assertThat(detail.categoryId()).isEqualTo(categoryId);
     }
 }
