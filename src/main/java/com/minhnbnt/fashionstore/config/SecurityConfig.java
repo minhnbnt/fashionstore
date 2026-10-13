@@ -44,6 +44,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/products/*").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/search/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/shop/**").hasRole("SHOP")
                 .anyRequest()
                 .authenticated()
             )
@@ -68,7 +69,11 @@ public class SecurityConfig {
                 return List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
             }
 
-            return List.of();
+            if ("shop".equals(role)) {
+                return List.of(new SimpleGrantedAuthority("ROLE_SHOP"));
+            }
+
+            return List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"));
         });
 
         return converter;
