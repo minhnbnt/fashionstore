@@ -301,6 +301,42 @@ class CatalogServiceTest {
     }
 
     @Test
+    void injectionPayloadsAreTreatedAsPlainValues() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-inj");
+        var categoryId = seededCategory("cat-inj");
+        var guard = catalog.createProduct(ownerId, shopId, productIn(
+            "inj-guard", "Ao injguard", categoryId, List.of(variant("INJ-M", "M", "Den", 100000))
+        ));
+        var tautology = "x' OR '1'='1";
+        var dropTable = "x'); DROP TABLE product; --";
+
+        var byCategory = catalog.search(inCategory(tautology));
+        var byKeyword = catalog.search(new ProductSearchRequest(
+            "' OR 1=1 --", "cat-inj", null, null, null, null, null, 0, 20
+        ));
+        var bySize = catalog.search(new ProductSearchRequest(
+            null, "cat-inj", null, null, tautology, null, null, 0, 20
+        ));
+        var byColor = catalog.search(new ProductSearchRequest(
+            null, "cat-inj", null, null, null, dropTable, null, 0, 20
+        ));
+        var keywordDrop = catalog.search(keyword(dropTable));
+        var operators = catalog.search(keyword("áo & | ! ( ) :* \\ ' \" ;"));
+        var facets = catalog.facets(dropTable, tautology);
+
+        assertThat(byCategory.items()).isEmpty();
+        assertThat(byKeyword.items()).isEmpty();
+        assertThat(bySize.items()).isEmpty();
+        assertThat(byColor.items()).isEmpty();
+        assertThat(keywordDrop.items()).extracting(h -> h.id()).doesNotContain(guard.id());
+        assertThat(operators.items()).extracting(h -> h.id()).doesNotContain(guard.id());
+        assertThat(facets.sizes()).isEmpty();
+        assertThat(catalog.search(inCategory("cat-inj")).items()).extracting(h -> h.id())
+            .containsExactly(guard.id());
+    }
+
+    @Test
     void detailExposesCategory() {
         var ownerId = mirroredUser();
         var shopId = approvedShop(ownerId, "shop-detail-cat");

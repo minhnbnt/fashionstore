@@ -3,4 +3,6 @@ spring:
     name: fashionstore
 
   config:
-    import: optional:file:config/springboot.yml
+    import: 
+      - optional:file:config/springboot.yml
+      - optional:file:.env[.properties]
