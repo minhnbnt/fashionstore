@@ -56,3 +56,16 @@ Chi tiết luồng này xem `docs/catalog.md`.
 | [x] | 21 | PATCH | `/api/seller/orders/{id}/confirm` | Confirm + trừ kho nguyên tử (`UPDATE ... WHERE stock >= qty`) |
 | [x] | 22 | PATCH | `/api/seller/orders/{id}/ship` | Chuyển sang `SHIPPING` |
 | [x] | 23 | PATCH | `/api/seller/orders/{id}/deliver` | `DELIVERED` = thu COD (`payment_status='COLLECTED'`) |
+
+## Flow 5 — Cart (giỏ + checkout nhiều shop)
+
+| Xong | # | Method | Path | Mô tả |
+|------|---|--------|------|-------|
+| [x] | 24 | GET | `/api/cart` | Xem giỏ (giá/tồn live, chưa có thì giỏ rỗng) |
+| [x] | 25 | POST | `/api/cart/items` | Thêm variant (trùng thì cộng dồn) |
+| [x] | 26 | PUT | `/api/cart/items/{variantId}` | Đổi số lượng (tối thiểu 1) |
+| [x] | 27 | DELETE | `/api/cart/items/{variantId}` | Xóa item |
+| [x] | 28 | DELETE | `/api/cart` | Xóa sạch giỏ |
+| [x] | 29 | POST | `/api/cart/checkout` | Kiểm tra hết rồi đặt, mỗi shop 1 đơn, hỏng thì 409 kèm từng item lỗi |
+
+Chi tiết luồng này xem `docs/cart.md`. Địa chỉ giao hàng hiện là text thuần (sổ địa chỉ chưa lên `master`) — xem mục "Nâng cấp sau" trong đó.
