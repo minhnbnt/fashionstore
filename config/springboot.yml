@@ -15,7 +15,7 @@ spring:
           issuer-uri: ${OAUTH2_ISS_URI:http://localhost:9999}
 
 server:
-  port: ${SERVER_PORT:8081}
+  port: ${SERVER_PORT:8082}
 
 s3:
   endpoint: ${S3_ENDPOINT:http://localhost:3900}
