@@ -57,3 +57,13 @@ Chi tiết luồng này xem `docs/catalog.md`.
 | [x] | 21 | PATCH | `/api/seller/orders/{id}/confirm` | Confirm + trừ kho nguyên tử (`UPDATE ... WHERE stock >= qty`) |
 | [x] | 22 | PATCH | `/api/seller/orders/{id}/ship` | Chuyển sang `SHIPPING` |
 | [x] | 23 | PATCH | `/api/seller/orders/{id}/deliver` | `DELIVERED` = thu COD (`payment_status='COLLECTED'`) |
+
+## Flow 6 — Wishlist (sản phẩm yêu thích)
+
+| Xong | # | Method | Path | Mô tả |
+|------|---|--------|------|-------|
+| [x] | 30 | GET | `/api/wishlist` | Liệt kê đã lưu, món tạm không mua được vẫn hiện kèm cờ |
+| [x] | 31 | POST | `/api/wishlist/items` | Lưu/bỏ lưu (toggle), món ẩn → `404` |
+| [x] | 32 | DELETE | `/api/wishlist/items/{productId}` | Xóa khỏi wishlist |
+
+Chi tiết luồng này xem `docs/wishlist.md`.
