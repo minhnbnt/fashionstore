@@ -57,3 +57,15 @@ Chi tiết luồng này xem `docs/catalog.md`.
 | [x] | 21 | PATCH | `/api/seller/orders/{id}/confirm` | Confirm + trừ kho nguyên tử (`UPDATE ... WHERE stock >= qty`) |
 | [x] | 22 | PATCH | `/api/seller/orders/{id}/ship` | Chuyển sang `SHIPPING` |
 | [x] | 23 | PATCH | `/api/seller/orders/{id}/deliver` | `DELIVERED` = thu COD (`payment_status='COLLECTED'`) |
+
+## Flow 7 — Review (đánh giá sau khi nhận hàng)
+
+| Xong | # | Method | Path | Mô tả |
+|------|---|--------|------|-------|
+| [x] | 33 | PATCH | `/api/orders/{id}/received` | Buyer xác nhận đã nhận (chỉ đơn `DELIVERED`) |
+| [x] | 34 | POST | `/api/products/{productId}/reviews` | Viết đánh giá (stars 1–5, đã nhận hàng mới viết được) |
+| [x] | 35 | GET | `/api/products/{productId}/reviews` | Public liệt kê, mới nhất trước |
+| [x] | 36 | PUT | `/api/products/{productId}/reviews` | Sửa bài của mình |
+| [x] | 37 | DELETE | `/api/products/{productId}/reviews` | Xóa bài của mình |
+
+Chi tiết luồng này xem `docs/review.md`. Số #24–29 và #30–32 giữ chỗ cho cart và wishlist khi merge.

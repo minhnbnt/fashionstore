@@ -17,6 +17,7 @@ import com.minhnbnt.fashionstore.features.catalog.repository.ProductImageReposit
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductSearchRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepository;
+import com.minhnbnt.fashionstore.features.review.ReviewService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.Product;
@@ -53,6 +54,8 @@ public class CatalogService {
     private final ProductSearchRepository search;
 
     private final ShopService shops;
+
+    private final ReviewService reviews;
 
     private final ShopAccessChecker access;
 
@@ -398,6 +401,8 @@ public class CatalogService {
             .map(CatalogMapper::toImageResponse)
             .toList();
 
-        return CatalogMapper.toResponse(product, variantResponses, imageResponses);
+        var summary = reviews.ratingSummary(product.getId());
+
+        return CatalogMapper.toResponse(product, variantResponses, imageResponses, summary.averageRating(), summary.reviewCount());
     }
 }

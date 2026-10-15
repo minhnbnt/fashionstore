@@ -17,6 +17,9 @@ public record ProductResponse(
     @Schema String status,
     @Schema List<VariantResponse> variants,
     @Schema List<ImageResponse> images,
-    @Schema Instant updatedAt
+    @Schema Instant updatedAt,
+    @Schema(description = "Diem trung binh, null khi chua ai danh gia", nullable = true)
+    @Nullable Double averageRating,
+    @Schema(description = "So luot danh gia") long reviewCount
 ) {
 }

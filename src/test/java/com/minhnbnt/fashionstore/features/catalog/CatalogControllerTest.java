@@ -72,7 +72,9 @@ class CatalogControllerTest {
             "ACTIVE",
             List.of(),
             List.of(),
-            Instant.now()
+            Instant.now(),
+            null,
+            0L
         );
     }
 

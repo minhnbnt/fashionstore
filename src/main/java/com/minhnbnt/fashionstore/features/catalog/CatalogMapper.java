@@ -10,6 +10,7 @@ import com.minhnbnt.fashionstore.model.Category;
 import com.minhnbnt.fashionstore.model.Product;
 import com.minhnbnt.fashionstore.model.ProductImage;
 import com.minhnbnt.fashionstore.model.ProductVariant;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -21,7 +22,9 @@ public final class CatalogMapper {
     public static ProductResponse toResponse(
         Product product,
         List<VariantResponse> variants,
-        List<ImageResponse> images
+        List<ImageResponse> images,
+        @Nullable Double averageRating,
+        long reviewCount
     ) {
         return new ProductResponse(
             product.getId(),
@@ -33,7 +36,9 @@ public final class CatalogMapper {
             product.getStatus().name(),
             variants,
             images,
-            product.getUpdatedAt()
+            product.getUpdatedAt(),
+            averageRating,
+            reviewCount
         );
     }
 

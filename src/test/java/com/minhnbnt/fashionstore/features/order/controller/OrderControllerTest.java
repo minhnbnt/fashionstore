@@ -95,4 +95,14 @@ class OrderControllerTest {
         mockMvc.perform(patch("/api/seller/orders/{id}/confirm", orderId))
             .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void confirmReceiptReturns200() throws Exception {
+        var id = UUID.randomUUID();
+        when(orders.confirmReceipt(any(), any())).thenReturn(response(UUID.randomUUID()));
+
+        mockMvc.perform(patch("/api/orders/{id}/received", id)
+                .with(jwt().jwt(builder -> builder.subject(id.toString()))))
+            .andExpect(status().isOk());
+    }
 }
