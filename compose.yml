@@ -1,6 +1,9 @@
 services:
   postgres:
     image: ghcr.io/minhnbnt/postgresql:latest
+    # The image bakes in USER postgres, but the entrypoint must start as root
+    # to take ownership of the data volume before dropping privileges.
+    user: "0:0"
 
     environment:
       POSTGRES_DB: postgres
@@ -39,6 +42,8 @@ services:
 
     env_file:
       - ./config/gotrue.env
+      - path: ./.env
+        required: false
 
     ports:
       - "9999:9999"

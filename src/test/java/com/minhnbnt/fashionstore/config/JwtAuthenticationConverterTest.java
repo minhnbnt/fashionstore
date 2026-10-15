@@ -38,12 +38,35 @@ class JwtAuthenticationConverterTest {
     }
 
     @Test
-    void missingClaimGrantsNoAdmin() {
+    void shopClaimBecomesShopRole() {
+        var jwt = token(Map.of("app_metadata", Map.of("role", "shop")));
+
+        var auth = security.jwtAuthenticationConverter().convert(jwt);
+
+        assertThat(auth.getAuthorities())
+            .contains(new SimpleGrantedAuthority("ROLE_SHOP"));
+    }
+
+    @Test
+    void missingClaimGrantsCustomerRole() {
         var jwt = token(Map.of());
 
         var auth = security.jwtAuthenticationConverter().convert(jwt);
 
         assertThat(auth.getAuthorities())
-            .doesNotContain(new SimpleGrantedAuthority("ROLE_ADMIN"));
+            .contains(new SimpleGrantedAuthority("ROLE_CUSTOMER"))
+            .doesNotContain(new SimpleGrantedAuthority("ROLE_ADMIN"))
+            .doesNotContain(new SimpleGrantedAuthority("ROLE_SHOP"));
+    }
+
+    @Test
+    void adminDoesNotGetShopRole() {
+        var jwt = token(Map.of("app_metadata", Map.of("role", "admin")));
+
+        var auth = security.jwtAuthenticationConverter().convert(jwt);
+
+        assertThat(auth.getAuthorities())
+            .doesNotContain(new SimpleGrantedAuthority("ROLE_SHOP"))
+            .doesNotContain(new SimpleGrantedAuthority("ROLE_CUSTOMER"));
     }
 }
