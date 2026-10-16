@@ -57,7 +57,7 @@ UI chưa gọi `POST /api/users`, nên `AccountFilter` tự tạo `user_profile`
 
 | Method | Path | Mô tả |
 |---|---|---|
-| GET | `/api/admin/stats` | Đếm shop theo trạng thái, user theo trạng thái |
+| GET | `/api/admin/stats` | Đếm user theo trạng thái/role, shop + đơn theo trạng thái, GMV + COD đã thu, `dailyTrend` 14 ngày (user mới, shop mới, số đơn, giá trị đơn chưa hủy; mốc ngày theo `Asia/Ho_Chi_Minh`) |
 | GET | `/api/admin/shops?status=&q=&page=&size=` | Danh sách phân trang, `q` tìm tên/slug/email owner |
 | GET | `/api/admin/shops/{id}` | Chi tiết + owner + lịch sử |
 | PATCH | `/api/admin/shops/{id}/approve` | PENDING → APPROVED |
@@ -84,7 +84,7 @@ Lý do: bắt buộc, 5–500 ký tự. Trạng thái sai thì `409`, khóa admi
 
 ## UI (`fashionstore-ui`)
 
-- `/admin`: tổng quan (thẻ số liệu + hàng đợi chờ duyệt).
+- `/admin`: tổng quan (thẻ số liệu người dùng/shop/đơn/doanh thu, biểu đồ cột 14 ngày chọn chỉ số, phân bổ theo trạng thái, 5 shop chờ duyệt cũ nhất).
 - `/admin/shops`: tab trạng thái (Chờ duyệt / Đang hoạt động / Tạm khóa / Từ chối / Tất cả), ô tìm kiếm, bảng phân trang. `/admin/shops/:id`: hồ sơ, owner, lịch sử, các nút hành động.
 - `/admin/users`, `/admin/users/:id`: tương tự cho khách hàng.
 - Hộp thoại lý do: có lý do mẫu để chọn nhanh + ô ghi chú, bắt buộc với từ chối/khóa.
