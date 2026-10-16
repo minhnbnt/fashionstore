@@ -7,8 +7,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.CsrfConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -22,15 +22,12 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 @Configuration
-@EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
-    /**
-     * Mọi method đều public. AccountFilter dùng chung list này để tài khoản bị khóa vẫn vào được.
-     */
     private static final List<String> PUBLIC_PATHS = List.of(
-        "/api/public/**",
-        "/actuator/health",
+        "/api/uploads/**",
+        "/api/uploads/presign",
         "/v3/api-docs/**",
         "/swagger-ui/**",
         "/swagger-ui.html"
@@ -41,8 +38,11 @@ public class SecurityConfig {
      */
     private static final List<String> PUBLIC_GET_PATHS = List.of(
         "/api/shops/*",
+        "/api/shops/**",
         "/api/categories",
+        "/api/categories/**",
         "/api/products/*",
+        "/api/products/**",
         "/api/search/**"
     );
 

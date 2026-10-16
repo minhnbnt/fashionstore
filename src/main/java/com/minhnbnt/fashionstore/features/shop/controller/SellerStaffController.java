@@ -1,0 +1,214 @@
+package com.minhnbnt.fashionstore.features.shop.controller;
+
+import com.minhnbnt.fashionstore.dto.shop.ChangeMemberRoleRequest;
+import com.minhnbnt.fashionstore.dto.shop.CreateShopRoleRequest;
+import com.minhnbnt.fashionstore.dto.shop.InviteStaffRequest;
+import com.minhnbnt.fashionstore.dto.shop.ShopMemberAuditResponse;
+import com.minhnbnt.fashionstore.dto.shop.ShopMemberDetailResponse;
+import com.minhnbnt.fashionstore.dto.shop.ShopRoleResponse;
+import com.minhnbnt.fashionstore.dto.shop.StaffInvitationResponse;
+import com.minhnbnt.fashionstore.features.shop.ShopStaffService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/seller/shops/{shopId}")
+@RequiredArgsConstructor
+@Tag(name = "Seller - Staff & Roles", description = "Quản lý nhân viên gian hàng, phân quyền và lịch sử thao tác")
+public class SellerStaffController {
+
+    private final ShopStaffService staffService;
+
+    @GetMapping("/roles")
+    @Operation(summary = "Danh sách vai trò của shop", description = "Lấy danh sách các vai trò mặc định (Quản lý, CSKH, Kho vận, Marketing) và các vai trò tùy chỉnh.")
+    @ApiResponse(responseCode = "200", description = "Danh sách vai trò")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không có quyền xem vai trò shop")
+    @SecurityRequirement(name = "bearerAuth")
+    public List<ShopRoleResponse> listRoles(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return staffService.listRoles(userId, shopId);
+    }
+
+    @PostMapping("/roles")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Tạo vai trò tùy chỉnh", description = "Chủ shop tạo nhóm quyền mới cho nhân viên.")
+    @ApiResponse(responseCode = "201", description = "Tạo vai trò thành công")
+    @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Chỉ chủ shop mới được tạo vai trò")
+    @ApiResponse(responseCode = "409", description = "Tên vai trò đã tồn tại")
+    @SecurityRequirement(name = "bearerAuth")
+    public ShopRoleResponse createRole(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Valid @RequestBody CreateShopRoleRequest request
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return staffService.createRole(userId, shopId, request);
+    }
+
+    @PutMapping("/roles/{roleId}")
+    @Operation(summary = "Cập nhật vai trò tùy chỉnh", description = "Chỉnh sửa tên và quyền của vai trò tùy chỉnh. Không thể sửa vai trò hệ thống.")
+    @ApiResponse(responseCode = "200", description = "Cập nhật thành công")
+    @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Chỉ chủ shop mới được chỉnh sửa vai trò")
+    @ApiResponse(responseCode = "404", description = "Không tìm thấy vai trò")
+    @ApiResponse(responseCode = "409", description = "Không thể sửa vai trò hệ thống")
+    @SecurityRequirement(name = "bearerAuth")
+    public ShopRoleResponse updateRole(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Parameter(description = "Id vai trò") @PathVariable UUID roleId,
+        @Valid @RequestBody CreateShopRoleRequest request
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return staffService.updateRole(userId, shopId, roleId, request);
+    }
+
+    @DeleteMapping("/roles/{roleId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Xóa vai trò tùy chỉnh", description = "Xóa một vai trò tùy chỉnh. Không thể xóa vai trò hệ thống.")
+    @ApiResponse(responseCode = "204", description = "Đã xóa vai trò thành công")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Chỉ chủ shop mới được xóa vai trò")
+    @ApiResponse(responseCode = "404", description = "Không tìm thấy vai trò")
+    @ApiResponse(responseCode = "409", description = "Không thể xóa vai trò hệ thống")
+    @SecurityRequirement(name = "bearerAuth")
+    public void deleteRole(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Parameter(description = "Id vai trò") @PathVariable UUID roleId
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        staffService.deleteRole(userId, shopId, roleId);
+    }
+
+    @GetMapping("/members")
+    @Operation(summary = "Danh sách thành viên shop", description = "Lấy danh sách chủ shop và nhân viên kèm theo vai trò chi tiết.")
+    @ApiResponse(responseCode = "200", description = "Danh sách thành viên")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không có quyền xem thành viên shop")
+    @SecurityRequirement(name = "bearerAuth")
+    public List<ShopMemberDetailResponse> listMembers(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return staffService.listMembers(userId, shopId);
+    }
+
+    @PostMapping("/invitations")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Mời nhân viên vào shop", description = "Gửi lời mời tham gia shop cho nhân viên theo email kèm theo vai trò.")
+    @ApiResponse(responseCode = "201", description = "Tạo lời mời thành công")
+    @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Chỉ chủ shop mới được mời nhân viên")
+    @ApiResponse(responseCode = "404", description = "Không tìm thấy vai trò được chỉ định")
+    @SecurityRequirement(name = "bearerAuth")
+    public StaffInvitationResponse inviteStaff(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Valid @RequestBody InviteStaffRequest request
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return staffService.inviteStaff(userId, shopId, request);
+    }
+
+    @PatchMapping("/members/{memberId}/role")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Thay đổi vai trò của nhân viên", description = "Chủ shop cập nhật vai trò/quyền hạn mới cho một nhân viên.")
+    @ApiResponse(responseCode = "204", description = "Cập nhật vai trò thành công")
+    @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Chỉ chủ shop mới được đổi vai trò")
+    @ApiResponse(responseCode = "404", description = "Không tìm thấy thành viên hoặc vai trò")
+    @ApiResponse(responseCode = "409", description = "Không thể thay đổi vai trò OWNER")
+    @SecurityRequirement(name = "bearerAuth")
+    public void changeMemberRole(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Parameter(description = "Id thành viên") @PathVariable UUID memberId,
+        @Valid @RequestBody ChangeMemberRoleRequest request
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        staffService.changeMemberRole(userId, shopId, memberId, request);
+    }
+
+    @DeleteMapping("/members/{memberId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Xóa nhân viên khỏi shop", description = "Chủ shop thu hồi quyền và xóa nhân viên ra khỏi danh sách quản lý shop.")
+    @ApiResponse(responseCode = "204", description = "Đã xóa nhân viên")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Chỉ chủ shop mới được xóa nhân viên")
+    @ApiResponse(responseCode = "404", description = "Không tìm thấy thành viên")
+    @ApiResponse(responseCode = "409", description = "Không thể xóa chủ shop (OWNER)")
+    @SecurityRequirement(name = "bearerAuth")
+    public void removeMember(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Parameter(description = "Id thành viên") @PathVariable UUID memberId
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        staffService.removeMember(userId, shopId, memberId);
+    }
+
+    @GetMapping("/audit")
+    @Operation(summary = "Nhật ký thao tác nhân sự (Audit log)", description = "Xem lại toàn bộ lịch sử mời nhân viên, đổi vai trò, xóa nhân sự trong shop.")
+    @ApiResponse(responseCode = "200", description = "Lịch sử thao tác")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Chỉ chủ shop mới được xem nhật ký")
+    @SecurityRequirement(name = "bearerAuth")
+    public List<ShopMemberAuditResponse> listAuditLogs(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return staffService.listAuditLogs(userId, shopId);
+    }
+}

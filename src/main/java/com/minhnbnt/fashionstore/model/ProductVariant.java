@@ -35,6 +35,8 @@ public class ProductVariant implements Persistable<UUID> {
 
     private int stockQuantity;
 
+    private int lowStockThreshold;
+
     @Column("is_default")
     private boolean defaultVariant;
 
@@ -56,6 +58,7 @@ public class ProductVariant implements Persistable<UUID> {
         long price,
         @Nullable Long compareAtPrice,
         int stockQuantity,
+        int lowStockThreshold,
         boolean defaultVariant,
         Instant createdAt,
         Instant updatedAt
@@ -69,6 +72,11 @@ public class ProductVariant implements Persistable<UUID> {
         this.price = price;
         this.compareAtPrice = compareAtPrice;
         this.stockQuantity = stockQuantity;
+        if (lowStockThreshold <= 0) {
+            this.lowStockThreshold = 5;
+        } else {
+            this.lowStockThreshold = lowStockThreshold;
+        }
         this.defaultVariant = defaultVariant;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -97,12 +105,23 @@ public class ProductVariant implements Persistable<UUID> {
             price,
             compareAtPrice,
             stockQuantity,
+            5,
             defaultVariant,
             now,
             now
         );
         variant.newRecord = true;
         return variant;
+    }
+
+    public void setStockQuantity(int stockQuantity) {
+        this.stockQuantity = stockQuantity;
+        this.updatedAt = Instant.now();
+    }
+
+    public void setLowStockThreshold(int lowStockThreshold) {
+        this.lowStockThreshold = lowStockThreshold;
+        this.updatedAt = Instant.now();
     }
 
     public void updatePricing(

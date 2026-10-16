@@ -46,6 +46,10 @@ public class Order implements Persistable<UUID> {
 
     private String note;
 
+    private @Nullable String cancelReason;
+
+    private @Nullable String cancelNote;
+
     private @Nullable Instant confirmedAt;
 
     private @Nullable Instant shippedAt;
@@ -77,6 +81,8 @@ public class Order implements Persistable<UUID> {
         String shippingPhone,
         String shippingAddress,
         String note,
+        @Nullable String cancelReason,
+        @Nullable String cancelNote,
         @Nullable Instant confirmedAt,
         @Nullable Instant shippedAt,
         @Nullable Instant deliveredAt,
@@ -98,6 +104,8 @@ public class Order implements Persistable<UUID> {
         this.shippingPhone = shippingPhone;
         this.shippingAddress = shippingAddress;
         this.note = note;
+        this.cancelReason = cancelReason;
+        this.cancelNote = cancelNote;
         this.confirmedAt = confirmedAt;
         this.shippedAt = shippedAt;
         this.deliveredAt = deliveredAt;
@@ -133,6 +141,8 @@ public class Order implements Persistable<UUID> {
             shippingPhone,
             shippingAddress,
             "",
+            null,
+            null,
             null,
             null,
             null,
@@ -177,6 +187,20 @@ public class Order implements Persistable<UUID> {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending orders can be cancelled");
         }
         status = OrderStatus.CANCELLED;
+        cancelledAt = Instant.now();
+        updatedAt = Instant.now();
+    }
+
+    public void cancelBySeller(String reason, @Nullable String note) {
+        if (status != OrderStatus.PENDING && status != OrderStatus.CONFIRMED) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Only pending or confirmed orders can be cancelled by seller"
+            );
+        }
+        status = OrderStatus.CANCELLED;
+        cancelReason = reason;
+        cancelNote = note;
         cancelledAt = Instant.now();
         updatedAt = Instant.now();
     }

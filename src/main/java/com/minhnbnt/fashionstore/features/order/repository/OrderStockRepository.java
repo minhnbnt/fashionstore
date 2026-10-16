@@ -26,4 +26,19 @@ public class OrderStockRepository {
 
         return updated == 1;
     }
+
+    public boolean increment(UUID variantId, int quantity) {
+        var updated = jdbc.sql(
+            """
+            UPDATE product_variant
+            SET stock_quantity = stock_quantity + :qty
+            WHERE id = :id
+            """
+        )
+            .param("qty", quantity)
+            .param("id", variantId)
+            .update();
+
+        return updated == 1;
+    }
 }

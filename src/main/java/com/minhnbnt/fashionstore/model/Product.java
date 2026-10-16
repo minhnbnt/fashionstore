@@ -108,6 +108,14 @@ public class Product implements Persistable<UUID> {
         updatedAt = Instant.now();
     }
 
+    public void delete() {
+        if (status == ProductStatus.DELETED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Product is already deleted");
+        }
+        status = ProductStatus.DELETED;
+        updatedAt = Instant.now();
+    }
+
     public void updateDetails(
         @Nullable String name,
         @Nullable String description,

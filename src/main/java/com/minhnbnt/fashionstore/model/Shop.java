@@ -40,6 +40,56 @@ public class Shop implements Persistable<UUID> {
 
     private Instant submittedAt;
 
+    private @Nullable String phone;
+
+    private @Nullable String address;
+
+    private @Nullable String returnPolicy;
+
+    private int processingDays;
+
+    private String sellerType;
+
+    private @Nullable String taxCode;
+
+    private @Nullable String idNumber;
+
+    private @Nullable String idDocKey;
+
+    private @Nullable String businessCertKey;
+
+    private @Nullable Double rating;
+
+    private int ratingCount;
+
+    private int followerCount;
+
+    private @Nullable String bankName;
+
+    private @Nullable String bankAccount;
+
+    private @Nullable String bankHolder;
+
+    private @Nullable String autoReplyText;
+
+    private @Nullable String workingHours;
+
+    private @Nullable String legalName;
+
+    private @Nullable String idFrontKey;
+
+    private @Nullable String idBackKey;
+
+    private @Nullable String idSelfieKey;
+
+    private @Nullable String idIssuedDate;
+
+    private @Nullable String idIssuedPlace;
+
+    private String kycStatus;
+
+    private @Nullable String kycRejectionReason;
+
     private Instant createdAt;
 
     private Instant updatedAt;
@@ -60,6 +110,31 @@ public class Shop implements Persistable<UUID> {
         @Nullable UUID approvedBy,
         @Nullable Instant approvedAt,
         Instant submittedAt,
+        @Nullable String phone,
+        @Nullable String address,
+        @Nullable String returnPolicy,
+        int processingDays,
+        String sellerType,
+        @Nullable String taxCode,
+        @Nullable String idNumber,
+        @Nullable String idDocKey,
+        @Nullable String businessCertKey,
+        @Nullable Double rating,
+        int ratingCount,
+        int followerCount,
+        @Nullable String bankName,
+        @Nullable String bankAccount,
+        @Nullable String bankHolder,
+        @Nullable String autoReplyText,
+        @Nullable String workingHours,
+        @Nullable String legalName,
+        @Nullable String idFrontKey,
+        @Nullable String idBackKey,
+        @Nullable String idSelfieKey,
+        @Nullable String idIssuedDate,
+        @Nullable String idIssuedPlace,
+        @Nullable String kycStatus,
+        @Nullable String kycRejectionReason,
         Instant createdAt,
         Instant updatedAt
     ) {
@@ -73,7 +148,48 @@ public class Shop implements Persistable<UUID> {
         this.statusReason = statusReason;
         this.approvedBy = approvedBy;
         this.approvedAt = approvedAt;
-        this.submittedAt = submittedAt;
+        if (submittedAt != null) {
+            this.submittedAt = submittedAt;
+        } else {
+            this.submittedAt = createdAt != null ? createdAt : Instant.now();
+        }
+        this.phone = phone;
+        this.address = address;
+        this.returnPolicy = returnPolicy;
+        if (processingDays <= 0) {
+            this.processingDays = 2;
+        } else {
+            this.processingDays = processingDays;
+        }
+        if (sellerType == null) {
+            this.sellerType = "INDIVIDUAL";
+        } else {
+            this.sellerType = sellerType;
+        }
+        this.taxCode = taxCode;
+        this.idNumber = idNumber;
+        this.idDocKey = idDocKey;
+        this.businessCertKey = businessCertKey;
+        this.rating = rating;
+        this.ratingCount = ratingCount;
+        this.followerCount = followerCount;
+        this.bankName = bankName;
+        this.bankAccount = bankAccount;
+        this.bankHolder = bankHolder;
+        this.autoReplyText = autoReplyText;
+        this.workingHours = workingHours;
+        this.legalName = legalName;
+        this.idFrontKey = idFrontKey;
+        this.idBackKey = idBackKey;
+        this.idSelfieKey = idSelfieKey;
+        this.idIssuedDate = idIssuedDate;
+        this.idIssuedPlace = idIssuedPlace;
+        if (kycStatus == null) {
+            this.kycStatus = "PENDING_REVIEW";
+        } else {
+            this.kycStatus = kycStatus;
+        }
+        this.kycRejectionReason = kycRejectionReason;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.newRecord = false;
@@ -86,10 +202,49 @@ public class Shop implements Persistable<UUID> {
         @Nullable String logoKey,
         @Nullable String bannerKey
     ) {
+        return create(
+            name, slug, description, logoKey, bannerKey,
+            null, null, "INDIVIDUAL", null, null,
+            null, null, null, null, null,
+            null, null, null, null, null
+        );
+    }
+
+    public static Shop create(
+        String name,
+        String slug,
+        String description,
+        @Nullable String logoKey,
+        @Nullable String bannerKey,
+        @Nullable String phone,
+        @Nullable String address,
+        @Nullable String sellerType,
+        @Nullable String legalName,
+        @Nullable String idNumber,
+        @Nullable String idIssuedDate,
+        @Nullable String idIssuedPlace,
+        @Nullable String taxCode,
+        @Nullable String idFrontKey,
+        @Nullable String idBackKey,
+        @Nullable String idSelfieKey,
+        @Nullable String businessCertKey,
+        @Nullable String bankName,
+        @Nullable String bankAccount,
+        @Nullable String bankHolder
+    ) {
         var now = Instant.now();
+        var effectiveSellerType = (sellerType != null) ? sellerType : "INDIVIDUAL";
         var shop = new Shop(
             UUID.randomUUID(), name, slug, description, logoKey, bannerKey,
-            ShopStatus.PENDING, null, null, null, now, now, now
+            ShopStatus.PENDING, null, null, null, now,
+            phone, address, null, 2, effectiveSellerType,
+            taxCode, idNumber, idFrontKey, businessCertKey,
+            null, 0, 0,
+            bankName, bankAccount, bankHolder,
+            null, null,
+            legalName, idFrontKey, idBackKey, idSelfieKey, idIssuedDate, idIssuedPlace,
+            "PENDING_REVIEW", null,
+            now, now
         );
         shop.newRecord = true;
         return shop;
@@ -101,18 +256,25 @@ public class Shop implements Persistable<UUID> {
         }
         status = ShopStatus.APPROVED;
         statusReason = null;
+        kycStatus = "VERIFIED";
         approvedBy = adminId;
         approvedAt = Instant.now();
         updatedAt = Instant.now();
     }
 
-    public void reject(String reason) {
+    public void reject(@Nullable String reason) {
         if (status != ShopStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending shops can be rejected");
         }
         status = ShopStatus.REJECTED;
         statusReason = reason;
+        kycStatus = "REJECTED";
+        kycRejectionReason = reason;
         updatedAt = Instant.now();
+    }
+
+    public void reject() {
+        reject(null);
     }
 
     /**
@@ -128,13 +290,17 @@ public class Shop implements Persistable<UUID> {
         updatedAt = Instant.now();
     }
 
-    public void suspend(String reason) {
+    public void suspend(@Nullable String reason) {
         if (status != ShopStatus.APPROVED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only approved shops can be suspended");
         }
         status = ShopStatus.SUSPENDED;
         statusReason = reason;
         updatedAt = Instant.now();
+    }
+
+    public void suspend() {
+        suspend(null);
     }
 
     public void reinstate() {
@@ -144,6 +310,10 @@ public class Shop implements Persistable<UUID> {
         status = ShopStatus.APPROVED;
         statusReason = null;
         updatedAt = Instant.now();
+    }
+
+    public void unsuspend() {
+        reinstate();
     }
 
     public void updateDetails(
@@ -165,6 +335,65 @@ public class Shop implements Persistable<UUID> {
             this.bannerKey = bannerKey;
         }
         updatedAt = Instant.now();
+    }
+
+    public void updateProfile(
+        @Nullable String phone,
+        @Nullable String address,
+        @Nullable String returnPolicy,
+        @Nullable Integer processingDays,
+        @Nullable String bankName,
+        @Nullable String bankAccount,
+        @Nullable String bankHolder,
+        @Nullable String autoReplyText,
+        @Nullable String workingHours
+    ) {
+        if (phone != null) {
+            this.phone = phone;
+        }
+        if (address != null) {
+            this.address = address;
+        }
+        if (returnPolicy != null) {
+            this.returnPolicy = returnPolicy;
+        }
+        if (processingDays != null) {
+            this.processingDays = processingDays;
+        }
+        if (bankName != null) {
+            this.bankName = bankName;
+        }
+        if (bankAccount != null) {
+            this.bankAccount = bankAccount;
+        }
+        if (bankHolder != null) {
+            this.bankHolder = bankHolder;
+        }
+        if (autoReplyText != null) {
+            this.autoReplyText = autoReplyText;
+        }
+        if (workingHours != null) {
+            this.workingHours = workingHours;
+        }
+        updatedAt = Instant.now();
+    }
+
+    public void incrementFollowers() {
+        this.followerCount++;
+        this.updatedAt = Instant.now();
+    }
+
+    public void decrementFollowers() {
+        if (this.followerCount > 0) {
+            this.followerCount--;
+            this.updatedAt = Instant.now();
+        }
+    }
+
+    public void updateRating(double newRating, int newRatingCount) {
+        this.rating = newRating;
+        this.ratingCount = newRatingCount;
+        this.updatedAt = Instant.now();
     }
 
     @Override

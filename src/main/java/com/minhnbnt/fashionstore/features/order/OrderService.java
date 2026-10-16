@@ -2,11 +2,13 @@ package com.minhnbnt.fashionstore.features.order;
 
 import com.minhnbnt.fashionstore.dto.admin.DailyOrderTotals;
 import com.minhnbnt.fashionstore.dto.admin.OrderRevenueTotals;
+import com.minhnbnt.fashionstore.dto.order.CancelOrderRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderItemResponse;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepository;
+import com.minhnbnt.fashionstore.features.catalog.repository.StockMovementRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderAdminQueryRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
@@ -19,9 +21,11 @@ import com.minhnbnt.fashionstore.model.Order;
 import com.minhnbnt.fashionstore.model.OrderItem;
 import com.minhnbnt.fashionstore.model.OrderStatus;
 import com.minhnbnt.fashionstore.model.OrderStatusHistory;
+import com.minhnbnt.fashionstore.model.StockMovement;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +36,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -51,9 +56,13 @@ public class OrderService {
 
     private final OrderStockRepository stocks;
 
+    private final StockMovementRepository movements;
+
     private final ShopService shops;
 
     private final ShopMemberRepository members;
+
+    private final RevenueService revenue;
 
     private final ShopAccessChecker access;
 
@@ -209,6 +218,87 @@ public class OrderService {
     }
 
     @Transactional
+    public OrderResponse sellerCancel(
+        @NonNull UUID userId,
+        @NonNull UUID orderId,
+        @NonNull CancelOrderRequest request
+    ) {
+        var order = requireOrder(orderId);
+        access.requireShopRole(userId, order.getShopId(), MemberRole.OWNER, MemberRole.STAFF);
+
+        var from = order.getStatus();
+        var orderItems = items.findByOrderId(order.getId());
+
+        if (from == OrderStatus.CONFIRMED) {
+            for (var item : orderItems) {
+                if (item.getVariantId() != null) {
+                    stocks.increment(item.getVariantId(), item.getQuantity());
+                    movements.save(StockMovement.record(
+                        item.getVariantId(),
+                        order.getShopId(),
+                        item.getQuantity(),
+                        "ORDER_CANCEL",
+                        order.getId()
+                    ));
+                }
+            }
+        }
+
+        order.cancelBySeller(request.reason(), request.note());
+        histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CANCELLED, userId));
+
+        return toResponse(orders.save(order), orderItems);
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderResponse> listSellerOrdersFiltered(
+        @NonNull UUID userId,
+        @Nullable UUID shopId,
+        @Nullable String statusFilter,
+        @Nullable String q,
+        int page,
+        int limit
+    ) {
+        List<UUID> shopIds;
+        if (shopId != null) {
+            access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+            shopIds = List.of(shopId);
+        } else {
+            shopIds = members.findShopIdsByUser(userId);
+        }
+
+        var result = new ArrayList<OrderResponse>();
+        for (var sId : shopIds) {
+            for (var order : orders.findByShopIdOrderByCreatedAtDesc(sId)) {
+                if (statusFilter != null && !statusFilter.isBlank()) {
+                    if (!order.getStatus().name().equalsIgnoreCase(statusFilter)) {
+                        continue;
+                    }
+                }
+                if (q != null && !q.isBlank()) {
+                    var lower = q.toLowerCase(Locale.ROOT);
+                    var matchCode = order.getCode().toLowerCase(Locale.ROOT).contains(lower);
+                    var matchBuyer = order.getShippingName().toLowerCase(Locale.ROOT).contains(lower);
+                    if (!matchCode && !matchBuyer) {
+                        continue;
+                    }
+                }
+                var orderItems = items.findByOrderId(order.getId());
+                result.add(toResponse(order, orderItems));
+            }
+        }
+
+        result.sort((left, right) -> right.createdAt().compareTo(left.createdAt()));
+
+        var pageSize = Math.clamp(limit, 1, 100);
+        var offset = (long) Math.max(page, 0) * pageSize;
+        return result.stream()
+            .skip(offset)
+            .limit(pageSize)
+            .toList();
+    }
+
+    @Transactional
     public OrderResponse confirm(@NonNull UUID userId, @NonNull UUID orderId) {
         var order = requireOrder(orderId);
         access.requireShopRole(userId, order.getShopId(), MemberRole.OWNER, MemberRole.STAFF);
@@ -253,9 +343,15 @@ public class OrderService {
         var from = order.getStatus();
         order.deliver();
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.DELIVERED, userId));
+        revenue.createSettlementForOrder(order.getShopId(), order.getId(), order.getSubtotal());
 
         var orderItems = items.findByOrderId(order.getId());
         return toResponse(orders.save(order), orderItems);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasActiveOrdersForProduct(@NonNull UUID productId) {
+        return items.hasActiveOrdersForProduct(productId);
     }
 
     private Order requireBuyerOrder(UUID buyerId, UUID orderId) {

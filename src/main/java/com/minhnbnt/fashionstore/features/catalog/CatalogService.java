@@ -12,17 +12,25 @@ import com.minhnbnt.fashionstore.dto.catalog.ProductSort;
 import com.minhnbnt.fashionstore.dto.catalog.SearchFacetsResponse;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateVariantRequest;
+import com.minhnbnt.fashionstore.dto.catalog.AdjustStockRequest;
+import com.minhnbnt.fashionstore.dto.catalog.BulkImportResult;
+import com.minhnbnt.fashionstore.dto.catalog.InventoryItemResponse;
+import com.minhnbnt.fashionstore.dto.catalog.SellerProductResponse;
+import com.minhnbnt.fashionstore.dto.catalog.StockMovementResponse;
 import com.minhnbnt.fashionstore.features.catalog.repository.CategoryRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductImageRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductSearchRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepository;
+import com.minhnbnt.fashionstore.features.catalog.repository.StockMovementRepository;
+import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.Product;
 import com.minhnbnt.fashionstore.model.ProductImage;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.model.ProductVariant;
+import com.minhnbnt.fashionstore.model.StockMovement;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +41,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Locale;
+import java.util.regex.Pattern;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -51,6 +63,10 @@ public class CatalogService {
     private final CategoryRepository categories;
 
     private final ProductSearchRepository search;
+
+    private final StockMovementRepository movements;
+
+    private final OrderService orderService;
 
     private final ShopService shops;
 
@@ -404,5 +420,281 @@ public class CatalogService {
             .toList();
 
         return CatalogMapper.toResponse(product, variantResponses, imageResponses);
+    }
+
+    @Transactional
+    public void deleteProduct(@NonNull UUID userId, @NonNull UUID shopId, @NonNull UUID productId) {
+        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        var product = products.findByShopIdAndId(shopId, productId).orElse(null);
+        if (product == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        if (orderService.hasActiveOrdersForProduct(productId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot delete product with active orders");
+        }
+        product.delete();
+        products.save(product);
+    }
+
+    @Transactional
+    public void deleteProductImage(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        @NonNull UUID productId,
+        @NonNull UUID imageId
+    ) {
+        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        var product = products.findByShopIdAndId(shopId, productId).orElse(null);
+        if (product == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        var image = images.findByProductIdAndId(productId, imageId).orElse(null);
+        if (image == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Image not found");
+        }
+        images.delete(image);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SellerProductResponse> listSellerProducts(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        @Nullable String statusFilter,
+        @Nullable String q,
+        int page,
+        int limit
+    ) {
+        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        List<Product> all;
+        if (statusFilter != null && !statusFilter.isBlank()) {
+            all = products.findByShopIdAndStatusOrderByCreatedAtDesc(
+                shopId,
+                ProductStatus.valueOf(statusFilter.toUpperCase(Locale.ROOT))
+            );
+        } else {
+            all = products.findByShopIdOrderByCreatedAtDesc(shopId);
+        }
+
+        if (q != null && !q.isBlank()) {
+            var lower = q.toLowerCase(Locale.ROOT).strip();
+            all = all.stream()
+                .filter(p -> p.getName().toLowerCase(Locale.ROOT).contains(lower) || p.getSlug().toLowerCase(Locale.ROOT).contains(lower))
+                .toList();
+        }
+
+        var pageSize = Math.clamp(limit, 1, 100);
+        var offset = (long) Math.max(page, 0) * pageSize;
+        return all.stream()
+            .skip(offset)
+            .limit(pageSize)
+            .map(this::toSellerResponse)
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<InventoryItemResponse> listInventory(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        boolean onlyLowStock
+    ) {
+        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        var variantsList = variants.findByShopId(shopId);
+        var result = new ArrayList<InventoryItemResponse>();
+        for (var v : variantsList) {
+            var isLow = v.getStockQuantity() <= v.getLowStockThreshold();
+            if (onlyLowStock && !isLow) {
+                continue;
+            }
+            var prod = products.findById(v.getProductId()).orElse(null);
+            var prodName = "Unknown";
+            if (prod != null) {
+                prodName = prod.getName();
+            }
+            result.add(new InventoryItemResponse(
+                v.getId(),
+                v.getProductId(),
+                prodName,
+                v.getSku(),
+                v.getSize(),
+                v.getColor(),
+                v.getPrice(),
+                v.getStockQuantity(),
+                v.getLowStockThreshold(),
+                isLow
+            ));
+        }
+        return result;
+    }
+
+    @Transactional
+    public InventoryItemResponse adjustStock(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        @NonNull UUID variantId,
+        @NonNull AdjustStockRequest request
+    ) {
+        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        var variant = variants.findByShopIdAndId(shopId, variantId).orElse(null);
+        if (variant == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found");
+        }
+        if (request.newStock() < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stock cannot be negative");
+        }
+
+        var oldStock = variant.getStockQuantity();
+        var delta = request.newStock() - oldStock;
+        variant.setStockQuantity(request.newStock());
+        variants.save(variant);
+
+        var reason = "MANUAL_ADJUST";
+        if (request.reason() != null && !request.reason().isBlank()) {
+            reason = request.reason();
+        }
+        movements.save(StockMovement.record(variant.getId(), shopId, delta, reason, null));
+
+        var prod = products.findById(variant.getProductId()).orElse(null);
+        var prodName = "Unknown";
+        if (prod != null) {
+            prodName = prod.getName();
+        }
+        var isLow = variant.getStockQuantity() <= variant.getLowStockThreshold();
+
+        return new InventoryItemResponse(
+            variant.getId(),
+            variant.getProductId(),
+            prodName,
+            variant.getSku(),
+            variant.getSize(),
+            variant.getColor(),
+            variant.getPrice(),
+            variant.getStockQuantity(),
+            variant.getLowStockThreshold(),
+            isLow
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<StockMovementResponse> listStockMovements(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        @NonNull UUID variantId
+    ) {
+        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        var variant = variants.findByShopIdAndId(shopId, variantId).orElse(null);
+        if (variant == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found");
+        }
+        return movements.findByVariantId(variantId).stream()
+            .map(m -> new StockMovementResponse(
+                m.getId(),
+                m.getVariantId(),
+                m.getShopId(),
+                m.getDelta(),
+                m.getReason(),
+                m.getReferenceId(),
+                m.getCreatedAt()
+            ))
+            .toList();
+    }
+
+    @Transactional
+    @SuppressWarnings("StringSplitter")
+    public BulkImportResult bulkImport(@NonNull UUID userId, @NonNull UUID shopId, byte[] csvBytes) {
+        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        var content = new String(csvBytes, StandardCharsets.UTF_8);
+        var lines = Pattern.compile("\\r?\\n").split(content);
+        var success = 0;
+        var failed = 0;
+        var errors = new ArrayList<String>();
+
+        for (var i = 1; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (line.isEmpty()) {
+                continue;
+            }
+            var parts = Pattern.compile(",").split(line);
+            if (parts.length < 8) {
+                failed++;
+                errors.add("Row " + (i + 1) + ": Not enough columns (required 8)");
+                continue;
+            }
+            try {
+                var name = parts[0].trim();
+                var slug = parts[1].trim();
+                var desc = parts[2].trim();
+                var sku = parts[3].trim();
+                var size = parts[4].trim();
+                var color = parts[5].trim();
+                var price = Long.parseLong(parts[6].trim());
+                var stock = Integer.parseInt(parts[7].trim());
+
+                var createReq = new CreateProductRequest(
+                    name,
+                    slug,
+                    desc,
+                    null,
+                    List.of(new CreateVariantRequest(sku, size, color, price, null, stock, true))
+                );
+                createProduct(userId, shopId, createReq);
+                success++;
+            } catch (Exception ex) {
+                failed++;
+                errors.add("Row " + (i + 1) + ": " + ex.getMessage());
+            }
+        }
+        return new BulkImportResult(success, failed, errors);
+    }
+
+    @Transactional(readOnly = true)
+    public String exportCsv(@NonNull UUID userId, @NonNull UUID shopId) {
+        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        var allProducts = products.findByShopIdOrderByCreatedAtDesc(shopId);
+        var sb = new StringBuilder("name,slug,description,sku,size,color,price,stockQuantity,status\n");
+        for (var p : allProducts) {
+            var varList = variants.findByProductIdOrderByCreatedAtAsc(p.getId());
+            for (var v : varList) {
+                sb.append('"').append(p.getName().replace("\"", "\"\"")).append("\",");
+                sb.append('"').append(p.getSlug().replace("\"", "\"\"")).append("\",");
+                sb.append('"').append(p.getDescription().replace("\"", "\"\"")).append("\",");
+                sb.append('"').append(v.getSku().replace("\"", "\"\"")).append("\",");
+                sb.append('"').append(v.getSize().replace("\"", "\"\"")).append("\",");
+                sb.append('"').append(v.getColor().replace("\"", "\"\"")).append("\",");
+                sb.append(v.getPrice()).append(",");
+                sb.append(v.getStockQuantity()).append(",");
+                sb.append(p.getStatus().name()).append("\n");
+            }
+        }
+        return sb.toString();
+    }
+
+    private SellerProductResponse toSellerResponse(Product product) {
+        var varList = variants.findByProductIdOrderByCreatedAtAsc(product.getId());
+        var totalStock = varList.stream().mapToInt(ProductVariant::getStockQuantity).sum();
+        var minPrice = varList.stream().mapToLong(ProductVariant::getPrice).min().orElse(0L);
+        var maxPrice = varList.stream().mapToLong(ProductVariant::getPrice).max().orElse(0L);
+        var imgList = images.findByProductIdOrderBySortOrderAsc(product.getId());
+        String defaultImg = null;
+        if (!imgList.isEmpty()) {
+            defaultImg = imgList.getFirst().getS3Key();
+        }
+        var variantResponses = varList.stream().map(CatalogMapper::toVariantResponse).toList();
+
+        return new SellerProductResponse(
+            product.getId(),
+            product.getShopId(),
+            product.getCategoryId(),
+            product.getName(),
+            product.getSlug(),
+            product.getDescription(),
+            product.getStatus().name(),
+            totalStock,
+            minPrice,
+            maxPrice,
+            defaultImg,
+            variantResponses,
+            product.getCreatedAt(),
+            product.getUpdatedAt()
+        );
     }
 }

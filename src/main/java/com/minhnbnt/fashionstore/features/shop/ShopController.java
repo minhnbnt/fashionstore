@@ -2,6 +2,7 @@ package com.minhnbnt.fashionstore.features.shop;
 
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
 import com.minhnbnt.fashionstore.dto.shop.ShopResponse;
+import com.minhnbnt.fashionstore.dto.shop.UpdateShopProfileRequest;
 import com.minhnbnt.fashionstore.dto.shop.UpdateShopRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -13,7 +14,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -75,7 +78,7 @@ public class ShopController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Sửa thông tin shop", description = "OWNER/STAFF của shop. Field null = giữ nguyên.")
+    @Operation(summary = "Sửa thông tin cơ bản shop", description = "OWNER/STAFF của shop. Field null = giữ nguyên.")
     @ApiResponse(responseCode = "200", description = "Shop sau update")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
@@ -112,5 +115,57 @@ public class ShopController {
         var ownerId = UUID.fromString(subject);
 
         return shops.resubmit(ownerId, id);
+    }
+
+    @PatchMapping("/{id}/profile")
+    @Operation(summary = "Cập nhật hồ sơ mở rộng của shop", description = "Cập nhật thông tin kho, SLA, tài khoản ngân hàng, giờ làm việc (OWNER/STAFF).")
+    @ApiResponse(responseCode = "200", description = "Shop sau khi cập nhật hồ sơ")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
+    @ApiResponse(responseCode = "404", description = "Shop không tồn tại")
+    @SecurityRequirement(name = "bearerAuth")
+    public ShopResponse updateProfile(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id shop") @PathVariable UUID id,
+        @Valid @RequestBody UpdateShopProfileRequest request
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return shops.updateProfile(userId, id, request);
+    }
+
+    @PostMapping("/{id}/follow")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Theo dõi shop", description = "Người dùng nhấn theo dõi shop.")
+    @ApiResponse(responseCode = "204", description = "Đã theo dõi thành công")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "404", description = "Shop không tồn tại")
+    @SecurityRequirement(name = "bearerAuth")
+    public void follow(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id shop") @PathVariable UUID id
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        shops.follow(userId, id);
+    }
+
+    @DeleteMapping("/{id}/follow")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Hủy theo dõi shop", description = "Người dùng bỏ theo dõi shop.")
+    @ApiResponse(responseCode = "204", description = "Đã hủy theo dõi")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "404", description = "Shop không tồn tại")
+    @SecurityRequirement(name = "bearerAuth")
+    public void unfollow(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id shop") @PathVariable UUID id
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        shops.unfollow(userId, id);
     }
 }
