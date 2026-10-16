@@ -1,6 +1,7 @@
 package com.minhnbnt.fashionstore.features.admin;
 
 import com.minhnbnt.fashionstore.config.SecurityConfig;
+import com.minhnbnt.fashionstore.dto.admin.AdminDailyStatResponse;
 import com.minhnbnt.fashionstore.dto.admin.AdminShopResponse;
 import com.minhnbnt.fashionstore.dto.admin.AdminStatsResponse;
 import com.minhnbnt.fashionstore.dto.admin.AdminUserResponse;
@@ -21,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -220,11 +222,22 @@ class AdminControllerTest {
 
     @Test
     void statsNeedsAdmin() throws Exception {
-        when(stats.get()).thenReturn(new AdminStatsResponse(10, 1, 5, 2, 2, 1, 0));
+        var trend = List.of(new AdminDailyStatResponse(LocalDate.of(2026, 10, 16), 3, 1, 2, 450000L));
+        when(stats.get()).thenReturn(new AdminStatsResponse(
+            10, 1, 6, 3, 1,
+            5, 2, 2, 1, 0,
+            17, 4, 3, 2, 7, 1,
+            1600000L, 700000L,
+            trend
+        ));
 
         mockMvc.perform(get("/api/admin/stats").with(admin()))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.pendingShops").value(2));
+            .andExpect(jsonPath("$.pendingShops").value(2))
+            .andExpect(jsonPath("$.totalOrders").value(17))
+            .andExpect(jsonPath("$.collectedRevenue").value(700000))
+            .andExpect(jsonPath("$.dailyTrend[0].date").value("2026-10-16"))
+            .andExpect(jsonPath("$.dailyTrend[0].orderValue").value(450000));
 
         mockMvc.perform(get("/api/admin/stats").with(jwt()))
             .andExpect(status().isForbidden());
