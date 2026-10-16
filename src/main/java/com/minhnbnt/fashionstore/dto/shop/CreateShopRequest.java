@@ -28,6 +28,80 @@ public record CreateShopRequest(
 
     @Schema(description = "S3 key banner, null nếu chưa có", nullable = true)
     @Nullable
-    String bannerKey
+    String bannerKey,
+
+    @Schema(description = "Số điện thoại kho / hotline", nullable = true)
+    @Nullable
+    String phone,
+
+    @Schema(description = "Địa chỉ kho lấy hàng", nullable = true)
+    @Nullable
+    String address,
+
+    @Schema(description = "Loại hình người bán: INDIVIDUAL hoặc CORPORATE", example = "INDIVIDUAL", nullable = true)
+    @Nullable
+    String sellerType,
+
+    @Schema(description = "Họ và tên thật của chủ shop theo CCCD", example = "NGUYEN HOANG HIEP", nullable = true)
+    @Nullable
+    String legalName,
+
+    @Schema(description = "Số Căn cước công dân (12 số)", example = "001202001234", nullable = true)
+    @Nullable
+    String idNumber,
+
+    @Schema(description = "Ngày cấp CCCD", example = "20/05/2021", nullable = true)
+    @Nullable
+    String idIssuedDate,
+
+    @Schema(description = "Nơi cấp CCCD", example = "Cục Cảnh sát QLHC về TTXH", nullable = true)
+    @Nullable
+    String idIssuedPlace,
+
+    @Schema(description = "Mã số thuế cá nhân hoặc doanh nghiệp", nullable = true)
+    @Nullable
+    String taxCode,
+
+    @Schema(description = "S3 key ảnh mặt trước CCCD", nullable = true)
+    @Nullable
+    String idFrontKey,
+
+    @Schema(description = "S3 key ảnh mặt sau CCCD", nullable = true)
+    @Nullable
+    String idBackKey,
+
+    @Schema(description = "S3 key ảnh chân dung cầm CCCD", nullable = true)
+    @Nullable
+    String idSelfieKey,
+
+    @Schema(description = "S3 key giấy chứng nhận ĐKKD (nếu là doanh nghiệp)", nullable = true)
+    @Nullable
+    String businessCertKey,
+
+    @Schema(description = "Tên ngân hàng thụ hưởng", example = "Vietcombank", nullable = true)
+    @Nullable
+    String bankName,
+
+    @Schema(description = "Số tài khoản ngân hàng", example = "0123456789", nullable = true)
+    @Nullable
+    String bankAccount,
+
+    @Schema(description = "Tên chủ tài khoản ngân hàng (phải khớp legalName)", example = "NGUYEN HOANG HIEP", nullable = true)
+    @Nullable
+    String bankHolder
 ) {
+    public CreateShopRequest(
+        String name,
+        String slug,
+        @Nullable String description,
+        @Nullable String logoKey,
+        @Nullable String bannerKey
+    ) {
+        this(
+            name, slug, description, logoKey, bannerKey,
+            null, null, "INDIVIDUAL", null, null,
+            null, null, null, null, null,
+            null, null, null, null, null
+        );
+    }
 }

@@ -73,12 +73,13 @@ public class AdminShopController {
     @SecurityRequirement(name = "bearerAuth")
     public ShopResponse reject(
         @AuthenticationPrincipal Jwt jwt,
-        @Parameter(description = "id shop") @PathVariable UUID id
+        @Parameter(description = "id shop") @PathVariable UUID id,
+        @RequestParam(required = false) String reason
     ) {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var adminId = UUID.fromString(subject);
 
-        return shops.reject(adminId, id);
+        return shops.reject(adminId, id, reason);
     }
 
     @PatchMapping("/{id}/suspend")

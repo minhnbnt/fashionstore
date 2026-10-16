@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.text.Normalizer;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -37,12 +38,45 @@ public class ShopService {
 
     @Transactional
     public ShopResponse register(@NonNull UUID ownerId, @NonNull CreateShopRequest request) {
+        // Fraud prevention check 1: CCCD format
+        if (request.idNumber() != null && !request.idNumber().isBlank()) {
+            var cleanedId = request.idNumber().trim();
+            if (!cleanedId.matches("^\\d{9}$|^\\d{12}$")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số CCCD/CMND không đúng định dạng (9 hoặc 12 chữ số).");
+            }
+        }
+
+        // Fraud prevention check 2: Bank holder name MUST match legal name
+        if (request.bankHolder() != null && request.legalName() != null
+            && !request.bankHolder().isBlank() && !request.legalName().isBlank()) {
+            var normHolder = normalizeName(request.bankHolder());
+            var normLegal = normalizeName(request.legalName());
+            if (!normHolder.equalsIgnoreCase(normLegal)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên chủ tài khoản ngân hàng phải trùng khớp với Họ và tên trên Căn cước công dân để chống gian lận.");
+            }
+        }
+
         var shop = Shop.create(
             request.name(),
             request.slug(),
             descriptionOf(request.description()),
             request.logoKey(),
-            request.bannerKey()
+            request.bannerKey(),
+            request.phone(),
+            request.address(),
+            request.sellerType(),
+            request.legalName(),
+            request.idNumber(),
+            request.idIssuedDate(),
+            request.idIssuedPlace(),
+            request.taxCode(),
+            request.idFrontKey(),
+            request.idBackKey(),
+            request.idSelfieKey(),
+            request.businessCertKey(),
+            request.bankName(),
+            request.bankAccount(),
+            request.bankHolder()
         );
         try {
             shops.save(shop);
@@ -65,11 +99,16 @@ public class ShopService {
 
     @Transactional
     public ShopResponse reject(@NonNull UUID adminId, @NonNull UUID id) {
+        return reject(adminId, id, null);
+    }
+
+    @Transactional
+    public ShopResponse reject(@NonNull UUID adminId, @NonNull UUID id, @Nullable String reason) {
         var shop = shops.findById(id).orElse(null);
         if (shop == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found");
         }
-        shop.reject();
+        shop.reject(reason);
         return toResponse(shops.save(shop));
     }
 
@@ -192,6 +231,17 @@ public class ShopService {
         return description;
     }
 
+    private static String normalizeName(String name) {
+        if (name == null) {
+            return "";
+        }
+        String normalized = Normalizer.normalize(name.trim(), Normalizer.Form.NFD);
+        return normalized.replaceAll("\\p{M}", "")
+            .replaceAll("[đĐ]", "d")
+            .replaceAll("\\s+", " ")
+            .toUpperCase(java.util.Locale.ROOT);
+    }
+
     public static ShopResponse toResponse(Shop shop) {
         return new ShopResponse(
             shop.getId(),
@@ -214,6 +264,17 @@ public class ShopService {
             shop.getBankHolder(),
             shop.getAutoReplyText(),
             shop.getWorkingHours(),
+            shop.getLegalName(),
+            shop.getIdNumber(),
+            shop.getIdIssuedDate(),
+            shop.getIdIssuedPlace(),
+            shop.getTaxCode(),
+            shop.getIdFrontKey(),
+            shop.getIdBackKey(),
+            shop.getIdSelfieKey(),
+            shop.getBusinessCertKey(),
+            shop.getKycStatus(),
+            shop.getKycRejectionReason(),
             shop.getCreatedAt()
         );
     }

@@ -70,6 +70,22 @@ public class Shop implements Persistable<UUID> {
 
     private @Nullable String workingHours;
 
+    private @Nullable String legalName;
+
+    private @Nullable String idFrontKey;
+
+    private @Nullable String idBackKey;
+
+    private @Nullable String idSelfieKey;
+
+    private @Nullable String idIssuedDate;
+
+    private @Nullable String idIssuedPlace;
+
+    private String kycStatus;
+
+    private @Nullable String kycRejectionReason;
+
     private Instant createdAt;
 
     private Instant updatedAt;
@@ -105,6 +121,14 @@ public class Shop implements Persistable<UUID> {
         @Nullable String bankHolder,
         @Nullable String autoReplyText,
         @Nullable String workingHours,
+        @Nullable String legalName,
+        @Nullable String idFrontKey,
+        @Nullable String idBackKey,
+        @Nullable String idSelfieKey,
+        @Nullable String idIssuedDate,
+        @Nullable String idIssuedPlace,
+        @Nullable String kycStatus,
+        @Nullable String kycRejectionReason,
         Instant createdAt,
         Instant updatedAt
     ) {
@@ -142,6 +166,18 @@ public class Shop implements Persistable<UUID> {
         this.bankHolder = bankHolder;
         this.autoReplyText = autoReplyText;
         this.workingHours = workingHours;
+        this.legalName = legalName;
+        this.idFrontKey = idFrontKey;
+        this.idBackKey = idBackKey;
+        this.idSelfieKey = idSelfieKey;
+        this.idIssuedDate = idIssuedDate;
+        this.idIssuedPlace = idIssuedPlace;
+        if (kycStatus == null) {
+            this.kycStatus = "PENDING_REVIEW";
+        } else {
+            this.kycStatus = kycStatus;
+        }
+        this.kycRejectionReason = kycRejectionReason;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.newRecord = false;
@@ -154,15 +190,48 @@ public class Shop implements Persistable<UUID> {
         @Nullable String logoKey,
         @Nullable String bannerKey
     ) {
+        return create(
+            name, slug, description, logoKey, bannerKey,
+            null, null, "INDIVIDUAL", null, null,
+            null, null, null, null, null,
+            null, null, null, null, null
+        );
+    }
+
+    public static Shop create(
+        String name,
+        String slug,
+        String description,
+        @Nullable String logoKey,
+        @Nullable String bannerKey,
+        @Nullable String phone,
+        @Nullable String address,
+        @Nullable String sellerType,
+        @Nullable String legalName,
+        @Nullable String idNumber,
+        @Nullable String idIssuedDate,
+        @Nullable String idIssuedPlace,
+        @Nullable String taxCode,
+        @Nullable String idFrontKey,
+        @Nullable String idBackKey,
+        @Nullable String idSelfieKey,
+        @Nullable String businessCertKey,
+        @Nullable String bankName,
+        @Nullable String bankAccount,
+        @Nullable String bankHolder
+    ) {
         var now = Instant.now();
+        var effectiveSellerType = (sellerType != null) ? sellerType : "INDIVIDUAL";
         var shop = new Shop(
             UUID.randomUUID(), name, slug, description, logoKey, bannerKey,
             ShopStatus.PENDING, null, null,
-            null, null, null, 2, "INDIVIDUAL",
-            null, null, null, null,
+            phone, address, null, 2, effectiveSellerType,
+            taxCode, idNumber, idFrontKey, businessCertKey,
             null, 0, 0,
-            null, null, null,
+            bankName, bankAccount, bankHolder,
             null, null,
+            legalName, idFrontKey, idBackKey, idSelfieKey, idIssuedDate, idIssuedPlace,
+            "PENDING_REVIEW", null,
             now, now
         );
         shop.newRecord = true;
@@ -174,17 +243,24 @@ public class Shop implements Persistable<UUID> {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending shops can be approved");
         }
         status = ShopStatus.APPROVED;
+        kycStatus = "VERIFIED";
         approvedBy = adminId;
         approvedAt = Instant.now();
         updatedAt = Instant.now();
     }
 
-    public void reject() {
+    public void reject(@Nullable String reason) {
         if (status != ShopStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending shops can be rejected");
         }
         status = ShopStatus.REJECTED;
+        kycStatus = "REJECTED";
+        kycRejectionReason = reason;
         updatedAt = Instant.now();
+    }
+
+    public void reject() {
+        reject(null);
     }
 
     public void suspend() {

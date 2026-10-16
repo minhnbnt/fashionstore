@@ -70,6 +70,49 @@ public record ShopResponse(
     @Nullable
     String workingHours,
 
+    @Schema(description = "Họ tên thật chủ shop theo CCCD", nullable = true)
+    @Nullable
+    String legalName,
+
+    @Schema(description = "Số CCCD", nullable = true)
+    @Nullable
+    String idNumber,
+
+    @Schema(description = "Ngày cấp CCCD", nullable = true)
+    @Nullable
+    String idIssuedDate,
+
+    @Schema(description = "Nơi cấp CCCD", nullable = true)
+    @Nullable
+    String idIssuedPlace,
+
+    @Schema(description = "Mã số thuế", nullable = true)
+    @Nullable
+    String taxCode,
+
+    @Schema(description = "S3 key ảnh mặt trước CCCD", nullable = true)
+    @Nullable
+    String idFrontKey,
+
+    @Schema(description = "S3 key ảnh mặt sau CCCD", nullable = true)
+    @Nullable
+    String idBackKey,
+
+    @Schema(description = "S3 key ảnh selfie cầm CCCD", nullable = true)
+    @Nullable
+    String idSelfieKey,
+
+    @Schema(description = "S3 key giấy chứng nhận ĐKKD", nullable = true)
+    @Nullable
+    String businessCertKey,
+
+    @Schema(description = "Trạng thái định danh eKYC: PENDING_REVIEW, VERIFIED, REJECTED", example = "PENDING_REVIEW")
+    String kycStatus,
+
+    @Schema(description = "Lý do từ chối định danh nếu có", nullable = true)
+    @Nullable
+    String kycRejectionReason,
+
     Instant createdAt
 ) {
     public ShopResponse(
@@ -85,7 +128,11 @@ public record ShopResponse(
         this(
             id, name, slug, description, logoKey, bannerKey, status,
             null, null, null, 2, "INDIVIDUAL", null, 0, 0,
-            null, null, null, null, null, createdAt
+            null, null, null, null, null,
+            null, null, null, null, null,
+            null, null, null, null,
+            "PENDING_REVIEW", null,
+            createdAt
         );
     }
 }
