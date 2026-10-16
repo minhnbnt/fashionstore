@@ -66,7 +66,7 @@ Chi tiết luồng này xem `docs/catalog.md`.
 
 | Xong | # | Method | Path | Mô tả |
 |------|---|--------|------|-------|
-| [x] | 24 | GET | `/api/admin/stats` | Tổng quan tài khoản và shop theo trạng thái |
+| [x] | 24 | GET | `/api/admin/stats` | Dashboard: tài khoản theo trạng thái/role, shop + đơn theo trạng thái, GMV, COD đã thu, xu hướng 14 ngày (giờ VN) |
 | [x] | 25 | GET | `/api/admin/users?status=&role=&q=&page=&size=` | Tìm/lọc tài khoản phân trang |
 | [x] | 26 | GET | `/api/admin/users/{id}` | Chi tiết + shop tham gia + số đơn + audit trail |
 | [x] | 27 | PATCH | `/api/admin/users/{id}/lock` | Khóa kèm lý do; tạm khóa shop mà user làm OWNER |
