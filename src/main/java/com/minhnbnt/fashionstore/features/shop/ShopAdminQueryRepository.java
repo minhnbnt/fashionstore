@@ -12,7 +12,10 @@ import org.springframework.stereotype.Repository;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -109,6 +112,31 @@ public class ShopAdminQueryRepository {
         }
 
         return counts;
+    }
+
+    /**
+     * Đếm bản ghi mới theo ngày tạo (tính theo {@code zone}) từ {@code from} đến nay. Ngày không có thì không có key.
+     */
+    public Map<LocalDate, Long> countCreatedPerDay(Instant from, ZoneId zone) {
+        var sql = """
+            SELECT (created_at AT TIME ZONE :zone)::date AS day, count(*) AS total
+            FROM shop
+            WHERE created_at >= :from
+            GROUP BY day
+            """;
+
+        var rows = jdbc.sql(sql)
+            .param("zone", zone.getId())
+            .param("from", OffsetDateTime.ofInstant(from, ZoneOffset.UTC))
+            .query((rs, rowNum) -> Map.entry(rs.getObject("day", LocalDate.class), rs.getLong("total")))
+            .list();
+
+        var result = new HashMap<LocalDate, Long>();
+        for (var row : rows) {
+            result.put(row.getKey(), row.getValue());
+        }
+
+        return result;
     }
 
     public List<UUID> findApprovedShopIdsOwnedBy(UUID userId) {
