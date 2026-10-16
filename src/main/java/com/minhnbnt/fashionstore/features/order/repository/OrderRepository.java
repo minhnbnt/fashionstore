@@ -11,4 +11,8 @@ public interface OrderRepository extends CrudRepository<Order, UUID> {
     List<Order> findByBuyerIdOrderByCreatedAtDesc(UUID buyerId);
 
     List<Order> findByShopIdOrderByCreatedAtDesc(UUID shopId);
+
+    long countByBuyerId(UUID buyerId);
+
+    long countByShopId(UUID shopId);
 }

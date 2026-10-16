@@ -26,6 +26,10 @@ public record ShopResponse(
     @Schema(example = "APPROVED")
     String status,
 
+    @Schema(description = "Lý do từ chối/tạm khóa gần nhất, null khi PENDING/APPROVED", nullable = true)
+    @Nullable
+    String statusReason,
+
     Instant createdAt
 ) {
 }

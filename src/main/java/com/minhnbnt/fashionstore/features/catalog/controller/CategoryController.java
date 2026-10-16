@@ -21,7 +21,11 @@ public class CategoryController {
     private final CatalogService catalog;
 
     @GetMapping
-    @Operation(summary = "Liệt kê danh mục", description = "Public, xếp theo sort_order.")
+    @Operation(
+        operationId = "listCategories",
+        summary = "Liệt kê danh mục",
+        description = "Public, xếp theo sort_order."
+    )
     @ApiResponse(responseCode = "200", description = "Danh sách danh mục")
     public List<CategoryResponse> list() {
         return catalog.listCategories();

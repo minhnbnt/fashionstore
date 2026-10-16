@@ -58,7 +58,7 @@ class UserControllerTest {
     @Test
     void getMeReturnsProfile() throws Exception {
         var id = UUID.randomUUID();
-        var response = new UserResponse(id, "a@t.local", "An", null, Instant.now());
+        var response = new UserResponse(id, "a@t.local", "An", null, "CUSTOMER", "ACTIVE", null, Instant.now());
         when(userService.getById(id)).thenReturn(response);
 
         mockMvc.perform(get("/api/users/me")
@@ -70,7 +70,7 @@ class UserControllerTest {
     @Test
     void upsertUserReturnsProfile() throws Exception {
         var id = UUID.randomUUID();
-        var response = new UserResponse(id, "a@t.local", "An", null, Instant.now());
+        var response = new UserResponse(id, "a@t.local", "An", null, "CUSTOMER", "ACTIVE", null, Instant.now());
         when(userService.upsert(any(), any())).thenReturn(response);
 
         mockMvc.perform(post("/api/users")

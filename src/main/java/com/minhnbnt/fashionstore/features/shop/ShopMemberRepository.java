@@ -41,4 +41,11 @@ public class ShopMemberRepository {
             .query((rs, rowNum) -> (UUID) rs.getObject("shop_id"))
             .list();
     }
+
+    public Optional<UUID> findOwner(UUID shopId) {
+        return jdbc.sql("SELECT user_id FROM shop_member WHERE shop_id = :shop AND role = 'OWNER'")
+            .param("shop", shopId)
+            .query((rs, rowNum) -> (UUID) rs.getObject("user_id"))
+            .optional();
+    }
 }

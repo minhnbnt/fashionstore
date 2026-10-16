@@ -24,7 +24,7 @@ public class PublicProductController {
 
     @GetMapping("/{id}")
     @Operation(
-        summary = "Chi tiết sản phẩm",
+        operationId = "detail", summary = "Chi tiết sản phẩm",
         description = "Chỉ product ACTIVE của shop APPROVED mới xem được, còn lại 404."
     )
     @ApiResponse(responseCode = "200", description = "Chi tiết kèm variants và ảnh")

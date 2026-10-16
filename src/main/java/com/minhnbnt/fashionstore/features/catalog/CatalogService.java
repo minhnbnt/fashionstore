@@ -177,6 +177,11 @@ public class CatalogService {
     }
 
     @Transactional(readOnly = true)
+    public long countProductsByShop(@NonNull UUID shopId) {
+        return products.countByShopId(shopId);
+    }
+
+    @Transactional(readOnly = true)
     public ProductResponse getDetail(@NonNull UUID productId) {
         var product = products.findById(productId).orElse(null);
         if (product == null) {
