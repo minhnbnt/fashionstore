@@ -20,7 +20,8 @@ public class AdminStatsController {
     @Operation(
         operationId = "getAdminStats",
         summary = "Số liệu tổng quan",
-        description = "Đếm tài khoản theo trạng thái và shop theo trạng thái."
+        description = "Tài khoản theo trạng thái/role, shop theo trạng thái, đơn hàng theo trạng thái, "
+            + "GMV + doanh thu COD đã thu, và xu hướng 14 ngày gần nhất (giờ Việt Nam)."
     )
     @ApiResponse(responseCode = "200", description = "Số liệu")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
