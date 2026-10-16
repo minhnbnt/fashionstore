@@ -1,9 +1,15 @@
 package com.minhnbnt.fashionstore.features.admin;
 
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
+import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
+import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
+import com.minhnbnt.fashionstore.dto.order.CheckoutItemRequest;
+import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
+import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
+import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.infrastructure.GoTrueAdminClient;
 import com.minhnbnt.fashionstore.model.UserRole;
@@ -15,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,6 +49,12 @@ class AdminServicesTest {
 
     @Autowired
     private UserService users;
+
+    @Autowired
+    private OrderService orders;
+
+    @Autowired
+    private CatalogService catalog;
 
     @MockitoBean
     private GoTrueAdminClient gotrue;
@@ -175,5 +188,45 @@ class AdminServicesTest {
         assertThat(result.pendingShops()).isPositive();
         assertThat(result.totalUsers()).isPositive();
         assertThat(result.totalShops()).isGreaterThanOrEqualTo(result.pendingShops());
+    }
+
+    @Test
+    void statsCountOrdersAndTodayTrend() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var adminId = mirroredUser();
+        var shopId = registerShop(ownerId, "admin-stats-orders");
+        shops.approve(adminId, shopId);
+
+        var product = catalog.createProduct(
+            ownerId,
+            shopId,
+            new CreateProductRequest(
+                "Ao stats",
+                "admin-stats-orders-ao",
+                null,
+                null,
+                List.of(new CreateVariantRequest("STATS-1", "M", "Den", 100000L, null, 10, true))
+            )
+        );
+        var variantId = catalog.getDetail(product.id()).variants().get(0).id();
+        var before = stats.get();
+
+        orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 2)), "An", "0901", "Ha Noi", 0L)
+        );
+        var after = stats.get();
+
+        assertThat(after.totalOrders()).isEqualTo(before.totalOrders() + 1);
+        assertThat(after.pendingOrders()).isEqualTo(before.pendingOrders() + 1);
+        assertThat(after.grossMerchandiseValue()).isEqualTo(before.grossMerchandiseValue() + 200000L);
+        assertThat(after.collectedRevenue()).isEqualTo(before.collectedRevenue());
+
+        var today = after.dailyTrend().get(AdminStatsService.TREND_DAYS - 1);
+        var todayBefore = before.dailyTrend().get(AdminStatsService.TREND_DAYS - 1);
+        assertThat(today.orders()).isEqualTo(todayBefore.orders() + 1);
+        assertThat(today.newUsers()).isPositive();
+        assertThat(today.newShops()).isPositive();
     }
 }
