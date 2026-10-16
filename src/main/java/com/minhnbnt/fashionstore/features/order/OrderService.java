@@ -1,10 +1,13 @@
 package com.minhnbnt.fashionstore.features.order;
 
+import com.minhnbnt.fashionstore.dto.admin.DailyOrderTotals;
+import com.minhnbnt.fashionstore.dto.admin.OrderRevenueTotals;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderItemResponse;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepository;
+import com.minhnbnt.fashionstore.features.order.repository.OrderAdminQueryRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderStatusHistoryRepository;
@@ -24,8 +27,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -49,6 +56,8 @@ public class OrderService {
     private final ShopMemberRepository members;
 
     private final ShopAccessChecker access;
+
+    private final OrderAdminQueryRepository adminQueries;
 
     @Transactional
     public OrderResponse checkout(@NonNull UUID buyerId, @NonNull CheckoutRequest request) {
@@ -136,6 +145,21 @@ public class OrderService {
     @Transactional(readOnly = true)
     public long countByShop(@NonNull UUID shopId) {
         return orders.countByShopId(shopId);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<OrderStatus, Long> countByStatus() {
+        return adminQueries.countByStatus();
+    }
+
+    @Transactional(readOnly = true)
+    public OrderRevenueTotals revenueTotals() {
+        return adminQueries.revenueTotals();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<LocalDate, DailyOrderTotals> totalsPerDay(@NonNull Instant from, @NonNull ZoneId zone) {
+        return adminQueries.totalsPerDay(from, zone);
     }
 
     @Transactional(readOnly = true)

@@ -17,6 +17,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -151,6 +154,16 @@ public class UserService {
     @Transactional(readOnly = true)
     public Map<AccountStatus, Long> countByStatus() {
         return adminQueries.countByStatus();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<UserRole, Long> countByRole() {
+        return adminQueries.countByRole();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<LocalDate, Long> countCreatedPerDay(@NonNull Instant from, @NonNull ZoneId zone) {
+        return adminQueries.countCreatedPerDay(from, zone);
     }
 
     private UserProfile lockedProfile(UUID userId) {
