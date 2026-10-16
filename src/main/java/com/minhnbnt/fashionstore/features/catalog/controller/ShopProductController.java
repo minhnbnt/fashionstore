@@ -106,4 +106,44 @@ public class ShopProductController {
 
         return catalog.attachImages(userId, shopId, id, request);
     }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Xóa mềm sản phẩm", description = "Chuyển trạng thái sang DELETED. Không thể xóa nếu có đơn đang xử lý.")
+    @ApiResponse(responseCode = "204", description = "Đã xóa sản phẩm")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
+    @ApiResponse(responseCode = "404", description = "Product không tồn tại")
+    @ApiResponse(responseCode = "409", description = "Còn đơn hàng đang xử lý")
+    @SecurityRequirement(name = "bearerAuth")
+    public void deleteProduct(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Parameter(description = "Id product") @PathVariable UUID id
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        catalog.deleteProduct(userId, shopId, id);
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/{id}/images/{imageId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Xóa ảnh sản phẩm", description = "Gỡ ảnh khỏi sản phẩm.")
+    @ApiResponse(responseCode = "204", description = "Đã xóa ảnh")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
+    @ApiResponse(responseCode = "404", description = "Ảnh hoặc product không tồn tại")
+    @SecurityRequirement(name = "bearerAuth")
+    public void deleteImage(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Parameter(description = "Id product") @PathVariable UUID id,
+        @Parameter(description = "Id image") @PathVariable UUID imageId
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        catalog.deleteProductImage(userId, shopId, id, imageId);
+    }
 }

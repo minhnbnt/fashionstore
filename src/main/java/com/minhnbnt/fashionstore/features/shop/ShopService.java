@@ -2,6 +2,7 @@ package com.minhnbnt.fashionstore.features.shop;
 
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
 import com.minhnbnt.fashionstore.dto.shop.ShopResponse;
+import com.minhnbnt.fashionstore.dto.shop.UpdateShopProfileRequest;
 import com.minhnbnt.fashionstore.dto.shop.UpdateShopRequest;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.Shop;
@@ -29,6 +30,8 @@ public class ShopService {
     private final ShopRepository shops;
 
     private final ShopMemberRepository members;
+
+    private final ShopFollowerRepository followers;
 
     private final ShopAccessChecker access;
 
@@ -71,6 +74,26 @@ public class ShopService {
     }
 
     @Transactional
+    public ShopResponse suspend(@NonNull UUID adminId, @NonNull UUID id) {
+        var shop = shops.findById(id).orElse(null);
+        if (shop == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found");
+        }
+        shop.suspend();
+        return toResponse(shops.save(shop));
+    }
+
+    @Transactional
+    public ShopResponse unsuspend(@NonNull UUID adminId, @NonNull UUID id) {
+        var shop = shops.findById(id).orElse(null);
+        if (shop == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found");
+        }
+        shop.unsuspend();
+        return toResponse(shops.save(shop));
+    }
+
+    @Transactional
     public ShopResponse update(@NonNull UUID userId, @NonNull UUID id, @NonNull UpdateShopRequest request) {
         var shop = shops.findById(id).orElse(null);
         if (shop == null) {
@@ -79,6 +102,53 @@ public class ShopService {
         access.requireShopRole(userId, id, MemberRole.OWNER, MemberRole.STAFF);
         shop.updateDetails(request.name(), request.description(), request.logoKey(), request.bannerKey());
         return toResponse(shops.save(shop));
+    }
+
+    @Transactional
+    public ShopResponse updateProfile(@NonNull UUID userId, @NonNull UUID id, @NonNull UpdateShopProfileRequest request) {
+        var shop = shops.findById(id).orElse(null);
+        if (shop == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found");
+        }
+        access.requireShopRole(userId, id, MemberRole.OWNER, MemberRole.STAFF);
+        shop.updateProfile(
+            request.phone(),
+            request.address(),
+            request.returnPolicy(),
+            request.processingDays(),
+            request.bankName(),
+            request.bankAccount(),
+            request.bankHolder(),
+            request.autoReplyText(),
+            request.workingHours()
+        );
+        return toResponse(shops.save(shop));
+    }
+
+    @Transactional
+    public void follow(@NonNull UUID userId, @NonNull UUID shopId) {
+        var shop = shops.findById(shopId).orElse(null);
+        if (shop == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found");
+        }
+        var inserted = followers.add(shopId, userId);
+        if (inserted > 0) {
+            shop.incrementFollowers();
+            shops.save(shop);
+        }
+    }
+
+    @Transactional
+    public void unfollow(@NonNull UUID userId, @NonNull UUID shopId) {
+        var shop = shops.findById(shopId).orElse(null);
+        if (shop == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found");
+        }
+        var deleted = followers.remove(shopId, userId);
+        if (deleted > 0) {
+            shop.decrementFollowers();
+            shops.save(shop);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -92,7 +162,6 @@ public class ShopService {
 
     @Transactional(readOnly = true)
     public ShopResponse getBySlug(@NonNull String slug) {
-
         var shop = shops.findBySlug(slug).orElse(null);
         if (shop == null || shop.getStatus() != ShopStatus.APPROVED) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found");
@@ -123,7 +192,7 @@ public class ShopService {
         return description;
     }
 
-    private static ShopResponse toResponse(Shop shop) {
+    public static ShopResponse toResponse(Shop shop) {
         return new ShopResponse(
             shop.getId(),
             shop.getName(),
@@ -132,6 +201,19 @@ public class ShopService {
             shop.getLogoKey(),
             shop.getBannerKey(),
             shop.getStatus().name(),
+            shop.getPhone(),
+            shop.getAddress(),
+            shop.getReturnPolicy(),
+            shop.getProcessingDays(),
+            shop.getSellerType(),
+            shop.getRating(),
+            shop.getRatingCount(),
+            shop.getFollowerCount(),
+            shop.getBankName(),
+            shop.getBankAccount(),
+            shop.getBankHolder(),
+            shop.getAutoReplyText(),
+            shop.getWorkingHours(),
             shop.getCreatedAt()
         );
     }

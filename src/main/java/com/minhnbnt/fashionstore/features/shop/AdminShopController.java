@@ -80,4 +80,40 @@ public class AdminShopController {
 
         return shops.reject(adminId, id);
     }
+
+    @PatchMapping("/{id}/suspend")
+    @Operation(summary = "Treo shop vi phạm", description = "APPROVED → SUSPENDED. Sản phẩm của shop tự ẩn.")
+    @ApiResponse(responseCode = "200", description = "Shop đã bị treo")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải admin")
+    @ApiResponse(responseCode = "404", description = "Shop không tồn tại")
+    @ApiResponse(responseCode = "409", description = "Shop không ở trạng thái APPROVED")
+    @SecurityRequirement(name = "bearerAuth")
+    public ShopResponse suspend(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id shop") @PathVariable UUID id
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var adminId = UUID.fromString(subject);
+
+        return shops.suspend(adminId, id);
+    }
+
+    @PatchMapping("/{id}/unsuspend")
+    @Operation(summary = "Gỡ treo shop", description = "SUSPENDED → APPROVED.")
+    @ApiResponse(responseCode = "200", description = "Shop đã mở lại")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải admin")
+    @ApiResponse(responseCode = "404", description = "Shop không tồn tại")
+    @ApiResponse(responseCode = "409", description = "Shop không ở trạng thái SUSPENDED")
+    @SecurityRequirement(name = "bearerAuth")
+    public ShopResponse unsuspend(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id shop") @PathVariable UUID id
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var adminId = UUID.fromString(subject);
+
+        return shops.unsuspend(adminId, id);
+    }
 }
