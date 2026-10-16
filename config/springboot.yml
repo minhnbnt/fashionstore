@@ -24,3 +24,10 @@ s3:
   # Browser cần resolve được host này:
   #   echo '127.0.0.1 fashionstore.web.garage.localhost' >> /etc/hosts
   public-base-url: http://fashionstore.web.garage.localhost:3902
+
+gotrue:
+  url: http://localhost:9999
+  # Service role key cho GoTrue Admin API (ban/unban, gán app_metadata.role khi duyệt shop):
+  # JWT ES256 ký bằng key trong GOTRUE_JWT_KEYS, claim {"role":"service_role"}, kid khớp key.
+  # Để trống = bỏ qua bước GoTrue (backend vẫn chặn tài khoản khóa qua AccountFilter).
+  service-role-key: ""

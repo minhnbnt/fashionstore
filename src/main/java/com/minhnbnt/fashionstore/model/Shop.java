@@ -32,9 +32,13 @@ public class Shop implements Persistable<UUID> {
 
     private ShopStatus status;
 
+    private @Nullable String statusReason;
+
     private @Nullable UUID approvedBy;
 
     private @Nullable Instant approvedAt;
+
+    private Instant submittedAt;
 
     private Instant createdAt;
 
@@ -52,8 +56,10 @@ public class Shop implements Persistable<UUID> {
         @Nullable String logoKey,
         @Nullable String bannerKey,
         ShopStatus status,
+        @Nullable String statusReason,
         @Nullable UUID approvedBy,
         @Nullable Instant approvedAt,
+        Instant submittedAt,
         Instant createdAt,
         Instant updatedAt
     ) {
@@ -64,8 +70,10 @@ public class Shop implements Persistable<UUID> {
         this.logoKey = logoKey;
         this.bannerKey = bannerKey;
         this.status = status;
+        this.statusReason = statusReason;
         this.approvedBy = approvedBy;
         this.approvedAt = approvedAt;
+        this.submittedAt = submittedAt;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.newRecord = false;
@@ -81,7 +89,7 @@ public class Shop implements Persistable<UUID> {
         var now = Instant.now();
         var shop = new Shop(
             UUID.randomUUID(), name, slug, description, logoKey, bannerKey,
-            ShopStatus.PENDING, null, null, now, now
+            ShopStatus.PENDING, null, null, null, now, now, now
         );
         shop.newRecord = true;
         return shop;
@@ -92,16 +100,49 @@ public class Shop implements Persistable<UUID> {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending shops can be approved");
         }
         status = ShopStatus.APPROVED;
+        statusReason = null;
         approvedBy = adminId;
         approvedAt = Instant.now();
         updatedAt = Instant.now();
     }
 
-    public void reject() {
+    public void reject(String reason) {
         if (status != ShopStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending shops can be rejected");
         }
         status = ShopStatus.REJECTED;
+        statusReason = reason;
+        updatedAt = Instant.now();
+    }
+
+    /**
+     * Owner sửa hồ sơ xong gửi duyệt lại, xếp cuối hàng đợi theo submittedAt mới.
+     */
+    public void resubmit() {
+        if (status != ShopStatus.REJECTED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only rejected shops can be resubmitted");
+        }
+        status = ShopStatus.PENDING;
+        statusReason = null;
+        submittedAt = Instant.now();
+        updatedAt = Instant.now();
+    }
+
+    public void suspend(String reason) {
+        if (status != ShopStatus.APPROVED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only approved shops can be suspended");
+        }
+        status = ShopStatus.SUSPENDED;
+        statusReason = reason;
+        updatedAt = Instant.now();
+    }
+
+    public void reinstate() {
+        if (status != ShopStatus.SUSPENDED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only suspended shops can be reinstated");
+        }
+        status = ShopStatus.APPROVED;
+        statusReason = null;
         updatedAt = Instant.now();
     }
 

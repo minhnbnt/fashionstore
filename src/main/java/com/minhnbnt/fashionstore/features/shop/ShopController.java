@@ -91,4 +91,26 @@ public class ShopController {
 
         return shops.update(userId, id, request);
     }
+
+    @PostMapping("/{id}/resubmit")
+    @Operation(
+        operationId = "resubmitShop", summary = "Gửi duyệt lại shop bị từ chối",
+        description = "Chỉ OWNER. REJECTED → PENDING, xóa lý do cũ, xếp cuối hàng đợi duyệt. "
+            + "Sửa hồ sơ bằng PUT /api/shops/{id} trước khi gửi lại."
+    )
+    @ApiResponse(responseCode = "200", description = "Shop đã quay về PENDING")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải OWNER của shop")
+    @ApiResponse(responseCode = "404", description = "Shop không tồn tại")
+    @ApiResponse(responseCode = "409", description = "Shop không ở trạng thái REJECTED")
+    @SecurityRequirement(name = "bearerAuth")
+    public ShopResponse resubmit(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id shop") @PathVariable UUID id
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var ownerId = UUID.fromString(subject);
+
+        return shops.resubmit(ownerId, id);
+    }
 }

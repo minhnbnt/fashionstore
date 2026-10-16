@@ -20,6 +20,16 @@ public record UserResponse(
     @Nullable
     String avatarKey,
 
+    @Schema(description = "Role trên sàn", example = "CUSTOMER")
+    String role,
+
+    @Schema(description = "ACTIVE hoặc LOCKED", example = "ACTIVE")
+    String status,
+
+    @Schema(description = "Lý do khóa, null khi ACTIVE", nullable = true)
+    @Nullable
+    String statusReason,
+
     Instant createdAt
 ) {
 }

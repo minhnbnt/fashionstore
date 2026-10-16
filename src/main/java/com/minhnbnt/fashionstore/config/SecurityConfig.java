@@ -1,5 +1,8 @@
 package com.minhnbnt.fashionstore.config;
 
+import com.minhnbnt.fashionstore.features.identity.AccountProvisioner;
+import com.minhnbnt.fashionstore.security.AccountFilter;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -10,6 +13,7 @@ import org.springframework.security.config.annotation.web.configurers.CsrfConfig
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -21,8 +25,32 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    /**
+     * Mọi method đều public. AccountFilter dùng chung list này để tài khoản bị khóa vẫn vào được.
+     */
+    private static final List<String> PUBLIC_PATHS = List.of(
+        "/api/public/**",
+        "/actuator/health",
+        "/v3/api-docs/**",
+        "/swagger-ui/**",
+        "/swagger-ui.html"
+    );
+
+    /**
+     * GET public. Riêng GET /api/shops/mine cần đăng nhập, khai trước "/api/shops/*".
+     */
+    private static final List<String> PUBLIC_GET_PATHS = List.of(
+        "/api/shops/*",
+        "/api/categories",
+        "/api/products/*",
+        "/api/search/**"
+    );
+
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) {
+    public SecurityFilterChain filterChain(
+        HttpSecurity http,
+        ObjectProvider<AccountProvisioner> provisioners
+    ) {
 
         http
             .cors(Customizer.withDefaults())
@@ -31,18 +59,9 @@ public class SecurityConfig {
                 session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(
-                    "/api/public/**",
-                    "/actuator/health",
-                    "/v3/api-docs/**",
-                    "/swagger-ui/**",
-                    "/swagger-ui.html"
-                ).permitAll()
+                .requestMatchers(PUBLIC_PATHS.toArray(String[]::new)).permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/shops/mine").authenticated()
-                .requestMatchers(HttpMethod.GET, "/api/shops/*").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/categories").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/products/*").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/search/**").permitAll()
+                .requestMatchers(HttpMethod.GET, PUBLIC_GET_PATHS.toArray(String[]::new)).permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/shop/**").hasRole("SHOP")
                 .anyRequest()
@@ -50,7 +69,11 @@ public class SecurityConfig {
             )
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(
                 jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())
-            ));
+            ))
+            .addFilterAfter(
+                new AccountFilter(provisioners, PUBLIC_GET_PATHS, PUBLIC_PATHS),
+                BearerTokenAuthenticationFilter.class
+            );
 
         return http.build();
     }
@@ -63,7 +86,10 @@ public class SecurityConfig {
         converter.setJwtGrantedAuthoritiesConverter(jwt -> {
 
             var metadata = jwt.getClaimAsMap("app_metadata");
-            var role = metadata == null ? null : metadata.get("role");
+            Object role = null;
+            if (metadata != null) {
+                role = metadata.get("role");
+            }
 
             if ("admin".equals(role)) {
                 return List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));

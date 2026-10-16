@@ -129,6 +129,16 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    public long countByBuyer(@NonNull UUID buyerId) {
+        return orders.countByBuyerId(buyerId);
+    }
+
+    @Transactional(readOnly = true)
+    public long countByShop(@NonNull UUID shopId) {
+        return orders.countByShopId(shopId);
+    }
+
+    @Transactional(readOnly = true)
     public List<OrderResponse> getMine(@NonNull UUID buyerId) {
         var result = new ArrayList<OrderResponse>();
 
