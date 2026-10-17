@@ -1,4 +1,7 @@
 spring:
+  aot:
+    enabled: true
+
   docker:
     compose:
       enabled: false
@@ -20,3 +23,6 @@ s3:
   bucket: fashionstore
   access-key: GKd44959a54214a28492750765e375479f
   secret-key: passwordpassword
+  # Base URL public (Garage website endpoint). Không có trailing slash.
+  # Host *.localhost trỏ sẵn về 127.0.0.1, khỏi sửa /etc/hosts.
+  public-base-url: http://fashionstore.web.localhost:3902
