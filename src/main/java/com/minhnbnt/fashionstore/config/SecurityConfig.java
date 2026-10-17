@@ -26,8 +26,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private static final List<String> PUBLIC_PATHS = List.of(
-        "/api/uploads/**",
-        "/api/uploads/presign",
+        "/api/public/**",
         "/v3/api-docs/**",
         "/swagger-ui/**",
         "/swagger-ui.html"
