@@ -60,12 +60,14 @@ public class GoTrueAdminClient {
     }
 
     private void updateUser(UUID userId, Map<String, Object> body) {
+
         if (serviceRoleKey.isBlank()) {
             log.warn("gotrue.service-role-key is not configured, skipped GoTrue update for user {}", userId);
             return;
         }
 
         try {
+
             rest.put()
                 .uri("/admin/users/{id}", userId)
                 .header("Authorization", "Bearer " + serviceRoleKey)
@@ -73,6 +75,7 @@ public class GoTrueAdminClient {
                 .body(body)
                 .retrieve()
                 .toBodilessEntity();
+
         } catch (RestClientException e) {
             log.error("GoTrue admin update failed for user {}: {}", userId, e.getMessage());
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Identity provider update failed");
