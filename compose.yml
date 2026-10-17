@@ -28,8 +28,6 @@ services:
 
     env_file:
       - ./config/gotrue.env
-      - path: ./.env
-        required: false
 
     ports:
       - "9999:9999"
@@ -65,11 +63,14 @@ services:
       ROOT_ACCESS_KEY: fashionstore
       ROOT_SECRET_KEY: passwordpassword
 
+      VGW_PORT: ":9000"
       VGW_ARGS: --health /health
       VGW_BACKEND_ARGS: /data/s3
       VGW_BACKEND: posix
       VGW_CORS_ALLOW_ORIGIN: "*"
       VGW_WEBUI_ADMIN_GATEWAYS: http://localhost:7071
+
+    restart: unless-stopped
 
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9000/health"]
