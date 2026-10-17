@@ -19,10 +19,10 @@ spring:
 
 s3:
   endpoint: http://localhost:3900
-  region: garage
+  region: us-east-1
   bucket: fashionstore
-  access-key: GKd44959a54214a28492750765e375479f
-  secret-key: passwordpassword
-  # Base URL public (Garage website endpoint). Không có trailing slash.
-  # Host *.localhost trỏ sẵn về 127.0.0.1, khỏi sửa /etc/hosts.
-  public-base-url: http://fashionstore.web.localhost:3902
+  access-key: versityadmin
+  secret-key: versityadmin
+  # URL gốc cho ảnh public (path-style trên chính port S3, kèm tên bucket).
+  # Anonymous GET nhờ bucket policy mà s3-init gắn khi compose up. Không có trailing slash.
+  public-base-url: http://localhost:3900/fashionstore

@@ -61,32 +61,50 @@ services:
       MAIL_FROM_ADDRESS: no-reply@test.local
       MAIL_FROM_NAME: My App
 
-  garage:
-    image: ghcr.io/minhnbnt/garage:latest
-    command: ["server", "--single-node", "--default-bucket"]
+  s3:
+    image: ghcr.io/versity/versitygw:v1.9.0
+
+    environment:
+      ROOT_ACCESS_KEY: versityadmin
+      ROOT_SECRET_KEY: versityadmin
+      VGW_BACKEND: posix
+      VGW_BACKEND_ARG: /data/s3
+      VGW_PORT: ":3900"
+      VGW_HEALTH: /health
+      VGW_CORS_ALLOW_ORIGIN: "*"
 
     ports:
       - "3900:3900"
-      - "3902:3902"
-      - "3903:3903"
 
     volumes:
-      - garage_data:/var/lib/garage
-      - ./config/garage.toml:/etc/garage.toml:ro
-
-    environment:
-      GARAGE_DEFAULT_ACCESS_KEY: GKd44959a54214a28492750765e375479f
-      GARAGE_DEFAULT_SECRET_KEY: passwordpassword
-      GARAGE_DEFAULT_BUCKET: fashionstore
+      - s3_data:/data/s3
 
     healthcheck:
-      test: ["CMD", "/usr/bin/garage", "health", "-q"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3900/health"]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 10s
 
+  s3-init:
+    image: amazon/aws-cli:latest
+
+    depends_on:
+      - s3
+
+    entrypoint: ["sh", "/versitygw-init.sh"]
+
+    environment:
+      AWS_ACCESS_KEY_ID: versityadmin
+      AWS_SECRET_ACCESS_KEY: versityadmin
+      AWS_DEFAULT_REGION: us-east-1
+      S3_ENDPOINT: http://s3:3900
+      S3_BUCKET: fashionstore
+
+    volumes:
+      - ./config/versitygw-init.sh:/versitygw-init.sh:ro
+
 volumes:
-  garage_data:
+  s3_data:
   mailpit_data:
   postgres_data:

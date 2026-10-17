@@ -18,7 +18,7 @@ class S3StorageTest {
 
     private final S3Presigner presigner = S3Presigner.builder()
             .endpointOverride(URI.create("http://localhost:3900"))
-            .region(Region.of("garage"))
+            .region(Region.of("us-east-1"))
             .credentialsProvider(StaticCredentialsProvider.create(
                     AwsBasicCredentials.create("access-key", "secret-key")))
             .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
