@@ -2,7 +2,8 @@ import net.ltgt.gradle.errorprone.errorprone
 
 plugins {
     java
-    id("org.springframework.boot") version "4.1.0"
+    id("org.springframework.boot") version "4.1.1"
+    id("org.springframework.boot.aot") version "4.1.1"
     id("io.spring.dependency-management") version "1.1.7"
     id("net.ltgt.errorprone") version "5.1.1"
 }
@@ -11,7 +12,7 @@ group = "com.minhnbnt"
 version = "0.0.1-SNAPSHOT"
 
 java.toolchain {
-    languageVersion = JavaLanguageVersion.of(25)
+    languageVersion = JavaLanguageVersion.of(21)
 }
 
 repositories {
@@ -21,8 +22,9 @@ repositories {
 dependencies {
 
     implementation("org.flywaydb:flyway-database-postgresql")
-	implementation("software.amazon.awssdk:s3:2.55.7")
+    implementation("software.amazon.awssdk:s3:2.55.7")
 
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server")
@@ -33,8 +35,8 @@ dependencies {
 
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0")
 
-	compileOnly("org.projectlombok:lombok")
-	annotationProcessor("org.projectlombok:lombok")
+    compileOnly("org.projectlombok:lombok")
+    annotationProcessor("org.projectlombok:lombok")
 
     errorprone("com.google.errorprone:error_prone_core:2.50.0")
     errorprone("com.uber.nullaway:nullaway:0.14.2")
@@ -58,11 +60,13 @@ tasks.withType<Test> {
 
 tasks.withType<JavaCompile>().configureEach {
     options.errorprone {
+        error("NullAway")
         option("NullAway:AnnotatedPackages", "com.minhnbnt")
+        option("NullAway:ExcludedClassAnnotations", "org.springframework.aot.generate.Generated")
         disable("StringConcatToTextBlock")
     }
 }
 
-tasks.named<JavaCompile>("compileJava") {
-    options.errorprone.error("NullAway")
+tasks.named<JavaCompile>("compileAotJava") {
+    options.errorprone.enabled = false
 }
