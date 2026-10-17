@@ -70,3 +70,7 @@ tasks.withType<JavaCompile>().configureEach {
 tasks.named<JavaCompile>("compileAotJava") {
     options.errorprone.enabled = false
 }
+
+tasks.named<JavaCompile>("compileAotTestJava") {
+    options.errorprone.enabled = false
+}
