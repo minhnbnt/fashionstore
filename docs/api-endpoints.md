@@ -185,3 +185,13 @@ Chi tiết luồng này xem `docs/cart.md`. Địa chỉ giao hàng vẫn là te
 | [x] | 90 | DELETE | `/api/products/{productId}/reviews` | Xóa bài của mình |
 
 Chi tiết luồng này xem `docs/review.md`.
+
+## Flow 15 — Wishlist (sản phẩm yêu thích)
+
+| Xong | # | Method | Path | Mô tả |
+|------|---|--------|------|-------|
+| [x] | 91 | GET | `/api/wishlist` | Liệt kê đã lưu, món tạm không mua được vẫn hiện kèm cờ |
+| [x] | 92 | POST | `/api/wishlist/items` | Lưu/bỏ lưu (toggle), món ẩn → `404` |
+| [x] | 93 | DELETE | `/api/wishlist/items/{productId}` | Xóa khỏi wishlist |
+
+Chi tiết luồng này xem `docs/wishlist.md`.
