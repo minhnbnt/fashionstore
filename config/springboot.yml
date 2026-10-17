@@ -4,9 +4,9 @@ spring:
       enabled: false
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/fashionstore
-    username: postgres
-    password: postgres
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/fashionstore}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
 
   flyway:
     out-of-order: true
@@ -15,15 +15,18 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:9999
+          issuer-uri: ${OAUTH2_ISS_URI:http://localhost:9999}
+
+server:
+  port: ${SERVER_PORT:8080}
 
 s3:
-  endpoint: http://localhost:9000
-  region: us-east-1
+  endpoint: ${S3_ENDPOINT:http://localhost:9000}
+  region: ${S3_REGION:us-east-1}
   bucket: fashionstore
-  access-key: fashionstore
-  secret-key: passwordpassword
-  public-base-url: http://localhost:9000
+  access-key: ${S3_ACCESS_KEY:fashionstore}
+  secret-key: ${S3_SECRET_KEY:passwordpassword}
+  public-base-url: ${S3_PUBLIC_BASE_URL:http://localhost:9000}
 
 gotrue:
   url: http://localhost:9999
