@@ -4,6 +4,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.UUID;
 
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.jdbc.autoconfigure.JdbcConnectionDetails;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -18,74 +19,81 @@ import org.testcontainers.utility.DockerImageName;
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfiguration {
 
-	@Bean
-	PostgreSQLContainer postgresContainer() {
-		return SharedPostgres.instance();
-	}
+    private static @Nullable PostgreSQLContainer sharedPostgres;
 
-	@Bean
-	JdbcConnectionDetails jdbcConnectionDetails(PostgreSQLContainer container) {
-		return new PerContextConnectionDetails(container);
-	}
+    @Bean
+    synchronized PostgreSQLContainer postgresContainer() {
 
-	private static final class SharedPostgres {
+        if (sharedPostgres == null) {
+            sharedPostgres = startedPostgres();
+        }
 
-		private static PostgreSQLContainer instance;
+        return sharedPostgres;
+    }
 
-		private SharedPostgres() {
-		}
+    private static PostgreSQLContainer startedPostgres() {
 
-		static synchronized PostgreSQLContainer instance() {
-			if (instance == null) {
-				var image = DockerImageName.parse("ghcr.io/minhnbnt/postgresql:latest")
-					.asCompatibleSubstituteFor("postgres");
-				var container = new PostgreSQLContainer(image);
-				container.start();
-				instance = container;
-			}
-			return instance;
-		}
-	}
+        var image = DockerImageName
+            .parse("ghcr.io/minhnbnt/postgresql:latest")
+            .asCompatibleSubstituteFor("postgres");
 
-	private static final class PerContextConnectionDetails implements JdbcConnectionDetails {
+        var container = new PostgreSQLContainer(image);
+        container.start();
 
-		private final PostgreSQLContainer container;
+        return container;
+    }
 
-		private final String database;
+    @Bean
+    JdbcConnectionDetails jdbcConnectionDetails(PostgreSQLContainer container) {
+        return new PerContextConnectionDetails(container);
+    }
 
-		private PerContextConnectionDetails(PostgreSQLContainer container) {
-			this.container = container;
-			this.database = createDatabase(container);
-		}
+    private static final class PerContextConnectionDetails implements JdbcConnectionDetails {
 
-		@Override
-		public String getJdbcUrl() {
-			var base = container.getJdbcUrl();
-			var slash = base.lastIndexOf('/');
-			return base.substring(0, slash + 1) + database;
-		}
+        private final PostgreSQLContainer container;
 
-		@Override
-		public @Nullable String getUsername() {
-			return container.getUsername();
-		}
+        private final String database;
 
-		@Override
-		public @Nullable String getPassword() {
-			return container.getPassword();
-		}
+        private PerContextConnectionDetails(PostgreSQLContainer container) {
+            this.container = container;
+            this.database = createDatabase(container);
+        }
 
-		private static String createDatabase(PostgreSQLContainer container) {
-			var database = "test_" + UUID.randomUUID().toString().replace("-", "");
-			try (var connection = DriverManager.getConnection(
-					container.getJdbcUrl(), container.getUsername(), container.getPassword());
-					var statement = connection.createStatement()) {
-				statement.execute("CREATE DATABASE " + database);
-			}
-			catch (SQLException ex) {
-				throw new IllegalStateException("Failed to create test database " + database, ex);
-			}
-			return database;
-		}
-	}
+        @Override
+        public @NonNull String getJdbcUrl() {
+            var base = container.getJdbcUrl();
+            var slash = base.lastIndexOf('/');
+            return base.substring(0, slash + 1) + database;
+        }
+
+        @Override
+        public @Nullable String getUsername() {
+            return container.getUsername();
+        }
+
+        @Override
+        public @Nullable String getPassword() {
+            return container.getPassword();
+        }
+
+        private static String createDatabase(PostgreSQLContainer container) {
+
+            var database = "test_" + UUID.randomUUID().toString().replace("-", "");
+
+            try (
+                var connection = DriverManager.getConnection(
+                    container.getJdbcUrl(),
+                    container.getUsername(),
+                    container.getPassword()
+                );
+                var statement = connection.createStatement()
+            ) {
+                statement.execute("CREATE DATABASE " + database);
+            } catch (SQLException ex) {
+                throw new IllegalStateException("Failed to create test database " + database, ex);
+            }
+
+            return database;
+        }
+    }
 }
