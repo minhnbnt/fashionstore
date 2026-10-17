@@ -10,7 +10,7 @@ Iteration đầu tiên, giữ đơn giản: **đăng nhập** và **CRUD sản p
 
 ## Giả định (sửa lại issue nếu sai)
 
-- Frontend: **Vite + React** đặt trong thư mục `frontend/` của repo này, dev server chạy ở cổng **3000** (khớp `GOTRUE_SITE_URL` trong `config/gotrue.env`), routing bằng `react-router`.
+- Frontend: **Vite + React** nằm ở repo riêng **`fashionstore-ui/`** (git repo độc lập, không track trong repo này), dev server chạy ở cổng **3000** (khớp `GOTRUE_SITE_URL` trong `config/gotrue.env`), routing bằng `react-router`.
 - Bất kỳ user nào đã đăng nhập đều được CRUD sản phẩm; phân quyền admin để iteration sau.
 - Mỗi sản phẩm có **tối đa 1 ảnh tuỳ chọn**.
 - `price` là số nguyên (VND, không có số lẻ).
@@ -84,30 +84,31 @@ Service one-shot `s3-init` tự tạo bucket `fashionstore` + gắn policy anony
 podman compose run --rm s3-init
 ```
 
-### 4. Frontend (`frontend/`)
+### 4. Frontend (`fashionstore-ui/`, repo riêng — dùng **pnpm**)
 
-- Scaffold: `npm create vite@latest frontend -- --template react-ts`. Trong `vite.config.ts` đặt `server.port = 3000` (khớp `GOTRUE_SITE_URL` và CORS).
-- Env trong `frontend/.env`: `VITE_GOTRUE_URL=http://localhost:9999`, `VITE_API_URL=http://localhost:8080`, `VITE_ASSETS_URL=http://localhost:3900/fashionstore` (Vite chỉ expose biến có prefix `VITE_`).
-- Dependency: `@supabase/supabase-js` + `react-router`.
-- Khởi tạo auth client: `createClient(GOTRUE_URL, ANON_PLACEHOLDER)` — GoTrue self-host (không multi-tenant) **bỏ qua** giá trị `apikey`, truyền chuỗi placeholder là được.
-- Routes: `/login` (đăng nhập + đăng ký cùng 1 form), `/` (danh sách), `/products/new`, `/products/:id/edit`. Chưa đăng nhập mà vào route quản lý → `<Navigate to="/login">`.
-- Mọi call API kèm `Authorization: Bearer <session.access_token>`; không cần thêm lib state — component + `useState`/`useEffect` đủ.
-- Flow upload: chọn file → `POST /api/uploads/presign` → `PUT` presigned URL (đúng `Content-Type` đã ký) → lấy `key` đưa vào payload tạo/sửa sản phẩm.
-- URL ảnh = `${VITE_ASSETS_URL}/${image_key}`.
+- Scaffold: `pnpm create vite fashionstore-ui --template react-ts`. Trong `vite.config.ts` đặt `server.port = 3000` (khớp `GOTRUE_SITE_URL` và CORS).
+- Env trong `fashionstore-ui/.env`: `VITE_GOTRUE_URL=http://localhost:9999`, `VITE_API_URL=http://localhost:8080`, `VITE_ASSETS_URL=http://localhost:3900/fashionstore` (Vite chỉ expose biến có prefix `VITE_`).
+- Dependency: `@supabase/auth-js` (dùng `GoTrueClient`, **không** dùng `createClient` của `@supabase/supabase-js` — supabase-js ghép `/auth/v1` sai path với GoTrue bare) + `react-router` + `@tanstack/react-query` + shadcn/ui.
+- Data-fetching gom trong `src/hooks/` (`useProducts`, `useProduct`, `useSaveProduct`, `useDeleteProduct`, `useAuth`); `src/lib/api.ts` giữ transport (Bearer + 401 → signOut + về `/login`) và mock mode (`VITE_USE_MOCK=1`).
+- Routes: `/login` (đăng nhập + đăng ký cùng 1 form), `/` (danh sách), `/products/new`, `/products/:id/edit`, placeholder `/products/:id`, `/cart`, `/orders`, `/account`. Chưa đăng nhập mà vào route quản lý → `<Navigate to="/login">`.
+- Mọi call API kèm `Authorization: Bearer <session.access_token>`; query/mutation qua hooks react-query (cache + invalidate `['products']`).
+- Flow upload: chọn file → `POST /api/uploads/presign` → `PUT` presigned URL (đúng `Content-Type` đã ký, không gắn Bearer) → lấy `key` đưa vào payload tạo/sửa sản phẩm.
+- URL ảnh = `${VITE_ASSETS_URL}/${image_key}` (absolute URL pass-through).
 
 ### 5. Kiểm tra end-to-end
 
 ```bash
 podman compose up -d
 ./gradlew bootRun
-cd frontend && npm run dev   # http://localhost:3000
+cd fashionstore-ui && pnpm dev   # http://localhost:3000
 ```
 
 1. `curl -i http://localhost:8080/api/products` → **401** (không token).
-2. Đăng ký user mới → vào thẳng trang danh sách (rỗng).
+2. Đăng ký user mới → vào thẳng trang danh sách (mock mode: 6 sản phẩm mẫu; real mode: rỗng).
 3. Tạo sản phẩm kèm ảnh → ảnh hiện trên list qua `localhost:3900/fashionstore`.
-4. Sửa tên/giá, thay ảnh → OK. Xoá sản phẩm → khỏi list.
-5. Refresh trang giữa chừng → vẫn đăng nhập (token tự refresh).
+4. Responsive đã kiểm tra bằng Chromium ở 375 / 768 / 1024 / 1440 (`/`, `/login`, `/products/new`) + luồng xoá end-to-end (dialog → toast → list refresh).
+5. Sửa tên/giá, thay ảnh → OK. Xoá sản phẩm → khỏi list.
+6. Refresh trang giữa chừng → vẫn đăng nhập (token tự refresh).
 
 ## Ngoài phạm vi (để iteration sau)
 

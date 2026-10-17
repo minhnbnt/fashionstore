@@ -1,6 +1,8 @@
 spring:
   application:
     name: fashionstore
+  flyway:
+    out-of-order: true
 
   config:
     import: optional:file:config/springboot.yml

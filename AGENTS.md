@@ -1,42 +1,18 @@
-# Coding conventions
+# fashionstore (backend) — AGENTS.md
 
-## Prefer explicit over clever
+Spring Boot 4 + Data JDBC + Postgres + GoTrue JWT + versitygw S3. Marketplace nhiều shop bán quần áo.
 
-Code gets read far more often than it is written. Pick the version a reader
-understands on the first pass, even when that version is a line longer.
+## Đọc thêm (chi tiết chia file để khỏi phình)
 
-- **No ternaries (`? :`) in this codebase.** Write an `if` with an early
-  `return` instead. A ternary saves a line but makes the reader evaluate the
-  condition inline, and it turns unreadable fast once nested or long.
-- Keep one statement per line. Do not cram several steps into one expression to
-  look tidy.
-- If a construct needs a comment to justify it, it should be simpler.
+- `docs/structure.md` — tổ chức thư mục: `features/` phẳng hay 3 lớp, đồ chung để đâu, migration để đâu.
+- `docs/code-guide.md` — luật viết code: explicit, Lombok allowlist, NullAway, TDD, annotation springdoc.
+- `docs/data.md` — aggregate JDBC, schema đã chốt, search BM25, S3, test DB.
+- `docs/api-endpoints.md` — danh sách API theo flow + checkbox tiến độ.
 
-Example — `S3Storage.extensionOf`:
+## Quy tắc nhanh
 
-```java
-// avoid: a ternary inside another expression, three things to read at once
-var key = UUID.randomUUID() + "."
-    + (subtype.contains("+") ? subtype.substring(0, subtype.indexOf('+')) : subtype);
-
-// prefer: the helper says what it returns, the caller says what it does
-var key = UUID.randomUUID() + "." + extensionOf(contentType);
-
-private static String extensionOf(String contentType) {
-    var subtype = MimeTypeUtils.parseMimeType(contentType).getSubtype();
-    var plusIndex = subtype.indexOf("+");
-    if (plusIndex < 0) {
-        return subtype;
-    }
-    return subtype.substring(0, plusIndex);
-}
-```
-
-Spend the extra lines. Clever is not the same as short, and short is not the
-same as clear.
-
-## Other rules
-
-- Follow the surrounding style (4-space indent in `src/main`, `var` for locals,
-  `record` for DTOs). Consistency beats personal preference.
-- Existing patterns in the repo win over new ones you prefer.
+- Cấm ternary (`? :`): `if` + early `return`.
+- Entity cấm `@Data`/`@Setter`/`@EqualsAndHashCode`; mặc định non-null (NullAway), nullable gắn `@Nullable`.
+- Exception/message tiếng Anh. DB chỉ lưu S3 key, không lưu URL.
+- Testcontainers dùng image Postgres của project, không đổi sang stock image.
+- `./gradlew test` xanh rồi mới xong việc.

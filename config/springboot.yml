@@ -11,6 +11,9 @@ spring:
     username: postgres
     password: postgres
 
+  flyway:
+    out-of-order: true
+
   security:
     oauth2:
       resourceserver:
@@ -26,3 +29,10 @@ s3:
   # URL gốc cho ảnh public (path-style trên chính port S3, kèm tên bucket).
   # Anonymous GET nhờ bucket policy mà s3-init gắn khi compose up. Không có trailing slash.
   public-base-url: http://localhost:3900/fashionstore
+
+gotrue:
+  url: http://localhost:9999
+  # Service role key cho GoTrue Admin API (ban/unban, gán app_metadata.role khi duyệt shop):
+  # JWT ES256 ký bằng key trong GOTRUE_JWT_KEYS, claim {"role":"service_role"}, kid khớp key.
+  # Để trống = bỏ qua bước GoTrue (backend vẫn chặn tài khoản khóa qua AccountFilter).
+  service-role-key: ""
