@@ -1,6 +1,7 @@
 spring:
   application:
     name: fashionstore
+
   flyway:
     out-of-order: true
 

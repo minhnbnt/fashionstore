@@ -1,13 +1,10 @@
 spring:
-  aot:
-    enabled: true
-
   docker:
     compose:
       enabled: false
 
   datasource:
-    url: jdbc:postgresql://localhost:6432/fashionstore
+    url: jdbc:postgresql://localhost:5432/fashionstore
     username: postgres
     password: postgres
 
@@ -22,17 +19,12 @@ spring:
 
 s3:
   endpoint: http://localhost:3900
-  region: us-east-1
+  region: garage
   bucket: fashionstore
-  access-key: versityadmin
-  secret-key: versityadmin
-  # URL gốc cho ảnh public (path-style trên chính port S3, kèm tên bucket).
-  # Anonymous GET nhờ bucket policy mà s3-init gắn khi compose up. Không có trailing slash.
-  public-base-url: http://localhost:3900/fashionstore
+  access-key: GKd44959a54214a28492750765e375479f
+  secret-key: passwordpassword
+  public-base-url: http://fashionstore.web.garage.localhost:3902
 
 gotrue:
   url: http://localhost:9999
-  # Service role key cho GoTrue Admin API (ban/unban, gán app_metadata.role khi duyệt shop):
-  # JWT ES256 ký bằng key trong GOTRUE_JWT_KEYS, claim {"role":"service_role"}, kid khớp key.
-  # Để trống = bỏ qua bước GoTrue (backend vẫn chặn tài khoản khóa qua AccountFilter).
   service-role-key: ""
