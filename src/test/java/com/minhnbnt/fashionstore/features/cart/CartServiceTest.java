@@ -1,0 +1,255 @@
+package com.minhnbnt.fashionstore.features.cart;
+
+import com.minhnbnt.fashionstore.TestcontainersConfiguration;
+import com.minhnbnt.fashionstore.dto.cart.CartCheckoutRequest;
+import com.minhnbnt.fashionstore.dto.cart.CartItemRequest;
+import com.minhnbnt.fashionstore.dto.cart.CheckoutBlockedItem;
+import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
+import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
+import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
+import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
+import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
+import com.minhnbnt.fashionstore.features.catalog.CatalogService;
+import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
+import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepository;
+import com.minhnbnt.fashionstore.features.identity.UserService;
+import com.minhnbnt.fashionstore.features.order.OrderService;
+import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.model.Product;
+import com.minhnbnt.fashionstore.model.ProductVariant;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+@Import(TestcontainersConfiguration.class)
+@SpringBootTest
+class CartServiceTest {
+
+    @Autowired
+    private CartService carts;
+
+    @Autowired
+    private OrderService orders;
+
+    @Autowired
+    private CatalogService catalog;
+
+    @Autowired
+    private ShopService shops;
+
+    @Autowired
+    private UserService users;
+
+    @Autowired
+    private ProductRepository products;
+
+    @Autowired
+    private ProductVariantRepository variants;
+
+    private UUID mirroredUser() {
+        var id = UUID.randomUUID();
+        users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U", null));
+        return id;
+    }
+
+    private UUID approvedShop(UUID ownerId, String slug) {
+        var adminId = mirroredUser();
+        var shop = shops.register(ownerId, new CreateShopRequest("Shop " + slug, slug, null, null, null));
+        shops.approve(adminId, shop.id());
+        return shop.id();
+    }
+
+    private UUID pendingShop(UUID ownerId, String slug) {
+        var shop = shops.register(ownerId, new CreateShopRequest("Shop " + slug, slug, null, null, null));
+        return shop.id();
+    }
+
+    private UUID variantInShop(UUID ownerId, UUID shopId, String slug, String sku, int stock) {
+        var created = catalog.createProduct(
+            ownerId,
+            shopId,
+            new CreateProductRequest(
+                "Ao " + slug,
+                slug,
+                null,
+                null,
+                List.of(new CreateVariantRequest(sku, "M", "Den", 100000L, null, stock, true))
+            )
+        );
+        var detail = catalog.getDetail(created.id());
+        return detail.variants().get(0).id();
+    }
+
+    private UUID hiddenVariantInShop(UUID ownerId, UUID shopId, String slug, String sku) {
+        var created = catalog.createProduct(
+            ownerId,
+            shopId,
+            new CreateProductRequest(
+                "Ao " + slug,
+                slug,
+                null,
+                null,
+                List.of(new CreateVariantRequest(sku, "M", "Den", 100000L, null, 10, true))
+            )
+        );
+        catalog.updateProduct(ownerId, shopId, created.id(), new UpdateProductRequest(null, null, null, "HIDDEN", null));
+        return variants.findByProductIdOrderByCreatedAtAsc(created.id()).get(0).getId();
+    }
+
+    private UUID variantInPendingShop(UUID ownerId, UUID shopId, String slug, String sku) {
+        var product = products.save(Product.create(shopId, null, "Ao " + slug, slug, "", ownerId));
+        var variant = variants.save(ProductVariant.create(shopId, product.getId(), sku, "M", "Den", 100000L, null, 10, true));
+        return variant.getId();
+    }
+
+    private static void assertStatus(ResponseStatusException e, HttpStatus status) {
+        assertThat(e.getStatusCode()).isEqualTo(status);
+    }
+
+    private static CartCheckoutRequest shipping() {
+        return new CartCheckoutRequest("An", "0901", "Ha Noi", 0L);
+    }
+
+    @Test
+    void addItemCreatesCartAndMergesQuantity() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-cart-a");
+        var variantId = variantInShop(ownerId, shopId, "ao-cart-a", "SKU-CART-A", 10);
+
+        carts.addItem(buyerId, new CartItemRequest(variantId, 2));
+        var cart = carts.addItem(buyerId, new CartItemRequest(variantId, 3));
+
+        assertThat(cart.items()).hasSize(1);
+        assertThat(cart.items().get(0).quantity()).isEqualTo(5);
+        assertThat(cart.subtotal()).isEqualTo(500000L);
+    }
+
+    @Test
+    void addUnknownVariantFails() {
+        var buyerId = mirroredUser();
+
+        assertThatThrownBy(() -> carts.addItem(buyerId, new CartItemRequest(UUID.randomUUID(), 1)))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    void updateQuantityAndRemoveAndClear() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-cart-b");
+        var variantId = variantInShop(ownerId, shopId, "ao-cart-b", "SKU-CART-B", 10);
+        carts.addItem(buyerId, new CartItemRequest(variantId, 2));
+
+        var updated = carts.updateQuantity(buyerId, variantId, 4);
+        assertThat(updated.items().get(0).quantity()).isEqualTo(4);
+
+        var removed = carts.removeItem(buyerId, variantId);
+        assertThat(removed.items()).isEmpty();
+
+        carts.addItem(buyerId, new CartItemRequest(variantId, 1));
+        var cleared = carts.clear(buyerId);
+        assertThat(cleared.items()).isEmpty();
+    }
+
+    @Test
+    void updateMissingItemFails() {
+        var buyerId = mirroredUser();
+
+        assertThatThrownBy(() -> carts.updateQuantity(buyerId, UUID.randomUUID(), 2))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    void checkoutSplitsPerShopAndEmptiesCart() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopA = approvedShop(ownerId, "shop-cart-c1");
+        var shopB = approvedShop(ownerId, "shop-cart-c2");
+        var variantA = variantInShop(ownerId, shopA, "ao-cart-c1", "SKU-CART-C1", 10);
+        var variantB = variantInShop(ownerId, shopB, "ao-cart-c2", "SKU-CART-C2", 10);
+        carts.addItem(buyerId, new CartItemRequest(variantA, 1));
+        carts.addItem(buyerId, new CartItemRequest(variantB, 2));
+
+        var placed = carts.checkout(buyerId, shipping());
+
+        assertThat(placed).hasSize(2);
+        assertThat(placed).extracting(order -> order.shopId()).containsExactlyInAnyOrder(shopA, shopB);
+        assertThat(placed).extracting(order -> order.status()).containsOnly("PENDING");
+        assertThat(carts.getCart(buyerId).items()).isEmpty();
+    }
+
+    @Test
+    void checkoutBlockedOnSoldOutPlacesNothing() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-cart-d");
+        var soldOut = variantInShop(ownerId, shopId, "ao-cart-d1", "SKU-CART-D1", 0);
+        var fine = variantInShop(ownerId, shopId, "ao-cart-d2", "SKU-CART-D2", 10);
+        carts.addItem(buyerId, new CartItemRequest(soldOut, 1));
+        carts.addItem(buyerId, new CartItemRequest(fine, 1));
+
+        assertThatThrownBy(() -> carts.checkout(buyerId, shipping()))
+            .isInstanceOf(CartCheckoutBlockedException.class)
+            .satisfies(e -> assertThat(((CartCheckoutBlockedException) e).getItems())
+                .extracting(CheckoutBlockedItem::variantId)
+                .containsExactly(soldOut));
+
+        assertThat(orders.getMine(buyerId)).isEmpty();
+        assertThat(carts.getCart(buyerId).items()).hasSize(2);
+    }
+
+    @Test
+    void checkoutEmptyCartFails() {
+        var buyerId = mirroredUser();
+
+        assertThatThrownBy(() -> carts.checkout(buyerId, shipping()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void checkoutBlockedForUnapprovedShop() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = pendingShop(ownerId, "shop-cart-e");
+        var variantId = variantInPendingShop(ownerId, shopId, "ao-cart-e", "SKU-CART-E");
+        carts.addItem(buyerId, new CartItemRequest(variantId, 1));
+
+        assertThatThrownBy(() -> carts.checkout(buyerId, shipping()))
+            .isInstanceOf(CartCheckoutBlockedException.class)
+            .satisfies(e -> assertThat(((CartCheckoutBlockedException) e).getItems())
+                .extracting(CheckoutBlockedItem::variantId)
+                .containsExactly(variantId));
+
+        assertThat(orders.getMine(buyerId)).isEmpty();
+    }
+
+    @Test
+    void checkoutBlockedForHiddenProduct() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-cart-f");
+        var variantId = hiddenVariantInShop(ownerId, shopId, "ao-cart-f", "SKU-CART-F");
+        carts.addItem(buyerId, new CartItemRequest(variantId, 1));
+
+        assertThatThrownBy(() -> carts.checkout(buyerId, shipping()))
+            .isInstanceOf(CartCheckoutBlockedException.class)
+            .satisfies(e -> assertThat(((CartCheckoutBlockedException) e).getItems())
+                .extracting(CheckoutBlockedItem::variantId)
+                .containsExactly(variantId));
+
+        assertThat(orders.getMine(buyerId)).isEmpty();
+    }
+}
