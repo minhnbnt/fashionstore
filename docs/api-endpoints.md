@@ -73,6 +73,17 @@ Chi tiết luồng này xem `docs/catalog.md`.
 | [x] | 27 | PATCH | `/api/admin/users/{id}/lock` | Khóa kèm lý do; tạm khóa shop mà user làm OWNER |
 | [x] | 28 | PATCH | `/api/admin/users/{id}/unlock` | Mở khóa tài khoản; không tự mở lại shop |
 
+### Kiểm duyệt sản phẩm (gỡ sản phẩm vi phạm)
+
+| Xong | # | Method | Path | Mô tả |
+|------|---|--------|------|-------|
+| [x] | 28b | GET | `/api/admin/products?status=&shopId=&q=&page=&size=` | Tìm/lọc sản phẩm toàn sàn; `q` khớp tên/slug, tên shop, SKU |
+| [x] | 28c | GET | `/api/admin/products/{id}` | Chi tiết + shop + biến thể + ảnh + lịch sử kiểm duyệt |
+| [x] | 28d | PATCH | `/api/admin/products/{id}/ban` | Gỡ kèm `{violationType, reason}`: `ACTIVE`/`HIDDEN` → `BANNED` |
+| [x] | 28e | PATCH | `/api/admin/products/{id}/restore` | Khôi phục `BANNED` → `HIDDEN`, shop tự đăng bán lại |
+
+Sản phẩm `BANNED` biến mất khỏi search/PDP, checkout trả `409`; shop không `activate` được nhưng vẫn sửa/xóa mềm được, đơn đang xử lý vẫn tiếp tục. Chi tiết xem `docs/superpowers/specs/2026-10-17-admin-product-moderation-design.md`.
+
 Khóa tài khoản được thực thi hai lớp: `AccountFilter` chặn access token hiện tại ngay ở backend; `GoTrueAdminClient` ban/unban đăng nhập khi có cấu hình `gotrue.service-role-key`. Mọi chuyển trạng thái khóa dòng bằng `SELECT ... FOR UPDATE` và ghi lịch sử trong cùng transaction.
 
 ## Flow 6 — Seller Center: Quản lý hồ sơ Shop & Tương tác

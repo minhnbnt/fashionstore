@@ -14,7 +14,16 @@ public record SellerProductResponse(
     String name,
     String slug,
     String description,
+    @Schema(description = "ACTIVE | HIDDEN | DELETED | BANNED", example = "ACTIVE")
     String status,
+    @Schema(
+        description = "Loại vi phạm khi bị admin gỡ (status = BANNED), null nếu không bị gỡ",
+        nullable = true,
+        example = "COUNTERFEIT"
+    )
+    @Nullable String violationType,
+    @Schema(description = "Lý do admin gỡ, null nếu không bị gỡ", nullable = true)
+    @Nullable String statusReason,
     int totalStock,
     long minPrice,
     long maxPrice,

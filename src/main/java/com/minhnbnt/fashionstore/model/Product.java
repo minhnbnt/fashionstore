@@ -32,6 +32,10 @@ public class Product implements Persistable<UUID> {
 
     private ProductStatus status;
 
+    private @Nullable ProductViolationType violationType;
+
+    private @Nullable String statusReason;
+
     private @Nullable UUID createdBy;
 
     private Instant createdAt;
@@ -50,6 +54,8 @@ public class Product implements Persistable<UUID> {
         String slug,
         String description,
         ProductStatus status,
+        @Nullable ProductViolationType violationType,
+        @Nullable String statusReason,
         @Nullable UUID createdBy,
         Instant createdAt,
         Instant updatedAt
@@ -61,6 +67,8 @@ public class Product implements Persistable<UUID> {
         this.slug = slug;
         this.description = description;
         this.status = status;
+        this.violationType = violationType;
+        this.statusReason = statusReason;
         this.createdBy = createdBy;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -84,6 +92,8 @@ public class Product implements Persistable<UUID> {
             slug,
             description,
             ProductStatus.ACTIVE,
+            null,
+            null,
             createdBy,
             now,
             now
@@ -101,6 +111,12 @@ public class Product implements Persistable<UUID> {
     }
 
     public void activate() {
+        if (status == ProductStatus.BANNED) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Product was banned for a policy violation and cannot be activated"
+            );
+        }
         if (status != ProductStatus.HIDDEN) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only hidden products can be activated");
         }
@@ -113,6 +129,35 @@ public class Product implements Persistable<UUID> {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Product is already deleted");
         }
         status = ProductStatus.DELETED;
+        updatedAt = Instant.now();
+    }
+
+    /**
+     * Admin gỡ sản phẩm vi phạm. Gỡ được cả hàng đang ẩn để shop không tự bật lại.
+     */
+    public void ban(ProductViolationType type, String reason) {
+        if (status == ProductStatus.BANNED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Product is already banned");
+        }
+        if (status == ProductStatus.DELETED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Deleted products cannot be banned");
+        }
+        status = ProductStatus.BANNED;
+        violationType = type;
+        statusReason = reason;
+        updatedAt = Instant.now();
+    }
+
+    /**
+     * Khôi phục về HIDDEN, không về thẳng ACTIVE: shop kiểm tra lại rồi tự đăng bán.
+     */
+    public void restore() {
+        if (status != ProductStatus.BANNED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only banned products can be restored");
+        }
+        status = ProductStatus.HIDDEN;
+        violationType = null;
+        statusReason = null;
         updatedAt = Instant.now();
     }
 

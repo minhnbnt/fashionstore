@@ -21,6 +21,7 @@ import com.minhnbnt.fashionstore.model.Order;
 import com.minhnbnt.fashionstore.model.OrderItem;
 import com.minhnbnt.fashionstore.model.OrderStatus;
 import com.minhnbnt.fashionstore.model.OrderStatusHistory;
+import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.model.StockMovement;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
@@ -98,6 +99,10 @@ public class OrderService {
             var product = products.findById(variant.getProductId()).orElse(null);
             if (product == null) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+            }
+            // Hàng shop ẩn/xóa hoặc admin gỡ vi phạm không được bán tiếp.
+            if (product.getStatus() != ProductStatus.ACTIVE) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Product is not available for sale");
             }
 
             var lineTotal = variant.getPrice() * item.quantity();
