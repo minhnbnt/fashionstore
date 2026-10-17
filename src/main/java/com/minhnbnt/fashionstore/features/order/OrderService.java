@@ -201,6 +201,15 @@ public class OrderService {
         return toResponse(orders.save(order), orderItems);
     }
 
+    @Transactional
+    public OrderResponse confirmReceipt(@NonNull UUID buyerId, @NonNull UUID orderId) {
+        var order = requireBuyerOrder(buyerId, orderId);
+        order.confirmReceipt();
+
+        var orderItems = items.findByOrderId(order.getId());
+        return toResponse(orders.save(order), orderItems);
+    }
+
     @Transactional(readOnly = true)
     public List<OrderResponse> listSellerOrders(@NonNull UUID userId) {
         var result = new ArrayList<OrderResponse>();

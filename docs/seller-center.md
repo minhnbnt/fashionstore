@@ -19,7 +19,7 @@ Hệ thống Kênh Người Bán (Seller Center) của **FashionStore Marketplac
 2. **Sản phẩm & Tồn kho (`features/catalog`)**: Quản lý vòng đời sản phẩm (`ACTIVE`, `INACTIVE`, `DELETED`), quản lý biến thể đa kích cỡ/màu sắc, cảnh báo tồn kho thấp (`low_stock_threshold`), điều chỉnh kho tức thời kèm sổ nhật ký biến động (`stock_movement`), xuất/nhập danh mục sản phẩm hàng loạt (CSV bulk import/export).
 3. **Đơn hàng & Đổi/Trả hàng (`features/order`)**: Quy trình xác nhận và giao hàng (`PENDING` -> `CONFIRMED` -> `SHIPPING` -> `DELIVERED`), hủy đơn an toàn kèm hoàn kho nguyên tử, quản lý yêu cầu trả hàng / hoàn tiền (`return_request`) với các bước xem xét chứng từ, phê duyệt phương án hoặc từ chối.
 4. **Quản lý Doanh thu & Ví Người bán (`features/order`)**: Quyết toán tự động sau khi giao hàng thành công (`seller_settlement`) với thời gian tạm giữ 3 ngày đối soát khiếu nại, biểu đồ doanh thu theo ngày, thống kê sản phẩm bán chạy nhất, quản lý số dư và lệnh rút tiền (`seller_withdrawal`).
-5. **Đánh giá & CSKH (`features/review`, `features/chat`)**: Đánh giá sản phẩm sau mua kèm ảnh thực tế, tính toán điểm uy tín shop, cơ chế phản hồi và khiếu nại đánh giá xấu, hệ thống nhắn tin trực tuyến Buyer - Shop kèm cơ chế tự động trả lời (Auto-reply).
+5. **Đánh giá & CSKH (`features/review`, `features/chat`)**: Đánh giá sản phẩm sau khi nhận hàng (1 bài/product/buyer, sửa/xóa được), cơ chế phản hồi và khiếu nại đánh giá xấu, hệ thống nhắn tin trực tuyến Buyer - Shop kèm cơ chế tự động trả lời (Auto-reply).
 6. **Trang trí Gian hàng (`features/shop`)**: Trình thiết kế gian hàng linh hoạt dựa trên khối JSON layout (Banner Carousel, Bộ sưu tập nổi bật, Flash Sale, Video), hỗ trợ cơ chế lưu nháp (Draft Preview) và xuất bản chính thức (Publish).
 7. **Phân quyền Nhân sự Shop (`features/shop`)**: Mô hình RBAC tùy biến theo nhu cầu từng gian hàng (Quản lý, CSKH, Kho vận, Marketing), mời nhân viên qua email bảo mật bằng token, phân quyền chi tiết từng chức năng, lưu vết hành động nhân viên (Audit Log).
 
@@ -62,8 +62,8 @@ Hệ thống Kênh Người Bán (Seller Center) của **FashionStore Marketplac
 - **Lệnh rút tiền (`seller_withdrawal`)**: Người bán gửi lệnh rút tiền (tối thiểu 50.000 VNĐ). Hệ thống kiểm tra số dư khả dụng, ghi nhận lệnh và chuyển sang trạng thái xử lý ngân hàng.
 
 ### 2.5. Đánh giá Sản phẩm & Chat CSKH
-- **Đánh giá**: Khách hàng chỉ được đánh giá 1 lần duy nhất cho mỗi sản phẩm trong đơn đã `DELIVERED`. Điểm đánh giá (1-5 sao) sẽ tự động tái tính toán điểm trung bình (`rating`) và tổng lượt đánh giá (`rating_count`) của shop.
-- **Seller Reply & Report**: Người bán có thể phản hồi giải thích công khai dưới đánh giá hoặc báo cáo nếu có hành vi bôi nhọ, cạnh tranh không lành mạnh.
+- **Đánh giá**: Mỗi buyer chỉ được đánh giá 1 lần duy nhất cho mỗi sản phẩm, chỉ khi đơn đã `DELIVERED` và buyer đã xác nhận nhận hàng (`received`). Buyer có thể sửa/xóa bài của mình. Dùng bảng `review` duy nhất (`V7` + `V11`, `product_review` đã drop).
+- **Seller Reply & Report**: Người bán có thể phản hồi giải thích công khai dưới đánh giá (1 lần) hoặc báo cáo nếu có hành vi bôi nhọ, cạnh tranh không lành mạnh.
 - **Tin nhắn trực tuyến**: Buyer và Seller trao đổi trực tiếp, hệ thống theo dõi số tin chưa đọc (`unread_count`). Khi buyer gửi tin đầu tiên, hệ thống tự kích hoạt tin nhắn chào mừng / giải đáp tự động nếu shop có cài đặt `auto_reply_text`.
 
 ### 2.6. Trang trí Gian hàng (Shop Decoration)
@@ -158,22 +158,20 @@ CREATE TABLE seller_withdrawal (
     processed_at TIMESTAMPTZ
 );
 
--- Đánh giá sản phẩm
-CREATE TABLE product_review (
+-- Đánh giá sản phẩm (bảng duy nhất, V7 + V11 — seller reply/report trên cùng bảng)
+CREATE TABLE review (
     id UUID PRIMARY KEY,
-    order_id UUID NOT NULL,
     product_id UUID NOT NULL,
-    shop_id UUID NOT NULL,
     buyer_id UUID NOT NULL,
-    rating SMALLINT NOT NULL,
+    buyer_display_name TEXT NOT NULL,
+    stars INT NOT NULL,
     comment TEXT,
-    image_keys TEXT[],
     seller_reply TEXT,
     replied_at TIMESTAMPTZ,
     is_reported BOOLEAN NOT NULL DEFAULT FALSE,
     report_reason TEXT,
     created_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT uq_product_review_order_product UNIQUE (order_id, product_id)
+    CONSTRAINT uq_review_one_per_buyer UNIQUE (product_id, buyer_id)
 );
 
 -- Chat hội thoại & tin nhắn

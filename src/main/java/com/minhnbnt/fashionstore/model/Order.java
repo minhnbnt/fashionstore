@@ -56,6 +56,8 @@ public class Order implements Persistable<UUID> {
 
     private @Nullable Instant deliveredAt;
 
+    private @Nullable Instant receivedAt;
+
     private @Nullable Instant cancelledAt;
 
     private Instant createdAt;
@@ -86,6 +88,7 @@ public class Order implements Persistable<UUID> {
         @Nullable Instant confirmedAt,
         @Nullable Instant shippedAt,
         @Nullable Instant deliveredAt,
+        @Nullable Instant receivedAt,
         @Nullable Instant cancelledAt,
         Instant createdAt,
         Instant updatedAt
@@ -109,6 +112,7 @@ public class Order implements Persistable<UUID> {
         this.confirmedAt = confirmedAt;
         this.shippedAt = shippedAt;
         this.deliveredAt = deliveredAt;
+        this.receivedAt = receivedAt;
         this.cancelledAt = cancelledAt;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -141,6 +145,7 @@ public class Order implements Persistable<UUID> {
             shippingPhone,
             shippingAddress,
             "",
+            null,
             null,
             null,
             null,
@@ -202,6 +207,14 @@ public class Order implements Persistable<UUID> {
         cancelReason = reason;
         cancelNote = note;
         cancelledAt = Instant.now();
+        updatedAt = Instant.now();
+    }
+
+    public void confirmReceipt() {
+        if (status != OrderStatus.DELIVERED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only delivered orders can be confirmed");
+        }
+        receivedAt = Instant.now();
         updatedAt = Instant.now();
     }
 

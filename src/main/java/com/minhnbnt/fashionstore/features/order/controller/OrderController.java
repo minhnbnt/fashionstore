@@ -97,4 +97,21 @@ public class OrderController {
 
         return orders.cancel(buyerId, id);
     }
+
+    @PatchMapping("/{id}/received")
+    @Operation(summary = "Xac nhan da nhan hang", description = "Chi xac nhan duoc don DELIVERED. Mo khoa viet danh gia.")
+    @ApiResponse(responseCode = "200", description = "Don sau khi xac nhan")
+    @ApiResponse(responseCode = "401", description = "Thieu hoac sai JWT")
+    @ApiResponse(responseCode = "404", description = "Don khong ton tai hoac khong phai cua ban")
+    @ApiResponse(responseCode = "409", description = "Don chua o trang thai DELIVERED")
+    @SecurityRequirement(name = "bearerAuth")
+    public OrderResponse confirmReceipt(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id don") @PathVariable UUID id
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var buyerId = UUID.fromString(subject);
+
+        return orders.confirmReceipt(buyerId, id);
+    }
 }

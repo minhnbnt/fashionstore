@@ -1,9 +1,9 @@
 package com.minhnbnt.fashionstore.features.review.controller;
 
-import com.minhnbnt.fashionstore.dto.review.ProductReviewResponse;
+import com.minhnbnt.fashionstore.dto.review.SellerReviewResponse;
 import com.minhnbnt.fashionstore.dto.review.ReplyReviewRequest;
 import com.minhnbnt.fashionstore.dto.review.ReportReviewRequest;
-import com.minhnbnt.fashionstore.features.review.ProductReviewService;
+import com.minhnbnt.fashionstore.features.review.ReviewService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -32,7 +32,7 @@ import java.util.UUID;
 @Tag(name = "Seller - Reviews", description = "Seller quản lý đánh giá của khách và phản hồi")
 public class SellerReviewController {
 
-    private final ProductReviewService reviews;
+    private final ReviewService reviews;
 
     @GetMapping
     @Operation(summary = "Xem đánh giá của shop", description = "Có thể lọc các đánh giá chưa phản hồi (unreplied=true).")
@@ -40,7 +40,7 @@ public class SellerReviewController {
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
     @SecurityRequirement(name = "bearerAuth")
-    public List<ProductReviewResponse> list(
+    public List<SellerReviewResponse> list(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "Id shop") @RequestParam UUID shopId,
         @Parameter(description = "Chỉ xem đánh giá chưa phản hồi") @RequestParam(defaultValue = "false") boolean unreplied
@@ -48,7 +48,7 @@ public class SellerReviewController {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var userId = UUID.fromString(subject);
 
-        return reviews.listSellerReviews(userId, shopId, unreplied);
+        return reviews.listForShop(userId, shopId, unreplied);
     }
 
     @PatchMapping("/{id}/reply")
@@ -60,7 +60,7 @@ public class SellerReviewController {
     @ApiResponse(responseCode = "404", description = "Đánh giá không tồn tại")
     @ApiResponse(responseCode = "409", description = "Đánh giá đã được phản hồi trước đó")
     @SecurityRequirement(name = "bearerAuth")
-    public ProductReviewResponse reply(
+    public SellerReviewResponse reply(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "Id đánh giá") @PathVariable UUID id,
         @Valid @RequestBody ReplyReviewRequest request
@@ -79,7 +79,7 @@ public class SellerReviewController {
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
     @ApiResponse(responseCode = "404", description = "Đánh giá không tồn tại")
     @SecurityRequirement(name = "bearerAuth")
-    public ProductReviewResponse report(
+    public SellerReviewResponse report(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "Id đánh giá") @PathVariable UUID id,
         @Valid @RequestBody ReportReviewRequest request

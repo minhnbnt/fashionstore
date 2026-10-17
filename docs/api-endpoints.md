@@ -124,11 +124,11 @@ Khóa tài khoản được thực thi hai lớp: `AccountFilter` chặn access 
 
 | Xong | # | Method | Path | Mô tả |
 |------|---|--------|------|-------|
-| [x] | 54 | POST | `/api/orders/{orderId}/reviews` | Buyer đánh giá sản phẩm (1-5 sao, bình luận, ảnh thực tế) |
-| [x] | 55 | GET | `/api/products/{productId}/reviews` | Public danh sách đánh giá của sản phẩm |
 | [x] | 56 | GET | `/api/seller/shops/{shopId}/reviews` | Seller xem toàn bộ đánh giá của shop (lọc đánh giá chưa phản hồi) |
-| [x] | 57 | POST | `/api/seller/reviews/{id}/reply` | Seller phản hồi đánh giá của khách hàng |
+| [x] | 57 | PATCH | `/api/seller/reviews/{id}/reply` | Seller phản hồi đánh giá của khách hàng |
 | [x] | 58 | POST | `/api/seller/reviews/{id}/report` | Seller báo cáo đánh giá vi phạm tiêu chuẩn cộng đồng |
+
+Buyer tạo/sửa/xóa đánh giá đã chuyển hẳn về Flow 14 (`review`, bảng `review` — gộp 1 hệ thống, `product_review` đã drop ở `V11`).
 
 ## Flow 11 — Seller Center: Tin nhắn & Chat trực tuyến (CSKH)
 
@@ -173,3 +173,15 @@ Khóa tài khoản được thực thi hai lớp: `AccountFilter` chặn access 
 | [x] | 85 | POST | `/api/cart/checkout` | Kiểm tra hết rồi đặt, mỗi shop 1 đơn, hỏng thì 409 kèm từng item lỗi |
 
 Chi tiết luồng này xem `docs/cart.md`. Địa chỉ giao hàng vẫn là text thuần (cart chưa dùng tới sổ địa chỉ `V5__address_book`) — xem mục "Nâng cấp sau" trong đó.
+
+## Flow 14 — Review (đánh giá sau khi nhận hàng)
+
+| Xong | # | Method | Path | Mô tả |
+|------|---|--------|------|-------|
+| [x] | 86 | PATCH | `/api/orders/{id}/received` | Buyer xác nhận đã nhận (chỉ đơn `DELIVERED`) |
+| [x] | 87 | POST | `/api/products/{productId}/reviews` | Viết đánh giá (stars 1–5, đã nhận hàng mới viết được) |
+| [x] | 88 | GET | `/api/products/{productId}/reviews` | Public liệt kê, mới nhất trước |
+| [x] | 89 | PUT | `/api/products/{productId}/reviews` | Sửa bài của mình |
+| [x] | 90 | DELETE | `/api/products/{productId}/reviews` | Xóa bài của mình |
+
+Chi tiết luồng này xem `docs/review.md`.
