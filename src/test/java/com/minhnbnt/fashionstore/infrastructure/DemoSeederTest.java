@@ -16,10 +16,12 @@ import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestPropertySource;
 import software.amazon.awssdk.services.s3.S3Client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@TestPropertySource(properties = "test.context.id=demo-seeder")
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class DemoSeederTest {
@@ -62,8 +64,7 @@ class DemoSeederTest {
             assertThat(products.count()).isEqualTo(before + 9);
         }
 
-        var shop = shops.findBySlug("net-lab").orElse(null);
-        assertThat(shop).isNotNull();
+        var shop = shops.findBySlug("net-lab").orElseThrow();
         assertThat(shop.getStatus()).isEqualTo(ShopStatus.APPROVED);
         assertThat(categories.count()).isGreaterThanOrEqualTo(5);
 

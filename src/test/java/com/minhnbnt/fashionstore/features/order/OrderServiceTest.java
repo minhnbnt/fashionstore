@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -135,7 +136,7 @@ class OrderServiceTest {
         var confirmed = orders.confirm(ownerId, created.id());
 
         assertThat(confirmed.status()).isEqualTo("CONFIRMED");
-        var detail = catalog.getDetail(created.items().get(0).productId());
+        var detail = catalog.getDetail(Objects.requireNonNull(created.items().get(0).productId()));
         var remaining = detail.variants().stream()
             .filter(v -> v.id().equals(variantId))
             .findFirst()

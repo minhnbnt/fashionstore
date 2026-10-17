@@ -12,23 +12,22 @@ import org.springframework.context.annotation.Bean;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-/**
- * Một container postgres dùng chung cho mọi Spring context trong lần chạy test,
- * mỗi context nhận một database rời để giữ isolation như khi mỗi context có container riêng.
- */
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfiguration {
 
     private static @Nullable PostgreSQLContainer sharedPostgres;
 
     @Bean
-    synchronized PostgreSQLContainer postgresContainer() {
+    PostgreSQLContainer postgresContainer() {
 
-        if (sharedPostgres == null) {
-            sharedPostgres = startedPostgres();
+        synchronized (TestcontainersConfiguration.class) {
+
+            if (sharedPostgres == null) {
+                sharedPostgres = startedPostgres();
+            }
+
+            return sharedPostgres;
         }
-
-        return sharedPostgres;
     }
 
     private static PostgreSQLContainer startedPostgres() {
