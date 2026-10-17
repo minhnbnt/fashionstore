@@ -18,7 +18,7 @@ src/main/java/com/minhnbnt/fashionstore/
 ├── model/               # entity dùng chung, không phụ thuộc ai
 ├── dto/                 # request/response records, chia theo domain: dto/identity/, dto/shop/...
 ├── security/            # đồ auth dùng chung (CurrentUser, ShopAccessChecker...)
-├── infrastructure/      # biên hạ tầng (S3Storage, S3BucketWebsite...)
+├── infrastructure/      # biên hạ tầng (S3Storage, S3BucketBootstrap...)
 └── config/              # SecurityConfig, S3Config, OpenApiConfig...
 ```
 

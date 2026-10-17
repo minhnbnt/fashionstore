@@ -18,12 +18,12 @@ spring:
           issuer-uri: http://localhost:9999
 
 s3:
-  endpoint: http://localhost:3900
-  region: garage
+  endpoint: http://localhost:9000
+  region: us-east-1
   bucket: fashionstore
-  access-key: GKd44959a54214a28492750765e375479f
+  access-key: fashionstore
   secret-key: passwordpassword
-  public-base-url: http://fashionstore.web.garage.localhost:3902
+  public-base-url: http://localhost:9000
 
 gotrue:
   url: http://localhost:9999

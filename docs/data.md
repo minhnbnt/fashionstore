@@ -26,8 +26,8 @@
 ## S3 / file
 
 - DB chỉ lưu **key** (`avatar_key`, `s3_key`), không lưu URL. Presign upload qua `S3Storage`, key sinh từ UUID + extension từ content-type.
-- Bucket cho đọc ẩn danh qua policy `s3:GetObject` mà one-shot `s3-init` gắn khi `compose up` (xem `config/versitygw-init.sh`). Frontend tự ghép `{public-base-url}/{key}`, base URL xem `config/springboot.yml` (`s3.public-base-url`).
-- URL ảnh public là path-style trên chính port S3, bucket name làm prefix: `http://localhost:3900/fashionstore/{key}`.
+- Bucket và policy đọc ẩn danh (`s3:GetObject`, `Principal: *`) do `S3Config` bảo đảm lúc tạo `S3Client` khi app khởi động: `headBucket` → thiếu thì tạo mới, policy luôn put lại (idempotent, lỗi S3 chỉ warn, không chặn boot). Frontend tự ghép `{public-base-url}/{key}`, base URL xem `config/springboot.yml` (`s3.public-base-url`).
+- URL ảnh public là path-style trên chính port S3, bucket name làm prefix: `http://localhost:9000/fashionstore/{key}`.
 - SDK gửi checksum mặc định bị một số S3-compatible gateway từ chối (`Invalid payload signature`): `S3Client` cấu hình `requestChecksumCalculation(WHEN_REQUIRED)` — xem `S3Config.java`. Không đụng `S3Presigner`.
 
 ## Demo seed (dev-only)
