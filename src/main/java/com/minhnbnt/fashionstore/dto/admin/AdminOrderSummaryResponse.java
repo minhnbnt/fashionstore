@@ -21,13 +21,13 @@ public record AdminOrderSummaryResponse(
     @Schema(description = "Đơn đã hủy")
     long cancelled,
 
-    @Schema(description = "Chờ xác nhận quá 24 giờ")
+    @Schema(description = "Chờ xác nhận quá 1 ngày làm việc (không tính Chủ nhật, ngày lễ)")
     long confirmLate,
 
-    @Schema(description = "Đã xác nhận nhưng chưa bàn giao vận chuyển sau 48 giờ kể từ lúc đặt")
+    @Schema(description = "Đã xác nhận nhưng chưa bàn giao vận chuyển sau 2 ngày làm việc kể từ lúc đặt")
     long handoverLate,
 
-    @Schema(description = "Đang giao quá 7 ngày")
+    @Schema(description = "Đang giao quá 7 ngày làm việc")
     long deliveryLate,
 
     @Schema(description = "Đã giao, đang có yêu cầu trả hàng chưa xong")

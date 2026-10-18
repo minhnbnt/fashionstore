@@ -81,7 +81,8 @@ public class AdminOrderController {
     @Operation(
         operationId = "getAdminOrderSummary", summary = "Đếm đơn theo trạng thái và cảnh báo",
         description = "Cùng bộ lọc với danh sách nhưng không lọc trạng thái/cảnh báo, để hiện số trên từng tab và "
-            + "thẻ cảnh báo: chờ xác nhận quá 24 giờ, chưa bàn giao vận chuyển sau 48 giờ, đang giao quá 7 ngày, "
+            + "thẻ cảnh báo (tính ngày làm việc, không tính Chủ nhật/ngày lễ): chờ xác nhận quá 1 ngày, "
+            + "chưa bàn giao vận chuyển sau 2 ngày, đang giao quá 7 ngày, "
             + "trả hàng chưa xong."
     )
     @ApiResponse(responseCode = "200", description = "Số đếm")

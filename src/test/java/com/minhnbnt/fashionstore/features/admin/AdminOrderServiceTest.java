@@ -15,6 +15,7 @@ import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
 import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
+import com.minhnbnt.fashionstore.features.order.OrderSlaPolicy;
 import com.minhnbnt.fashionstore.features.order.ReturnRequestService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.AdminCancelReason;
@@ -29,10 +30,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -63,6 +69,9 @@ class AdminOrderServiceTest {
 
     @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private OrderSlaPolicy sla;
 
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
@@ -110,6 +119,18 @@ class AdminOrderServiceTest {
     private void ageOrder(UUID orderId, String column, String interval) {
         jdbc.sql("UPDATE orders SET " + column + " = now() - CAST(:interval AS interval) WHERE id = :id")
             .param("interval", interval)
+            .param("id", orderId)
+            .update();
+    }
+
+    /**
+     * Đẩy mốc của đơn qua cutoff 1 phút. Cutoff tính theo ngày làm việc nên không lùi cố định N giờ được
+     * (hôm trước là Chủ nhật/lễ thì N giờ chưa đủ).
+     */
+    private void agePast(UUID orderId, String column, Function<OrderSlaPolicy.Cutoffs, Instant> cutoff) {
+        var instant = cutoff.apply(sla.cutoffsAt(Instant.now())).minus(Duration.ofMinutes(1));
+        jdbc.sql("UPDATE orders SET " + column + " = :at WHERE id = :id")
+            .param("at", OffsetDateTime.ofInstant(instant, ZoneOffset.UTC))
             .param("id", orderId)
             .update();
     }
@@ -174,14 +195,14 @@ class AdminOrderServiceTest {
     }
 
     @Test
-    void pendingOrderOlderThanOneDayIsConfirmLate() {
+    void pendingOrderOlderThanOneWorkingDayIsConfirmLate() {
         var ownerId = mirroredUser();
         var buyerId = mirroredUser();
         var shopId = approvedShop(ownerId, "mon-confirm-late");
         var variantId = variantInShop(ownerId, shopId, "mon-confirm-late-ao", 10);
         var late = placeOrder(buyerId, shopId, variantId, 1);
         placeOrder(buyerId, shopId, variantId, 1);
-        ageOrder(late.id(), "created_at", "25 hours");
+        agePast(late.id(), "created_at", OrderSlaPolicy.Cutoffs::confirm);
 
         var found = onlyOrderOf(byShopAndAlert(shopId, OrderAlert.CONFIRM_LATE));
 
@@ -190,14 +211,14 @@ class AdminOrderServiceTest {
     }
 
     @Test
-    void confirmedOrderNotHandedOverAfterTwoDaysIsHandoverLate() {
+    void confirmedOrderNotHandedOverAfterTwoWorkingDaysIsHandoverLate() {
         var ownerId = mirroredUser();
         var buyerId = mirroredUser();
         var shopId = approvedShop(ownerId, "mon-handover-late");
         var variantId = variantInShop(ownerId, shopId, "mon-handover-late-ao", 10);
         var order = placeOrder(buyerId, shopId, variantId, 1);
         orders.confirm(ownerId, order.id());
-        ageOrder(order.id(), "created_at", "49 hours");
+        agePast(order.id(), "created_at", OrderSlaPolicy.Cutoffs::handover);
 
         var found = onlyOrderOf(byShopAndAlert(shopId, OrderAlert.HANDOVER_LATE));
 
@@ -206,7 +227,7 @@ class AdminOrderServiceTest {
     }
 
     @Test
-    void shippingOrderOlderThanSevenDaysIsDeliveryLate() {
+    void shippingOrderOlderThanSevenWorkingDaysIsDeliveryLate() {
         var ownerId = mirroredUser();
         var buyerId = mirroredUser();
         var shopId = approvedShop(ownerId, "mon-delivery-late");
@@ -214,7 +235,7 @@ class AdminOrderServiceTest {
         var order = placeOrder(buyerId, shopId, variantId, 1);
         orders.confirm(ownerId, order.id());
         orders.ship(ownerId, order.id());
-        ageOrder(order.id(), "shipped_at", "8 days");
+        agePast(order.id(), "shipped_at", OrderSlaPolicy.Cutoffs::delivery);
 
         var found = onlyOrderOf(byShopAndAlert(shopId, OrderAlert.DELIVERY_LATE));
 
@@ -251,7 +272,7 @@ class AdminOrderServiceTest {
         orders.confirm(ownerId, confirmed.id());
         var cancelled = placeOrder(buyerId, shopId, variantId, 1);
         orders.cancel(buyerId, cancelled.id());
-        ageOrder(late.id(), "created_at", "30 hours");
+        agePast(late.id(), "created_at", OrderSlaPolicy.Cutoffs::confirm);
 
         var summary = adminOrders.summary(byShop(shopId));
 
@@ -410,5 +431,12 @@ class AdminOrderServiceTest {
         assertThat(page.items())
             .extracting(order -> order.code() + ":" + order.cancelledBy())
             .containsExactlyInAnyOrder(byBuyer.code() + ":BUYER", bySeller.code() + ":SELLER");
+    }
+
+    @Test
+    void holidaysFromConfigAreNotWorkingDays() {
+        assertThat(sla.isWorkingDay(LocalDate.of(2026, 11, 24))).isFalse();
+        assertThat(sla.isWorkingDay(LocalDate.of(2027, 2, 8))).isFalse();
+        assertThat(sla.isWorkingDay(LocalDate.of(2026, 11, 23))).isTrue();
     }
 }

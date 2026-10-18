@@ -14,7 +14,7 @@ Ngoài phạm vi: tự động hủy đơn quá hạn bằng job định kỳ, �
 
 ## Tham khảo nghiệp vụ
 
-- Shopee: đơn thường phải bàn giao vận chuyển trong **2 ngày** kể từ lúc đặt, quá hạn tính vào tỷ lệ giao trễ, quá hạn lâu hơn thì sàn tự hủy.
+- Shopee: đơn thường phải bàn giao vận chuyển trong **2 ngày** kể từ lúc đặt, **không tính Chủ nhật và ngày lễ**; quá hạn tính vào tỷ lệ giao trễ, quá hạn lâu hơn thì sàn tự hủy.
 - Lazada: đơn phải đóng gói, chuyển Ready-to-Ship trong **2 ngày làm việc**; đơn bị sàn hủy vì quá hạn tính là lỗi người bán. Hàng phải tới kho phân loại trong **7 ngày**.
 - Walmart Marketplace / VTEX: sàn được hủy đơn thay shop (gian lận, theo yêu cầu người mua), ghi rõ ai hủy + lý do để hai bên cùng thấy.
 - Sau khi đã bàn giao vận chuyển thì không hủy nữa, đi luồng giao thất bại / trả hàng.
@@ -25,12 +25,17 @@ Mỗi đơn có tối đa 1 cảnh báo, vì mỗi cảnh báo gắn với 1 tr�
 
 | Mã | Điều kiện | Ý nghĩa |
 |---|---|---|
-| `CONFIRM_LATE` | `PENDING`, đặt quá **24 giờ** | Shop chưa xác nhận đơn |
-| `HANDOVER_LATE` | `CONFIRMED`, đặt quá **48 giờ** | Đã xác nhận nhưng chưa giao cho vận chuyển (mốc 2 ngày của Shopee/Lazada) |
-| `DELIVERY_LATE` | `SHIPPING`, gửi đi quá **7 ngày** | Giao hàng quá lâu |
+| `CONFIRM_LATE` | `PENDING`, đặt quá **1 ngày làm việc** | Shop chưa xác nhận đơn |
+| `HANDOVER_LATE` | `CONFIRMED`, đặt quá **2 ngày làm việc** | Đã xác nhận nhưng chưa giao cho vận chuyển (mốc của Shopee/Lazada) |
+| `DELIVERY_LATE` | `SHIPPING`, gửi đi quá **7 ngày làm việc** | Giao hàng quá lâu |
 | `RETURN_OPEN` | `DELIVERED`, có yêu cầu trả hàng `REQUESTED`/`APPROVED` | Trả hàng đang chờ shop xử lý |
 
-Mốc tính theo giờ thực, không trừ Chủ nhật/ngày lễ (đơn giản hóa so với Shopee/Lazada). "Bây giờ" lấy từ bean `Clock`.
+### Ngày làm việc
+
+- Không tính **Chủ nhật** và **ngày lễ** (giờ Việt Nam). Thứ Bảy vẫn tính, giống Shopee.
+- 1 ngày làm việc = 24 giờ trôi qua trong các ngày làm việc; ngày nghỉ "đóng băng" đồng hồ. Ví dụ đơn đặt 10h thứ Bảy thì trễ xác nhận lúc 10h thứ Hai, cả Chủ nhật không trễ thêm.
+- `OrderSlaPolicy` lùi từ "bây giờ" (bean `Clock`) ra mốc cutoff theo ngày làm việc; SQL chỉ so `created_at`/`shipped_at <= cutoff`, nên vẫn lọc/đếm/sắp xếp được trong DB.
+- Ngày lễ khai ở `application.yml` (`order-sla.holidays`, gồm cả ngày nghỉ bù). Lịch lễ do Chính phủ chốt từng năm và có thể thay đổi (vd. từ 2026 thêm 24/11 Ngày Văn hóa Việt Nam), nên cập nhật khi Bộ Nội vụ thông báo. Đã khai 2026 và phần đã công bố của 2027; Giỗ Tổ 2027 còn chờ.
 
 ## Hủy can thiệp
 

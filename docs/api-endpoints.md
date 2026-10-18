@@ -93,7 +93,7 @@ Sản phẩm `BANNED` biến mất khỏi search/PDP, checkout trả `409`; shop
 | [x] | 28h | GET | `/api/admin/orders/{id}` | Chi tiết + sản phẩm + dòng thời gian (vai trò người thao tác) + yêu cầu trả hàng |
 | [x] | 28i | PATCH | `/api/admin/orders/{id}/cancel` | Hủy can thiệp `{reason, note}`: `PENDING`/`CONFIRMED` → `CANCELLED`, hoàn kho nếu đã xác nhận |
 
-Cảnh báo SLA: `CONFIRM_LATE` (chờ xác nhận > 24h), `HANDOVER_LATE` (đã xác nhận, đặt > 48h chưa bàn giao vận chuyển), `DELIVERY_LATE` (đang giao > 7 ngày), `RETURN_OPEN` (trả hàng chưa xong). `orders.cancelled_by` ghi ai hủy (`BUYER`/`SELLER`/`ADMIN`). Mọi chuyển trạng thái đơn của shop/admin khóa dòng `SELECT ... FOR UPDATE`. Chi tiết xem `docs/superpowers/specs/2026-10-18-admin-order-monitoring-design.md`.
+Cảnh báo SLA tính theo ngày làm việc (không tính Chủ nhật, ngày lễ khai ở `order-sla.holidays`): `CONFIRM_LATE` (chờ xác nhận > 1 ngày), `HANDOVER_LATE` (đã xác nhận, đặt > 2 ngày chưa bàn giao vận chuyển), `DELIVERY_LATE` (đang giao > 7 ngày), `RETURN_OPEN` (trả hàng chưa xong). `orders.cancelled_by` ghi ai hủy (`BUYER`/`SELLER`/`ADMIN`). Mọi chuyển trạng thái đơn của shop/admin khóa dòng `SELECT ... FOR UPDATE`. Chi tiết xem `docs/superpowers/specs/2026-10-18-admin-order-monitoring-design.md`.
 
 Khóa tài khoản được thực thi hai lớp: `AccountFilter` chặn access token hiện tại ngay ở backend; `GoTrueAdminClient` ban/unban đăng nhập khi có cấu hình `gotrue.service-role-key`. Mọi chuyển trạng thái khóa dòng bằng `SELECT ... FOR UPDATE` và ghi lịch sử trong cùng transaction.
 

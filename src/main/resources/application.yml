@@ -7,3 +7,39 @@ spring:
 
   config:
     import: optional:file:config/springboot.yml
+
+# SLA xử lý đơn tính theo ngày làm việc: Chủ nhật luôn bỏ qua, ngày lễ khai dưới đây.
+# Lịch lễ do Chính phủ chốt từng năm (kể cả ngày nghỉ bù), cập nhật khi Bộ Nội vụ thông báo.
+order-sla:
+  holidays:
+    - 2026-01-01 # Tết Dương lịch
+    - 2026-02-14 # Tết Nguyên đán Bính Ngọ: 14/2 - 22/2
+    - 2026-02-15
+    - 2026-02-16
+    - 2026-02-17
+    - 2026-02-18
+    - 2026-02-19
+    - 2026-02-20
+    - 2026-02-21
+    - 2026-02-22
+    - 2026-04-27 # Giỗ Tổ Hùng Vương (26/4 trùng Chủ nhật, nghỉ bù)
+    - 2026-04-30 # Giải phóng miền Nam
+    - 2026-05-01 # Quốc tế Lao động
+    - 2026-09-01 # Quốc khánh
+    - 2026-09-02
+    - 2026-11-24 # Ngày Văn hóa Việt Nam
+    - 2027-01-01 # Tết Dương lịch
+    - 2027-02-04 # Tết Nguyên đán Đinh Mùi: 4/2 - 10/2
+    - 2027-02-05
+    - 2027-02-06
+    - 2027-02-07
+    - 2027-02-08
+    - 2027-02-09
+    - 2027-02-10
+    # TODO: Giỗ Tổ Hùng Vương 2027 (10/3 âm lịch) chờ thông báo chính thức.
+    - 2027-04-30 # Giải phóng miền Nam
+    - 2027-05-01 # Quốc tế Lao động (thứ Bảy)
+    - 2027-05-03 # nghỉ bù 1/5
+    - 2027-09-02 # Quốc khánh
+    - 2027-09-03
+    - 2027-11-24 # Ngày Văn hóa Việt Nam

@@ -83,6 +83,8 @@ public class OrderService {
 
     private final Clock clock;
 
+    private final OrderSlaPolicy sla;
+
     @Transactional
     public OrderResponse checkout(@NonNull UUID buyerId, @NonNull CheckoutRequest request) {
         if (!shops.isShopApproved(request.shopId())) {
@@ -259,9 +261,9 @@ public class OrderService {
     public PageResponse<AdminOrderResponse> searchForAdmin(@NonNull AdminOrderFilter filter, int page, int size) {
         requireValidRange(filter);
 
-        var now = clock.instant();
-        var found = monitoring.search(filter, now, page, size);
-        var total = monitoring.count(filter, now);
+        var cutoffs = sla.cutoffsAt(clock.instant());
+        var found = monitoring.search(filter, cutoffs, page, size);
+        var total = monitoring.count(filter, cutoffs);
         return new PageResponse<>(found, total, page, size);
     }
 
@@ -269,7 +271,7 @@ public class OrderService {
     public AdminOrderSummaryResponse summaryForAdmin(@NonNull AdminOrderFilter filter) {
         requireValidRange(filter);
 
-        return monitoring.summary(filter, clock.instant());
+        return monitoring.summary(filter, sla.cutoffsAt(clock.instant()));
     }
 
     @Transactional(readOnly = true)
@@ -451,7 +453,7 @@ public class OrderService {
     }
 
     private AdminOrderResponse requireAdminOrder(UUID orderId) {
-        var order = monitoring.findById(orderId, clock.instant()).orElse(null);
+        var order = monitoring.findById(orderId, sla.cutoffsAt(clock.instant())).orElse(null);
         if (order == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found");
         }

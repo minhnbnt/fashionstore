@@ -4,6 +4,7 @@ import com.minhnbnt.fashionstore.dto.admin.AdminOrderFilter;
 import com.minhnbnt.fashionstore.dto.admin.AdminOrderResponse;
 import com.minhnbnt.fashionstore.dto.admin.AdminOrderSummaryResponse;
 import com.minhnbnt.fashionstore.dto.admin.OrderTimelineResponse;
+import com.minhnbnt.fashionstore.features.order.OrderSlaPolicy;
 import com.minhnbnt.fashionstore.infrastructure.SqlLike;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -11,7 +12,6 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -25,19 +25,11 @@ import java.util.UUID;
 
 /**
  * Read model màn giám sát đơn toàn sàn: đơn + shop + người mua + tổng hợp sản phẩm + cảnh báo SLA.
+ * Mốc trễ hạn (theo ngày làm việc) do {@link OrderSlaPolicy} tính sẵn, SQL chỉ so sánh.
  */
 @Repository
 @RequiredArgsConstructor
 public class OrderMonitoringQueryRepository {
-
-    /** Shop phải xác nhận đơn trong 24 giờ. */
-    static final Duration CONFIRM_SLA = Duration.ofHours(24);
-
-    /** Shopee/Lazada: 2 ngày kể từ lúc đặt phải bàn giao cho vận chuyển. */
-    static final Duration HANDOVER_SLA = Duration.ofHours(48);
-
-    /** Lazada: hàng phải tới nơi trong 7 ngày kể từ lúc gửi. */
-    static final Duration DELIVERY_SLA = Duration.ofDays(7);
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
@@ -77,8 +69,13 @@ public class OrderMonitoringQueryRepository {
 
     private final JdbcClient jdbc;
 
-    public List<AdminOrderResponse> search(AdminOrderFilter filter, Instant now, int page, int size) {
-        var where = whereOf(filter, now);
+    public List<AdminOrderResponse> search(
+        AdminOrderFilter filter,
+        OrderSlaPolicy.Cutoffs cutoffs,
+        int page,
+        int size
+    ) {
+        var where = whereOf(filter, cutoffs);
 
         // Lọc theo cảnh báo: đơn trễ lâu nhất lên đầu để xử lý trước. Còn lại mới đặt trước.
         var orderBy = " ORDER BY o.created_at DESC, o.id";
@@ -96,8 +93,8 @@ public class OrderMonitoringQueryRepository {
             .list();
     }
 
-    public long count(AdminOrderFilter filter, Instant now) {
-        var where = whereOf(filter, now);
+    public long count(AdminOrderFilter filter, OrderSlaPolicy.Cutoffs cutoffs) {
+        var where = whereOf(filter, cutoffs);
 
         return jdbc.sql("SELECT count(*) " + BASE_FROM + " WHERE " + where.sql())
             .params(where.params())
@@ -108,11 +105,11 @@ public class OrderMonitoringQueryRepository {
     /**
      * Đếm theo trạng thái + cảnh báo trên cùng bộ lọc, bỏ qua {@code status}/{@code alert} để làm số cho từng tab.
      */
-    public AdminOrderSummaryResponse summary(AdminOrderFilter filter, Instant now) {
+    public AdminOrderSummaryResponse summary(AdminOrderFilter filter, OrderSlaPolicy.Cutoffs cutoffs) {
         var unfiltered = new AdminOrderFilter(
             null, null, filter.shopId(), filter.buyerId(), filter.query(), filter.from(), filter.to()
         );
-        var where = whereOf(unfiltered, now);
+        var where = whereOf(unfiltered, cutoffs);
 
         var sql = """
             SELECT count(*) AS total,
@@ -144,9 +141,9 @@ public class OrderMonitoringQueryRepository {
             .single();
     }
 
-    public Optional<AdminOrderResponse> findById(UUID id, Instant now) {
+    public Optional<AdminOrderResponse> findById(UUID id, OrderSlaPolicy.Cutoffs cutoffs) {
         return jdbc.sql(SELECT + " WHERE o.id = :id")
-            .params(cutoffsOf(now))
+            .params(paramsOf(cutoffs))
             .param("id", id)
             .query(OrderMonitoringQueryRepository::toAdminOrder)
             .optional();
@@ -199,9 +196,9 @@ public class OrderMonitoringQueryRepository {
     private record Where(String sql, Map<String, Object> params) {
     }
 
-    private static Where whereOf(AdminOrderFilter filter, Instant now) {
+    private static Where whereOf(AdminOrderFilter filter, OrderSlaPolicy.Cutoffs cutoffs) {
         var clauses = new ArrayList<String>();
-        var params = cutoffsOf(now);
+        var params = paramsOf(cutoffs);
         clauses.add("TRUE");
 
         if (filter.status() != null) {
@@ -246,11 +243,11 @@ public class OrderMonitoringQueryRepository {
         return new Where(String.join(" AND ", clauses), params);
     }
 
-    private static Map<String, Object> cutoffsOf(Instant now) {
+    private static Map<String, Object> paramsOf(OrderSlaPolicy.Cutoffs cutoffs) {
         var params = new HashMap<String, Object>();
-        params.put("confirmCutoff", utcOf(now.minus(CONFIRM_SLA)));
-        params.put("handoverCutoff", utcOf(now.minus(HANDOVER_SLA)));
-        params.put("deliveryCutoff", utcOf(now.minus(DELIVERY_SLA)));
+        params.put("confirmCutoff", utcOf(cutoffs.confirm()));
+        params.put("handoverCutoff", utcOf(cutoffs.handover()));
+        params.put("deliveryCutoff", utcOf(cutoffs.delivery()));
         return params;
     }
 
