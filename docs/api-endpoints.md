@@ -84,6 +84,26 @@ Chi tiết luồng này xem `docs/catalog.md`.
 
 Sản phẩm `BANNED` biến mất khỏi search/PDP, checkout trả `409`; shop không `activate` được nhưng vẫn sửa/xóa mềm được, đơn đang xử lý vẫn tiếp tục. Chi tiết xem `docs/superpowers/specs/2026-10-17-admin-product-moderation-design.md`.
 
+### Nội dung sàn (banner, popup, trang tĩnh, FAQ)
+
+| Xong | # | Method | Path | Mô tả |
+|------|---|--------|------|-------|
+| [x] | 28f | GET/POST | `/api/admin/banners?placement=` | Danh sách (kèm `scheduleState`) / tạo banner theo vị trí |
+| [x] | 28g | PUT/DELETE | `/api/admin/banners/{id}` | Sửa toàn bộ / xóa banner |
+| [x] | 28h | GET/POST | `/api/admin/popups` | Danh sách theo ưu tiên / tạo popup |
+| [x] | 28i | PUT/DELETE | `/api/admin/popups/{id}` | Sửa / xóa popup |
+| [x] | 28j | GET/POST | `/api/admin/pages` | Danh sách trang (không kèm nội dung) / tạo nháp, slug trùng `409` |
+| [x] | 28k | GET/PUT/DELETE | `/api/admin/pages/{id}` | Chi tiết / sửa / xóa (chỉ `DRAFT`, còn lại `409`) |
+| [x] | 28l | PATCH | `/api/admin/pages/{id}/publish`, `/unpublish` | `DRAFT` ↔ `PUBLISHED` |
+| [x] | 28m | GET/POST | `/api/admin/faqs` | Danh sách theo nhóm / thêm câu hỏi |
+| [x] | 28n | PUT/DELETE | `/api/admin/faqs/{id}` | Sửa / xóa câu hỏi |
+| [x] | 28o | GET | `/api/public/banners?placement=` | Banner đang chạy (bật + trong khung giờ) theo thứ tự |
+| [x] | 28p | GET | `/api/public/popups` | Popup đang chạy theo ưu tiên; trình duyệt lọc đối tượng + tần suất, hiện tối đa 1 |
+| [x] | 28q | GET | `/api/public/pages`, `/api/public/pages/{slug}` | Link footer / nội dung trang đã xuất bản (nháp `404`) |
+| [x] | 28r | GET | `/api/public/faqs` | FAQ đang hiện theo nhóm rồi thứ tự |
+
+Nội dung trang + câu trả lời FAQ lưu Markdown, frontend render không cho HTML thô. Link banner/popup chỉ nhận đường dẫn nội bộ hoặc `http(s)`. Chi tiết xem `docs/superpowers/specs/2026-10-18-admin-site-content-design.md`.
+
 Khóa tài khoản được thực thi hai lớp: `AccountFilter` chặn access token hiện tại ngay ở backend; `GoTrueAdminClient` ban/unban đăng nhập khi có cấu hình `gotrue.service-role-key`. Mọi chuyển trạng thái khóa dòng bằng `SELECT ... FOR UPDATE` và ghi lịch sử trong cùng transaction.
 
 ## Flow 6 — Seller Center: Quản lý hồ sơ Shop & Tương tác
