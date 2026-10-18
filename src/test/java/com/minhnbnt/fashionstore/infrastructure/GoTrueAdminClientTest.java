@@ -3,6 +3,7 @@ package com.minhnbnt.fashionstore.infrastructure;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
@@ -73,6 +74,87 @@ class GoTrueAdminClientTest {
         client("").banUser(UUID.randomUUID());
 
         server.verify();
+    }
+
+    @Test
+    void isConfiguredDependsOnKey() {
+        assertThat(client("service-key").isConfigured()).isTrue();
+        assertThat(client(" ").isConfigured()).isFalse();
+    }
+
+    @Test
+    void findUserIdByEmailPicksExactMatchIgnoringCase() {
+        var id = UUID.randomUUID();
+        server.expect(requestTo(URL + "/admin/users?filter=admin%40t.local&per_page=50"))
+            .andExpect(method(HttpMethod.GET))
+            .andExpect(header("Authorization", "Bearer service-key"))
+            .andRespond(withSuccess(
+                """
+                {"aud":"authenticated","users":[
+                  {"id":"%s","email":"super-admin@t.local","role":"authenticated"},
+                  {"id":"%s","email":"Admin@T.local","role":"authenticated","app_metadata":{}}
+                ]}
+                """.formatted(UUID.randomUUID(), id),
+                MediaType.APPLICATION_JSON
+            ));
+
+        var found = client("service-key").findUserIdByEmail("admin@t.local");
+
+        assertThat(found).contains(id);
+        server.verify();
+    }
+
+    @Test
+    void findUserIdByEmailReturnsEmptyWhenNoExactMatch() {
+        server.expect(requestTo(URL + "/admin/users?filter=admin%40t.local&per_page=50"))
+            .andRespond(withSuccess(
+                "{\"users\":[{\"id\":\"" + UUID.randomUUID() + "\",\"email\":\"super-admin@t.local\"}]}",
+                MediaType.APPLICATION_JSON
+            ));
+
+        assertThat(client("service-key").findUserIdByEmail("admin@t.local")).isEmpty();
+    }
+
+    @Test
+    void createUserIsConfirmedAndCarriesRole() {
+        var id = UUID.randomUUID();
+        server.expect(requestTo(URL + "/admin/users"))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(header("Authorization", "Bearer service-key"))
+            .andExpect(content().json("""
+                {
+                  "email": "admin@t.local",
+                  "password": "Secret@123",
+                  "email_confirm": true,
+                  "app_metadata": {"role": "admin"},
+                  "user_metadata": {"full_name": "Admin"}
+                }
+                """))
+            .andRespond(withSuccess(
+                "{\"id\":\"" + id + "\",\"email\":\"admin@t.local\",\"aud\":\"authenticated\"}",
+                MediaType.APPLICATION_JSON
+            ));
+
+        var created = client("service-key").createUser("admin@t.local", "Secret@123", "Admin", "admin");
+
+        assertThat(created).isEqualTo(id);
+        server.verify();
+    }
+
+    @Test
+    void createUserWithoutKeyFails() {
+        assertThatThrownBy(() -> client("").createUser("admin@t.local", "Secret@123", "Admin", "admin"))
+            .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void createUserFailureBecomesBadGateway() {
+        server.expect(requestTo(URL + "/admin/users"))
+            .andRespond(withStatus(HttpStatus.UNPROCESSABLE_CONTENT));
+
+        assertThatThrownBy(() -> client("service-key").createUser("admin@t.local", "123", "Admin", "admin"))
+            .isInstanceOfSatisfying(ResponseStatusException.class, e ->
+                assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY));
     }
 
     @Test

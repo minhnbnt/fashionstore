@@ -27,4 +27,15 @@ s3:
 
 gotrue:
   url: http://localhost:9999
-  service-role-key: ""
+  # DEV ONLY: JWT role=service_role ký bằng khóa ES256 dev (d=1, công khai) trong config/gotrue.env, hạn 10 năm.
+  # Staging/production: tạo key riêng từ khóa thật, truyền qua GOTRUE_SERVICE_ROLE_KEY.
+  service-role-key: ${GOTRUE_SERVICE_ROLE_KEY:eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImQ4NzVkYjdkZWYyMzIyMzYifQ.eyJpc3MiOiJodHRwOi8vbG9jYWxob3N0Ojk5OTkiLCJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNzkyMjgxNjAwLCJleHAiOjIxMDc2NDE2MDB9.z0DAYl8eP7yk9WvmzjKQoOqHbTeHamqBvkoYrJ4rTKCRUByTy4nZwe8JF5q3_0EQ9yHQ4DnUuLY3RVYHoCsuEw}
+
+app:
+  demo-seed: true
+
+  # Tài khoản admin tạo sẵn lúc khởi động (idempotent). Đổi mật khẩu qua ADMIN_PASSWORD.
+  bootstrap-admin:
+    email: ${ADMIN_EMAIL:admin@fashionstore.local}
+    password: ${ADMIN_PASSWORD:Admin@123456}
+    display-name: Admin
