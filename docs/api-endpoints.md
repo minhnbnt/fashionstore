@@ -84,6 +84,17 @@ Chi tiết luồng này xem `docs/catalog.md`.
 
 Sản phẩm `BANNED` biến mất khỏi search/PDP, checkout trả `409`; shop không `activate` được nhưng vẫn sửa/xóa mềm được, đơn đang xử lý vẫn tiếp tục. Chi tiết xem `docs/superpowers/specs/2026-10-17-admin-product-moderation-design.md`.
 
+### Giám sát đơn hàng toàn sàn
+
+| Xong | # | Method | Path | Mô tả |
+|------|---|--------|------|-------|
+| [x] | 28f | GET | `/api/admin/orders?status=&alert=&shopId=&buyerId=&q=&from=&to=&page=&size=` | Tìm/lọc đơn toàn sàn; `q` khớp mã đơn, tên/SĐT người nhận, tên shop, email người mua; lọc `alert` thì trễ lâu nhất lên đầu |
+| [x] | 28g | GET | `/api/admin/orders/summary?shopId=&buyerId=&q=&from=&to=` | Đếm theo trạng thái + cảnh báo SLA, cùng bộ lọc với danh sách |
+| [x] | 28h | GET | `/api/admin/orders/{id}` | Chi tiết + sản phẩm + dòng thời gian (vai trò người thao tác) + yêu cầu trả hàng |
+| [x] | 28i | PATCH | `/api/admin/orders/{id}/cancel` | Hủy can thiệp `{reason, note}`: `PENDING`/`CONFIRMED` → `CANCELLED`, hoàn kho nếu đã xác nhận |
+
+Cảnh báo SLA: `CONFIRM_LATE` (chờ xác nhận > 24h), `HANDOVER_LATE` (đã xác nhận, đặt > 48h chưa bàn giao vận chuyển), `DELIVERY_LATE` (đang giao > 7 ngày), `RETURN_OPEN` (trả hàng chưa xong). `orders.cancelled_by` ghi ai hủy (`BUYER`/`SELLER`/`ADMIN`). Mọi chuyển trạng thái đơn của shop/admin khóa dòng `SELECT ... FOR UPDATE`. Chi tiết xem `docs/superpowers/specs/2026-10-18-admin-order-monitoring-design.md`.
+
 Khóa tài khoản được thực thi hai lớp: `AccountFilter` chặn access token hiện tại ngay ở backend; `GoTrueAdminClient` ban/unban đăng nhập khi có cấu hình `gotrue.service-role-key`. Mọi chuyển trạng thái khóa dòng bằng `SELECT ... FOR UPDATE` và ghi lịch sử trong cùng transaction.
 
 ## Flow 6 — Seller Center: Quản lý hồ sơ Shop & Tương tác

@@ -50,6 +50,8 @@ public class Order implements Persistable<UUID> {
 
     private @Nullable String cancelNote;
 
+    private @Nullable OrderCanceller cancelledBy;
+
     private @Nullable Instant confirmedAt;
 
     private @Nullable Instant shippedAt;
@@ -83,6 +85,7 @@ public class Order implements Persistable<UUID> {
         String note,
         @Nullable String cancelReason,
         @Nullable String cancelNote,
+        @Nullable OrderCanceller cancelledBy,
         @Nullable Instant confirmedAt,
         @Nullable Instant shippedAt,
         @Nullable Instant deliveredAt,
@@ -106,6 +109,7 @@ public class Order implements Persistable<UUID> {
         this.note = note;
         this.cancelReason = cancelReason;
         this.cancelNote = cancelNote;
+        this.cancelledBy = cancelledBy;
         this.confirmedAt = confirmedAt;
         this.shippedAt = shippedAt;
         this.deliveredAt = deliveredAt;
@@ -141,6 +145,7 @@ public class Order implements Persistable<UUID> {
             shippingPhone,
             shippingAddress,
             "",
+            null,
             null,
             null,
             null,
@@ -187,6 +192,7 @@ public class Order implements Persistable<UUID> {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending orders can be cancelled");
         }
         status = OrderStatus.CANCELLED;
+        cancelledBy = OrderCanceller.BUYER;
         cancelledAt = Instant.now();
         updatedAt = Instant.now();
     }
@@ -201,6 +207,25 @@ public class Order implements Persistable<UUID> {
         status = OrderStatus.CANCELLED;
         cancelReason = reason;
         cancelNote = note;
+        cancelledBy = OrderCanceller.SELLER;
+        cancelledAt = Instant.now();
+        updatedAt = Instant.now();
+    }
+
+    /**
+     * Admin hủy can thiệp (gian lận, shop bỏ mặc đơn...). Như shop, chỉ hủy được khi chưa bàn giao vận chuyển.
+     */
+    public void cancelByAdmin(AdminCancelReason reason, String note) {
+        if (status != OrderStatus.PENDING && status != OrderStatus.CONFIRMED) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Only pending or confirmed orders can be cancelled by admin"
+            );
+        }
+        status = OrderStatus.CANCELLED;
+        cancelReason = reason.name();
+        cancelNote = note;
+        cancelledBy = OrderCanceller.ADMIN;
         cancelledAt = Instant.now();
         updatedAt = Instant.now();
     }
