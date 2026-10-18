@@ -93,7 +93,7 @@ Sản phẩm `BANNED` biến mất khỏi search/PDP, checkout trả `409`; shop
 | [x] | 28h | GET | `/api/admin/orders/{id}` | Chi tiết + sản phẩm + dòng thời gian (vai trò người thao tác) + yêu cầu trả hàng |
 | [x] | 28i | PATCH | `/api/admin/orders/{id}/cancel` | Hủy can thiệp `{reason, note}`: `PENDING`/`CONFIRMED` → `CANCELLED`, hoàn kho nếu đã xác nhận |
 
-Cảnh báo SLA tính theo ngày làm việc (không tính Chủ nhật, ngày lễ khai ở `order-sla.holidays`): `CONFIRM_LATE` (chờ xác nhận > 1 ngày), `HANDOVER_LATE` (đã xác nhận, đặt > 2 ngày chưa bàn giao vận chuyển), `DELIVERY_LATE` (đang giao > 7 ngày), `RETURN_OPEN` (trả hàng chưa xong). `orders.cancelled_by` ghi ai hủy (`BUYER`/`SELLER`/`ADMIN`). Mọi chuyển trạng thái đơn của shop/admin khóa dòng `SELECT ... FOR UPDATE`. Chi tiết xem `docs/superpowers/specs/2026-10-18-admin-order-monitoring-design.md`.
+Cảnh báo SLA tính theo ngày làm việc (không tính Chủ nhật và ngày lễ trong bảng `public_holiday`): `CONFIRM_LATE` (chờ xác nhận > 1 ngày), `HANDOVER_LATE` (đã xác nhận, đặt > 2 ngày chưa bàn giao vận chuyển), `DELIVERY_LATE` (đang giao > 7 ngày), `RETURN_OPEN` (trả hàng chưa xong). `orders.cancelled_by` ghi ai hủy (`BUYER`/`SELLER`/`ADMIN`). Mọi chuyển trạng thái đơn của shop/admin khóa dòng `SELECT ... FOR UPDATE`. Chi tiết xem `docs/superpowers/specs/2026-10-18-admin-order-monitoring-design.md`.
 
 Khóa tài khoản được thực thi hai lớp: `AccountFilter` chặn access token hiện tại ngay ở backend; `GoTrueAdminClient` ban/unban đăng nhập khi có cấu hình `gotrue.service-role-key`. Mọi chuyển trạng thái khóa dòng bằng `SELECT ... FOR UPDATE` và ghi lịch sử trong cùng transaction.
 
@@ -182,3 +182,14 @@ Khóa tài khoản được thực thi hai lớp: `AccountFilter` chặn access 
 | [x] | 77 | PATCH | `/api/seller/shops/{shopId}/members/{memberId}/role` | Chủ shop thay đổi vai trò nhân viên |
 | [x] | 78 | DELETE | `/api/seller/shops/{shopId}/members/{memberId}` | Chủ shop thu hồi quyền và xóa nhân viên |
 | [x] | 79 | GET | `/api/seller/shops/{shopId}/audit` | Nhật ký thao tác nhân sự (Audit Log) |
+
+### Lịch nghỉ lễ (SLA đơn hàng)
+
+| Xong | # | Method | Path | Mô tả |
+|------|---|--------|------|-------|
+| [x] | 28j | GET | `/api/admin/holidays?year=` | Ngày lễ của năm + lần đồng bộ gần nhất + đã cấu hình key chưa |
+| [x] | 28k | PUT | `/api/admin/holidays/{day}` | Thêm/sửa tay `{name, kind}` (`HOLIDAY`/`WORKING_DAY`), đồng bộ không ghi đè |
+| [x] | 28l | DELETE | `/api/admin/holidays/{day}` | Bỏ ngày (giữ dòng `enabled=false` để đồng bộ không thêm lại) |
+| [x] | 28m | POST | `/api/admin/holidays/sync?year=` | Đồng bộ Calendarific ngay; `503` chưa có key, `502` Calendarific lỗi/hết lượt |
+
+Tự đồng bộ 03:00 ngày 1 hằng tháng (năm nay + năm sau). Key qua biến môi trường `CALENDARIFIC_API_KEY`. Chi tiết xem `docs/superpowers/specs/2026-10-18-holiday-calendar-design.md`.

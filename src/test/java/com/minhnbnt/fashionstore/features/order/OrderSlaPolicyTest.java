@@ -1,13 +1,13 @@
 package com.minhnbnt.fashionstore.features.order;
 
-import com.minhnbnt.fashionstore.config.OrderSlaProperties;
+import com.minhnbnt.fashionstore.features.holiday.WorkingCalendar;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -17,7 +17,7 @@ class OrderSlaPolicyTest {
 
     private static final LocalDate CULTURE_DAY = LocalDate.of(2026, 11, 24);
 
-    private final OrderSlaPolicy policy = new OrderSlaPolicy(new OrderSlaProperties(List.of(CULTURE_DAY)));
+    private static final WorkingCalendar CALENDAR = new WorkingCalendar(Set.of(CULTURE_DAY), Set.of());
 
     private static Instant vn(String localDateTime) {
         return LocalDateTime.parse(localDateTime).atZone(ZONE).toInstant();
@@ -27,7 +27,7 @@ class OrderSlaPolicyTest {
     void weekdayCountsWholeDays() {
         var now = vn("2026-10-14T10:00");
 
-        assertThat(policy.workingDaysBefore(now, 1)).isEqualTo(vn("2026-10-13T10:00"));
+        assertThat(OrderSlaPolicy.workingDaysBefore(CALENDAR, now, 1)).isEqualTo(vn("2026-10-13T10:00"));
     }
 
     @Test
@@ -35,7 +35,7 @@ class OrderSlaPolicyTest {
         var mondayMorning = vn("2026-10-19T10:00");
 
         // 10 giờ thứ Hai + 14 giờ thứ Bảy, Chủ nhật không tính.
-        assertThat(policy.workingDaysBefore(mondayMorning, 1)).isEqualTo(vn("2026-10-17T10:00"));
+        assertThat(OrderSlaPolicy.workingDaysBefore(CALENDAR, mondayMorning, 1)).isEqualTo(vn("2026-10-17T10:00"));
     }
 
     @Test
@@ -43,26 +43,32 @@ class OrderSlaPolicyTest {
         var sundayMorning = vn("2026-10-18T10:00");
         var sundayNight = vn("2026-10-18T23:00");
 
-        assertThat(policy.workingDaysBefore(sundayMorning, 1)).isEqualTo(vn("2026-10-17T00:00"));
-        assertThat(policy.workingDaysBefore(sundayNight, 1)).isEqualTo(vn("2026-10-17T00:00"));
+        assertThat(OrderSlaPolicy.workingDaysBefore(CALENDAR, sundayMorning, 1)).isEqualTo(vn("2026-10-17T00:00"));
+        assertThat(OrderSlaPolicy.workingDaysBefore(CALENDAR, sundayNight, 1)).isEqualTo(vn("2026-10-17T00:00"));
     }
 
     @Test
-    void configuredHolidayIsSkipped() {
+    void holidayIsSkipped() {
         var now = vn("2026-11-25T10:00");
 
         // Thứ Tư 10h + thứ Hai 24h + thứ Bảy 14h, bỏ thứ Ba 24/11 (lễ) và Chủ nhật.
-        assertThat(policy.workingDaysBefore(now, 2)).isEqualTo(vn("2026-11-21T10:00"));
-        assertThat(policy.isWorkingDay(CULTURE_DAY)).isFalse();
-        assertThat(policy.isWorkingDay(LocalDate.of(2026, 10, 18))).isFalse();
-        assertThat(policy.isWorkingDay(LocalDate.of(2026, 10, 17))).isTrue();
+        assertThat(OrderSlaPolicy.workingDaysBefore(CALENDAR, now, 2)).isEqualTo(vn("2026-11-21T10:00"));
+    }
+
+    @Test
+    void workingSundayCounts() {
+        var calendar = new WorkingCalendar(Set.of(), Set.of(LocalDate.of(2026, 10, 25)));
+        var mondayMorning = vn("2026-10-26T10:00");
+
+        // Chủ nhật 25/10 đi làm bù nên tính đủ 24 giờ.
+        assertThat(OrderSlaPolicy.workingDaysBefore(calendar, mondayMorning, 1)).isEqualTo(vn("2026-10-25T10:00"));
     }
 
     @Test
     void cutoffsUseOneTwoAndSevenWorkingDays() {
         var now = vn("2026-10-14T10:00");
 
-        var cutoffs = policy.cutoffsAt(now);
+        var cutoffs = OrderSlaPolicy.cutoffsAt(CALENDAR, now);
 
         assertThat(cutoffs.confirm()).isEqualTo(vn("2026-10-13T10:00"));
         assertThat(cutoffs.handover()).isEqualTo(vn("2026-10-12T10:00"));

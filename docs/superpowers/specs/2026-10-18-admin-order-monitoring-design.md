@@ -35,7 +35,7 @@ Mỗi đơn có tối đa 1 cảnh báo, vì mỗi cảnh báo gắn với 1 tr�
 - Không tính **Chủ nhật** và **ngày lễ** (giờ Việt Nam). Thứ Bảy vẫn tính, giống Shopee.
 - 1 ngày làm việc = 24 giờ trôi qua trong các ngày làm việc; ngày nghỉ "đóng băng" đồng hồ. Ví dụ đơn đặt 10h thứ Bảy thì trễ xác nhận lúc 10h thứ Hai, cả Chủ nhật không trễ thêm.
 - `OrderSlaPolicy` lùi từ "bây giờ" (bean `Clock`) ra mốc cutoff theo ngày làm việc; SQL chỉ so `created_at`/`shipped_at <= cutoff`, nên vẫn lọc/đếm/sắp xếp được trong DB.
-- Ngày lễ khai ở `application.yml` (`order-sla.holidays`, gồm cả ngày nghỉ bù). Lịch lễ do Chính phủ chốt từng năm và có thể thay đổi (vd. từ 2026 thêm 24/11 Ngày Văn hóa Việt Nam), nên cập nhật khi Bộ Nội vụ thông báo. Đã khai 2026 và phần đã công bố của 2027; Giỗ Tổ 2027 còn chờ.
+- Ngày lễ lưu ở DB (`public_holiday`), đồng bộ từ Calendarific và admin sửa tay, xem `2026-10-18-holiday-calendar-design.md`.
 
 ## Hủy can thiệp
 
@@ -68,6 +68,10 @@ Dòng thời gian chi tiết đơn suy ra vai trò người thao tác: trùng ng
 | PATCH | `/api/admin/orders/{id}/cancel` | body `{reason, note}`, `PENDING`/`CONFIRMED` → `CANCELLED` |
 
 `from`/`to` là ngày (`yyyy-MM-dd`) theo giờ Việt Nam, `to` tính trọn ngày. `from > to` → `400`.
+
+## Lịch nghỉ lễ
+
+Ngày lễ lưu ở bảng `public_holiday` (migration V13), đồng bộ từ Calendarific + admin sửa tay. Xem `2026-10-18-holiday-calendar-design.md`.
 
 ## Code
 

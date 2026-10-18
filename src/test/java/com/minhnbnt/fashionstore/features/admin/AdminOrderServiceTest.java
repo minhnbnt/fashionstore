@@ -432,11 +432,4 @@ class AdminOrderServiceTest {
             .extracting(order -> order.code() + ":" + order.cancelledBy())
             .containsExactlyInAnyOrder(byBuyer.code() + ":BUYER", bySeller.code() + ":SELLER");
     }
-
-    @Test
-    void holidaysFromConfigAreNotWorkingDays() {
-        assertThat(sla.isWorkingDay(LocalDate.of(2026, 11, 24))).isFalse();
-        assertThat(sla.isWorkingDay(LocalDate.of(2027, 2, 8))).isFalse();
-        assertThat(sla.isWorkingDay(LocalDate.of(2026, 11, 23))).isTrue();
-    }
 }
