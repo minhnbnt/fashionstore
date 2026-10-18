@@ -32,7 +32,7 @@ Bốn chức năng admin:
 - Bảng `ward(code TEXT PK, province_code FK, name)` — ~3.321 xã/phường/đặc khu, mã theo danh mục đơn vị hành chính mới.
 - Seed bằng migration (dữ liệu tham chiếu, cần ở production), không gọi API ngoài lúc chạy. Nguồn: danh mục chính thức 2025 (ví dụ `provinces.open-api.vn/api/v2/?depth=2`); builder tải 1 lần, sinh file SQL, ghi nguồn + ngày tải ở đầu file.
 - Phân miền theo vị trí địa lý; Bắc: từ Thanh Hóa trở ra; Trung: Nghệ An → Lâm Đồng (gồm Tây Nguyên); Nam: còn lại. *(Lời Claude — builder giữ quy ước này, liệt kê bảng tỉnh→miền trong migration.)*
-- Public API: `GET /api/locations/provinces`, `GET /api/locations/provinces/{code}/wards`.
+- Public API: `GET /api/public/locations/provinces`, `GET /api/public/locations/provinces/{code}/wards` (prefix `/api/public/**` đã permitAll sẵn trong `SecurityConfig`).
 
 ### Shop
 
@@ -90,12 +90,12 @@ Bảng phí mẫu seed (VND, theo mặt bằng GHN/GHTK 2025, admin sửa đư�
 
 ### Cấu hình
 
-Bảng `payment_gateway`: `code TEXT PK IN ('COD','VNPAY')`, `name`, `enabled`, `config JSONB`, `updated_at`, `updated_by`. Seed: COD bật; VNPay tắt, `config = {tmnCode: "", hashSecret: "", payUrl: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html", returnUrl: "http://localhost:5173/payment/vnpay-return"}`.
+Bảng `payment_gateway`: `code TEXT PK IN ('COD','VNPAY')`, `name`, `enabled`, `tmn_code`, `hash_secret`, `pay_url`, `return_url` (4 cột cuối nullable, chỉ VNPay dùng), `updated_at`, `updated_by`. Seed: COD bật; VNPay tắt, `tmn_code`/`hash_secret` rỗng, `pay_url = https://sandbox.vnpayment.vn/paymentv2/vpcpay.html`, `return_url = http://localhost:5173/payment/vnpay-return`.
 
 - `hashSecret` **write-only**: response trả `hashSecretSet: true/false` + `tmnCode`, không bao giờ trả secret. `PUT` gửi `hashSecret` null/rỗng = giữ secret cũ.
 - Bật VNPay khi `tmnCode` hoặc `hashSecret` trống → `409`.
 - Phải còn ít nhất 1 cổng bật.
-- `GET /api/payment-methods` (public): các cổng đang bật + giới hạn COD từ cấu hình chung, để UI checkout dựng lựa chọn.
+- `GET /api/public/payment-methods`: các cổng đang bật + giới hạn COD từ cấu hình chung, để UI checkout dựng lựa chọn.
 
 ### Luồng đơn VNPay
 
@@ -134,7 +134,7 @@ VNPAY: checkout ─▶ AWAITING_PAYMENT ─paid─────▶ PENDING ──
 
 - Tham số: `vnp_Version=2.1.0`, `vnp_Command=pay`, `vnp_TmnCode`, `vnp_Amount = total × 100`, `vnp_CurrCode=VND`, `vnp_TxnRef` (unique mỗi giao dịch), `vnp_OrderInfo` (không dấu, chứa mã đơn), `vnp_OrderType=other`, `vnp_Locale=vn`, `vnp_ReturnUrl`, `vnp_IpAddr`, `vnp_CreateDate`/`vnp_ExpireDate` (`yyyyMMddHHmmss`, giờ `Asia/Ho_Chi_Minh`, expire = `payment_expires_at`).
 - Ký: sort key tăng dần, URL-encode giá trị (`US_ASCII`, space → `+`), nối `k=v&...`, `vnp_SecureHash = HMAC-SHA512(hashSecret, data)` hex. Verify: bỏ `vnp_SecureHash`/`vnp_SecureHashType` rồi ký lại, so sánh constant-time.
-- Bảng `payment_transaction`: `id`, `order_id`, `provider='VNPAY'`, `txn_ref UNIQUE`, `amount`, `status IN ('PENDING','SUCCESS','FAILED')`, `response_code`, `transaction_status`, `transaction_no`, `bank_code`, `card_type`, `pay_date`, `raw JSONB` (toàn bộ query VNPay trả), `created_at`, `updated_at`.
+- Bảng `payment_transaction`: `id`, `order_id`, `provider='VNPAY'`, `txn_ref UNIQUE`, `amount`, `status IN ('PENDING','SUCCESS','FAILED')`, `response_code`, `transaction_status`, `transaction_no`, `bank_code`, `card_type`, `pay_date`, `raw_query TEXT` (nguyên query string VNPay trả, để đối soát), `created_at`, `updated_at`.
 - **Một hàm xử lý kết quả dùng chung** cho Return và IPN, idempotent, khóa `SELECT ... FOR UPDATE` giao dịch + đơn:
   1. Chữ ký sai → không đổi gì (IPN `97`).
   2. Không có `txn_ref` → IPN `01`. Số tiền lệch → IPN `04`, không đổi gì.
@@ -142,8 +142,8 @@ VNPAY: checkout ─▶ AWAITING_PAYMENT ─paid─────▶ PENDING ──
   4. `vnp_ResponseCode=00` và `vnp_TransactionStatus=00` → giao dịch `SUCCESS`; đơn đang `AWAITING_PAYMENT` → `PAID` + `PENDING` + `placed_at` + history. Đơn đã `CANCELLED` (trả muộn sau hết hạn) → `REFUND_PENDING`, đơn giữ `CANCELLED`. Đơn đã `PAID` bởi giao dịch khác → trả trùng (xem *Hoàn tiền*).
   5. Khác → giao dịch `FAILED`, đơn giữ `AWAITING_PAYMENT` (thanh toán lại được).
   6. IPN trả `{"RspCode":"00","Message":"Confirm Success"}` khi xử lý xong.
-- `GET /api/payments/vnpay/ipn` (public): VNPay gọi server-to-server — chỉ chạy khi deploy có URL public, đăng ký IPN URL trong cổng merchant VNPay.
-- `GET /api/payments/vnpay/return` (public): UI trang `/payment/vnpay-return` chuyển nguyên query string sang đây → backend verify + chạy hàm xử lý trên → trả `{orderId, orderCode, success, message}`. **Ở localhost đây là đường xác nhận chính** vì IPN không gọi về `localhost` được.
+- `GET /api/public/payments/vnpay/ipn`: VNPay gọi server-to-server — chỉ chạy khi deploy có URL public, đăng ký IPN URL trong cổng merchant VNPay.
+- `GET /api/public/payments/vnpay/return`: UI trang `/payment/vnpay-return` chuyển nguyên query string sang đây → backend verify + chạy hàm xử lý trên → trả `{orderId, orderCode, success, message}`. **Ở localhost đây là đường xác nhận chính** vì IPN không gọi về `localhost` được.
 - Admin đối soát: `GET /api/admin/payments/transactions?status=&q=&page=&size=` (`q` khớp mã đơn, `txn_ref`, `transaction_no`), mới trước.
 
 ## 5. Cấu hình chung
@@ -162,9 +162,9 @@ Bảng `system_setting(key TEXT PK, value TEXT, updated_at, updated_by)`, Java �
 | `order.cod_min_total` | VND | `0` | ≥ 0 |
 | `order.cod_max_total` | VND | `10000000` | ≥ cod_min, `0` = không giới hạn |
 
-- COD ngoài `[cod_min, cod_max]` → checkout `409`, `GET /api/payment-methods` trả kèm giới hạn để UI disable COD kèm lý do.
+- COD ngoài `[cod_min, cod_max]` → checkout `409`, `GET /api/public/payment-methods` trả kèm giới hạn để UI disable COD kèm lý do.
 - `order.auto_complete_days`: lưu + hiển thị; **hệ thống chưa có trạng thái "Hoàn thành / đã nhận hàng"** nên chưa có job dùng tới. *(Lời Claude — làm luồng hoàn thành đơn thuộc nhánh khác.)*
-- `GET /api/admin/settings`, `PUT /api/admin/settings` (partial: chỉ key gửi lên, validate tất cả trước khi ghi, 1 transaction), `GET /api/settings/public` (tên sàn, hotline, email, ngưỡng freeship) cho footer + checkout.
+- `GET /api/admin/settings`, `PUT /api/admin/settings` (partial: chỉ key gửi lên, validate tất cả trước khi ghi, 1 transaction), `GET /api/public/settings` (tên sàn, hotline, email, ngưỡng freeship) cho footer + checkout.
 
 ## 6. Lịch sử thay đổi cấu hình
 
@@ -207,7 +207,7 @@ Một bảng chung `admin_config_audit(id, entity IN ('CARRIER','SHIPPING_RATE',
 - `features/settings/` (phẳng): `SystemSettingsService`, audit.
 - `features/admin/`: `AdminShippingController`, `AdminPaymentController`, `AdminSettingsController` điều phối, giống `AdminProductController`.
 - `OrderService.checkout` gọi `ShippingService` / `PaymentService` / `SystemSettingsService` qua service (luật `docs/structure.md`).
-- `SecurityConfig`: `/api/admin/**` sẵn `hasRole('ADMIN')`; mở public `/api/locations/**`, `/api/payment-methods`, `/api/settings/public`, `/api/payments/vnpay/return`, `/api/payments/vnpay/ipn`.
+- `SecurityConfig`: `/api/admin/**` sẵn `hasRole('ADMIN')`; endpoint public đặt dưới `/api/public/**` (đã permitAll), không sửa `SecurityConfig`.
 - Cập nhật `docs/api-endpoints.md` (flow mới + checkbox), `docs/data.md` (schema mới).
 
 ## Kiểm thử
