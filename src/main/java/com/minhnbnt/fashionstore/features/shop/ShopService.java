@@ -224,6 +224,13 @@ public class ShopService {
     @Transactional(readOnly = true)
     public ShopResponse getBySlug(@NonNull String slug) {
         var shop = shops.findBySlug(slug).orElse(null);
+        if (shop == null) {
+            try {
+                var id = UUID.fromString(slug);
+                shop = shops.findById(id).orElse(null);
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
         if (shop == null || shop.getStatus() != ShopStatus.APPROVED) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found");
         }
