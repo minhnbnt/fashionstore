@@ -3,6 +3,7 @@ package com.minhnbnt.fashionstore.features.order;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderItemResponse;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
+import com.minhnbnt.fashionstore.features.address.repository.AddressRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
@@ -11,6 +12,7 @@ import com.minhnbnt.fashionstore.features.order.repository.OrderStatusHistoryRep
 import com.minhnbnt.fashionstore.features.order.repository.OrderStockRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.model.Address;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.Order;
 import com.minhnbnt.fashionstore.model.OrderItem;
@@ -50,6 +52,8 @@ public class OrderService {
 
     private final ShopAccessChecker access;
 
+    private final AddressRepository addresses;
+
     @Transactional
     public OrderResponse checkout(@NonNull UUID buyerId, @NonNull CheckoutRequest request) {
         if (!shops.isShopApproved(request.shopId())) {
@@ -63,6 +67,18 @@ public class OrderService {
         var shippingFee = request.shippingFee() == null ? 0L : request.shippingFee();
         if (shippingFee < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Shipping fee must not be negative");
+        }
+
+        var shippingAddress = request.shippingAddress();
+        if (request.addressId() != null) {
+            var address = addresses.findByIdAndUserId(request.addressId(), buyerId).orElse(null);
+            if (address == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Address not found");
+            }
+            shippingAddress = formatAddress(address);
+        }
+        if (shippingAddress == null || shippingAddress.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Shipping address is required");
         }
 
         var snapshots = new ArrayList<OrderItemSnapshot>();
@@ -105,7 +121,8 @@ public class OrderService {
             shippingFee,
             request.shippingName(),
             request.shippingPhone(),
-            request.shippingAddress()
+            shippingAddress,
+            request.addressId()
         );
         orders.save(order);
 
@@ -278,9 +295,30 @@ public class OrderService {
             order.getShippingName(),
             order.getShippingPhone(),
             order.getShippingAddress(),
+            order.getAddressId(),
             itemResponses,
             order.getCreatedAt()
         );
+    }
+
+    private static String formatAddress(Address address) {
+        var parts = new java.util.ArrayList<String>();
+        if (address.getHouseNumber() != null) {
+            parts.add(address.getHouseNumber());
+        }
+        if (address.getStreet() != null) {
+            parts.add(address.getStreet());
+        }
+        if (address.getWard() != null) {
+            parts.add(address.getWard());
+        }
+        if (address.getDistrict() != null) {
+            parts.add(address.getDistrict());
+        }
+        if (address.getCity() != null) {
+            parts.add(address.getCity());
+        }
+        return String.join(", ", parts);
     }
 
     private record OrderItemSnapshot(

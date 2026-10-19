@@ -11,7 +11,6 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.UUID;
-
 public record CheckoutRequest(
     @Schema(description = "Shop checkout, 1 don dung 1 shop")
     @NotNull
@@ -33,9 +32,13 @@ public record CheckoutRequest(
     String shippingPhone,
 
     @Schema(example = "Ha Noi")
-    @NotBlank
     @Size(max = 1000)
+    @Nullable
     String shippingAddress,
+
+    @Schema(description = "Id dia chi da luu trong address book, neu co", nullable = true)
+    @Nullable
+    UUID addressId,
 
     @Schema(description = "Phi ship VND, null = 0", nullable = true)
     @Nullable

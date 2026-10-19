@@ -44,6 +44,8 @@ public class Order implements Persistable<UUID> {
 
     private String shippingAddress;
 
+    private @Nullable UUID addressId;
+
     private String note;
 
     private @Nullable Instant confirmedAt;
@@ -76,6 +78,7 @@ public class Order implements Persistable<UUID> {
         String shippingName,
         String shippingPhone,
         String shippingAddress,
+        @Nullable UUID addressId,
         String note,
         @Nullable Instant confirmedAt,
         @Nullable Instant shippedAt,
@@ -97,6 +100,7 @@ public class Order implements Persistable<UUID> {
         this.shippingName = shippingName;
         this.shippingPhone = shippingPhone;
         this.shippingAddress = shippingAddress;
+        this.addressId = addressId;
         this.note = note;
         this.confirmedAt = confirmedAt;
         this.shippedAt = shippedAt;
@@ -115,7 +119,8 @@ public class Order implements Persistable<UUID> {
         long shippingFee,
         String shippingName,
         String shippingPhone,
-        String shippingAddress
+        String shippingAddress,
+        @Nullable UUID addressId
     ) {
         var now = Instant.now();
         var order = new Order(
@@ -132,6 +137,7 @@ public class Order implements Persistable<UUID> {
             shippingName,
             shippingPhone,
             shippingAddress,
+            addressId,
             "",
             null,
             null,

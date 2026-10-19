@@ -1,6 +1,7 @@
 package com.minhnbnt.fashionstore.dto.order;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.List;
@@ -32,6 +33,10 @@ public record OrderResponse(
     String shippingPhone,
 
     String shippingAddress,
+
+    @Schema(description = "Id dia chi da luu, null neu nhap tay", nullable = true)
+    @Nullable
+    UUID addressId,
 
     List<OrderItemResponse> items,
 

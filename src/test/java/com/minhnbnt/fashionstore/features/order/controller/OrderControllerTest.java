@@ -52,6 +52,7 @@ class OrderControllerTest {
             "An",
             "0901",
             "Ha Noi",
+            null,
             List.of(),
             Instant.now()
         );

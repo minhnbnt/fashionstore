@@ -1,0 +1,1 @@
+ALTER TABLE orders ADD COLUMN address_id UUID REFERENCES address (id) ON DELETE SET NULL;

@@ -182,6 +182,7 @@ public class CartService {
                     request.shippingName(),
                     request.shippingPhone(),
                     request.shippingAddress(),
+                    null,
                     request.shippingFee()
                 )
             ));

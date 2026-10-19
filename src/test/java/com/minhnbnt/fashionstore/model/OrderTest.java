@@ -19,7 +19,8 @@ class OrderTest {
             0L,
             "An",
             "0900000000",
-            "Ha Noi"
+            "Ha Noi",
+            null
         );
     }
 
