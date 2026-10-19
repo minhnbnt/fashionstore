@@ -10,6 +10,7 @@ import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.model.ChatConversation;
 import com.minhnbnt.fashionstore.model.ChatMessage;
 import com.minhnbnt.fashionstore.model.MemberRole;
+import com.minhnbnt.fashionstore.model.Shop;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -177,16 +178,19 @@ public class ChatService {
         }
     }
 
-    private static ChatConversationResponse toConversationResponse(ChatConversation c, boolean forSeller) {
+    private ChatConversationResponse toConversationResponse(ChatConversation c, boolean forSeller) {
         var unread = c.getBuyerUnreadCount();
         if (forSeller) {
             unread = c.getSellerUnreadCount();
         }
 
+        var shopName = shops.findById(c.getShopId()).map(Shop::getName).orElse(null);
+
         return new ChatConversationResponse(
             c.getId(),
             c.getShopId(),
             c.getBuyerId(),
+            shopName,
             c.getLastMessageText(),
             c.getLastMessageAt(),
             unread,
