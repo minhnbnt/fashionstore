@@ -54,7 +54,7 @@ Lý do bắt buộc 5–500 ký tự (giống kiểm duyệt shop). Đồng th�
 
 ## Code
 
-- Migration `V10__product_moderation.sql`: thêm `BANNED` vào CHECK, cột `violation_type`, `status_reason`, bảng `product_moderation_history`.
+- Migration `V13__product_moderation.sql`: thêm `BANNED` vào CHECK, cột `violation_type`, `status_reason`, bảng `product_moderation_history`.
 - `model/Product`: `ban(type, reason)`, `restore()`; `activate()` chặn `BANNED`.
 - `features/catalog/`: luật gỡ/khôi phục + lịch sử trong `CatalogService`, read model admin ở `ProductAdminQueryRepository`.
 - `features/admin/`: `AdminProductController` + `AdminProductService` điều phối, giống `AdminShopService`.

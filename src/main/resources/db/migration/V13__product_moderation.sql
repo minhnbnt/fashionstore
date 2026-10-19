@@ -1,4 +1,4 @@
--- V10__product_moderation.sql
+-- V13__product_moderation.sql
 -- Module quản trị: admin gỡ sản phẩm vi phạm (BANNED) kèm loại vi phạm + lý do, lịch sử kiểm duyệt.
 
 ALTER TABLE product DROP CONSTRAINT IF EXISTS product_status_check;
