@@ -1,5 +1,7 @@
 package com.minhnbnt.fashionstore.features.catalog;
 
+import com.minhnbnt.fashionstore.dto.admin.AdminProductDetailResponse;
+import com.minhnbnt.fashionstore.dto.admin.AdminProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.AttachImagesRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CategoryResponse;
 import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
@@ -17,8 +19,11 @@ import com.minhnbnt.fashionstore.dto.catalog.BulkImportResult;
 import com.minhnbnt.fashionstore.dto.catalog.InventoryItemResponse;
 import com.minhnbnt.fashionstore.dto.catalog.SellerProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.StockMovementResponse;
+import com.minhnbnt.fashionstore.dto.common.PageResponse;
 import com.minhnbnt.fashionstore.features.catalog.repository.CategoryRepository;
+import com.minhnbnt.fashionstore.features.catalog.repository.ProductAdminQueryRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductImageRepository;
+import com.minhnbnt.fashionstore.features.catalog.repository.ProductModerationHistoryRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductSearchRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepository;
@@ -29,8 +34,10 @@ import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.Product;
 import com.minhnbnt.fashionstore.model.ProductImage;
+import com.minhnbnt.fashionstore.model.ProductModerationHistory;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.model.ProductVariant;
+import com.minhnbnt.fashionstore.model.ProductViolationType;
 import com.minhnbnt.fashionstore.model.StockMovement;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
@@ -66,6 +73,10 @@ public class CatalogService {
     private final ProductSearchRepository search;
 
     private final StockMovementRepository movements;
+
+    private final ProductAdminQueryRepository adminQueries;
+
+    private final ProductModerationHistoryRepository moderationHistories;
 
     private final OrderService orderService;
 
@@ -258,6 +269,92 @@ public class CatalogService {
         return categories.findAllByOrderBySortOrderAsc().stream()
             .map(CatalogMapper::toCategoryResponse)
             .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<AdminProductResponse> searchForAdmin(
+        @Nullable ProductStatus status,
+        @Nullable UUID shopId,
+        @Nullable String query,
+        int page,
+        int size
+    ) {
+        var items = adminQueries.search(status, shopId, query, page, size);
+        var total = adminQueries.count(status, shopId, query);
+        return new PageResponse<>(items, total, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public AdminProductDetailResponse getForAdmin(@NonNull UUID productId) {
+        var summary = requireAdminProduct(productId);
+        var product = products.findById(productId).orElseThrow();
+
+        var variantResponses = variants.findByProductIdOrderByCreatedAtAsc(productId).stream()
+            .map(CatalogMapper::toVariantResponse)
+            .toList();
+        var imageResponses = images.findByProductIdOrderBySortOrderAsc(productId).stream()
+            .map(CatalogMapper::toImageResponse)
+            .toList();
+
+        return new AdminProductDetailResponse(
+            summary,
+            product.getDescription(),
+            variantResponses,
+            imageResponses,
+            adminQueries.history(productId)
+        );
+    }
+
+    /**
+     * Admin gỡ sản phẩm vi phạm: biến mất khỏi search/PDP/checkout ngay, đơn đang xử lý vẫn tiếp tục.
+     */
+    @Transactional
+    public AdminProductResponse banProduct(
+        @NonNull UUID adminId,
+        @NonNull UUID productId,
+        @NonNull ProductViolationType violationType,
+        @NonNull String reason
+    ) {
+        var product = lockedProduct(productId);
+        var from = product.getStatus();
+
+        product.ban(violationType, reason);
+        products.save(product);
+
+        moderationHistories.save(ProductModerationHistory.record(
+            productId, from, product.getStatus(), violationType, adminId, reason
+        ));
+        return requireAdminProduct(productId);
+    }
+
+    @Transactional
+    public AdminProductResponse restoreProduct(@NonNull UUID adminId, @NonNull UUID productId) {
+        var product = lockedProduct(productId);
+        var from = product.getStatus();
+
+        product.restore();
+        products.save(product);
+
+        moderationHistories.save(ProductModerationHistory.record(
+            productId, from, product.getStatus(), null, adminId, ""
+        ));
+        return requireAdminProduct(productId);
+    }
+
+    private Product lockedProduct(UUID productId) {
+        var product = products.findLockedById(productId).orElse(null);
+        if (product == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        return product;
+    }
+
+    private AdminProductResponse requireAdminProduct(UUID productId) {
+        var product = adminQueries.findById(productId).orElse(null);
+        if (product == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        return product;
     }
 
     private void applyStatus(Product product, String status) {
@@ -693,6 +790,8 @@ public class CatalogService {
             product.getSlug(),
             product.getDescription(),
             product.getStatus().name(),
+            violationNameOf(product),
+            product.getStatusReason(),
             totalStock,
             minPrice,
             maxPrice,
@@ -701,5 +800,13 @@ public class CatalogService {
             product.getCreatedAt(),
             product.getUpdatedAt()
         );
+    }
+
+    private static @Nullable String violationNameOf(Product product) {
+        var violationType = product.getViolationType();
+        if (violationType == null) {
+            return null;
+        }
+        return violationType.name();
     }
 }

@@ -59,4 +59,90 @@ class ProductTest {
         assertThatThrownBy(product()::activate)
             .isInstanceOf(ResponseStatusException.class);
     }
+
+    @Test
+    void banKeepsViolationTypeAndReason() {
+        var product = product();
+
+        product.ban(ProductViolationType.COUNTERFEIT, "Hàng nhái thương hiệu");
+
+        assertThat(product.getStatus()).isEqualTo(ProductStatus.BANNED);
+        assertThat(product.getViolationType()).isEqualTo(ProductViolationType.COUNTERFEIT);
+        assertThat(product.getStatusReason()).isEqualTo("Hàng nhái thương hiệu");
+    }
+
+    @Test
+    void banWorksOnHiddenProduct() {
+        var product = product();
+        product.hide();
+
+        product.ban(ProductViolationType.PROHIBITED, "Hàng cấm kinh doanh");
+
+        assertThat(product.getStatus()).isEqualTo(ProductStatus.BANNED);
+    }
+
+    @Test
+    void banTwiceFails() {
+        var product = product();
+        product.ban(ProductViolationType.SPAM, "Đăng trùng lặp");
+
+        assertThatThrownBy(() -> product.ban(ProductViolationType.SPAM, "Đăng trùng lặp"))
+            .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void banDeletedProductFails() {
+        var product = product();
+        product.delete();
+
+        assertThatThrownBy(() -> product.ban(ProductViolationType.SPAM, "Đăng trùng lặp"))
+            .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void sellerCannotActivateBannedProduct() {
+        var product = product();
+        product.ban(ProductViolationType.MISLEADING, "Ảnh không đúng sản phẩm");
+
+        assertThatThrownBy(product::activate)
+            .isInstanceOf(ResponseStatusException.class)
+            .hasMessageContaining("banned");
+    }
+
+    @Test
+    void sellerCannotHideBannedProduct() {
+        var product = product();
+        product.ban(ProductViolationType.MISLEADING, "Ảnh không đúng sản phẩm");
+
+        assertThatThrownBy(product::hide)
+            .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void sellerCanDeleteBannedProduct() {
+        var product = product();
+        product.ban(ProductViolationType.MISLEADING, "Ảnh không đúng sản phẩm");
+
+        product.delete();
+
+        assertThat(product.getStatus()).isEqualTo(ProductStatus.DELETED);
+    }
+
+    @Test
+    void restoreMovesBannedToHiddenAndClearsReason() {
+        var product = product();
+        product.ban(ProductViolationType.WRONG_CATEGORY, "Sai danh mục");
+
+        product.restore();
+
+        assertThat(product.getStatus()).isEqualTo(ProductStatus.HIDDEN);
+        assertThat(product.getViolationType()).isNull();
+        assertThat(product.getStatusReason()).isNull();
+    }
+
+    @Test
+    void restoreNotBannedFails() {
+        assertThatThrownBy(product()::restore)
+            .isInstanceOf(ResponseStatusException.class);
+    }
 }

@@ -56,6 +56,11 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+
+    // config/springboot.yml (dev) cũng được nạp khi test: tắt bootstrap admin + GoTrue thật để test không ghi vào GoTrue dev.
+    // System property ưu tiên hơn file import nên ghi đè được.
+    systemProperty("app.bootstrap-admin.email", "")
+    systemProperty("gotrue.service-role-key", "")
 }
 
 tasks.withType<JavaCompile>().configureEach {

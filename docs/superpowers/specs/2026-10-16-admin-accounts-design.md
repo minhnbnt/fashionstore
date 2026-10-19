@@ -40,7 +40,7 @@ ACTIVE ──lock(reason)──▶ LOCKED ──unlock──▶ ACTIVE
 ## Thực thi khóa tài khoản (2 lớp)
 
 1. **Backend, tức thì**: `AccountFilter` chạy sau khi xác thực JWT. Tài khoản `LOCKED` bị trả `403` (`ProblemDetail`, `code=ACCOUNT_LOCKED`) cho mọi API, trừ `GET /api/users/me` (để UI hiện lý do) và các GET public.
-2. **GoTrue**: gọi Admin API `PUT /admin/users/{id}` với `ban_duration` để chặn đăng nhập và refresh token. Cần `gotrue.service-role-key` (JWT `role=service_role` ký bằng key GoTrue). Key trống thì bỏ qua lớp này và log cảnh báo, lớp 1 vẫn chặn.
+2. **GoTrue**: gọi Admin API `PUT /admin/users/{id}` với `ban_duration` để chặn đăng nhập và refresh token. Cần `gotrue.service-role-key` (JWT `role=service_role` ký bằng key GoTrue; dev đã cấu hình sẵn trong `config/springboot.yml`). Key trống thì bỏ qua lớp này và log cảnh báo, lớp 1 vẫn chặn.
 
 Gọi GoTrue lỗi thì rollback transaction và trả `502`, để DB và GoTrue không lệch nhau.
 
@@ -48,6 +48,23 @@ Gọi GoTrue lỗi thì rollback transaction và trả `502`, để DB và GoTru
 
 - `user_profile.role` (`CUSTOMER` | `SHOP` | `ADMIN`) mirror từ claim `app_metadata.role`, **chỉ nâng, không hạ** khi đồng bộ từ token.
 - Duyệt shop: owner đang `CUSTOMER` được nâng lên `SHOP` trong DB và GoTrue (`app_metadata.role = "shop"`), FE refresh session để nhận role mới.
+
+## Tài khoản admin đầu tiên (bootstrap)
+
+`features/admin/AdminAccountBootstrap` chạy lúc khởi động khi có `app.bootstrap-admin.email` (giống `KEYCLOAK_ADMIN`, `GF_SECURITY_ADMIN_USER`):
+
+- Email chưa có trong GoTrue: tạo qua `POST /admin/users` (`email_confirm=true`, `app_metadata.role=admin`), đăng nhập được ngay.
+- Email đã có: chỉ gán lại `app_metadata.role=admin`, **không đổi mật khẩu**.
+- Cả hai trường hợp đều mirror `user_profile` với role `ADMIN`.
+- Thiếu `gotrue.service-role-key`, thiếu mật khẩu khi cần tạo, hay GoTrue chưa lên: log rồi bỏ qua, app vẫn khởi động.
+
+| Property | Env | Dev mặc định |
+|---|---|---|
+| `app.bootstrap-admin.email` | `ADMIN_EMAIL` | `admin@fashionstore.local` |
+| `app.bootstrap-admin.password` | `ADMIN_PASSWORD` | `Admin@123456` |
+| `gotrue.service-role-key` | `GOTRUE_SERVICE_ROLE_KEY` | JWT `role=service_role` ký bằng khóa dev công khai |
+
+Production: không dùng giá trị dev; ký service-role key bằng khóa GoTrue thật và truyền mật khẩu qua secret.
 
 ## JIT provisioning
 

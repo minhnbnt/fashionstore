@@ -14,6 +14,9 @@
 
 - `V1__marketplace.sql`: user, shop (duyệt `PENDING` → `APPROVED`), catalog full variant (SKU unique theo shop), order COD 1-checkout-1-shop, CHECK toán học (`total = subtotal + shipping`), partial unique (1 OWNER/shop, 1 default variant).
 - `V2__product_search.sql`: index BM25 (`idx_product_bm25`, xem Search).
+- `V10__product_moderation.sql`: product thêm `BANNED` + `violation_type`/`status_reason` (lần gỡ gần nhất), bảng `product_moderation_history` (audit gỡ/khôi phục).
+- `V12__site_content.sql`: `site_banner`, `site_popup` (lịch chạy `starts_at`/`ends_at`, CHECK kết thúc sau bắt đầu), `site_page` (slug unique, `DRAFT`/`PUBLISHED`), `faq_item`; seed 5 trang chính sách + vài FAQ. V11 thuộc nhánh giám sát đơn.
+- Repository Spring Data JDBC: derived query sắp nhiều cột (`OrderByAAscBAsc`) làm AOT repository sinh code không compile được → viết `@Query` SQL tay.
 
 ## Search BM25 (pg_textsearch)
 
