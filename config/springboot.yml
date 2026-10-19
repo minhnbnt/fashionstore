@@ -4,7 +4,7 @@ spring:
       enabled: false
 
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/fashionstore}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:6432/fashionstore?prepareThreshold=0}
     username: ${DATABASE_USERNAME:postgres}
     password: ${DATABASE_PASSWORD:postgres}
 
