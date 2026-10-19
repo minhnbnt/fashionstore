@@ -12,6 +12,7 @@ import com.minhnbnt.fashionstore.model.Shop;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -45,6 +46,8 @@ class ChatServiceUnitTest {
     @InjectMocks
     private ChatService chatService;
 
+    private final ArgumentCaptor<ChatMessage> captor = ArgumentCaptor.forClass(ChatMessage.class);
+
     @Test
     void startConversationCreatesNewWhenNotFound() {
         var buyerId = UUID.randomUUID();
@@ -68,6 +71,7 @@ class ChatServiceUnitTest {
         var shopId = UUID.randomUUID();
         var convId = UUID.randomUUID();
         var conv = ChatConversation.create(shopId, buyerId);
+        var ownerId = UUID.randomUUID();
 
         var shop = Shop.create("Fashion Hub", "fashion-hub", "Mo ta", null, null);
         shop.updateProfile(
@@ -78,6 +82,7 @@ class ChatServiceUnitTest {
 
         when(conversations.findById(convId)).thenReturn(Optional.of(conv));
         when(shops.findById(shopId)).thenReturn(Optional.of(shop));
+        when(members.findOwner(shopId)).thenReturn(Optional.of(ownerId));
 
         var req = new SendMessageRequest("Shop oi, mau xanh con size M khong?", null);
         var resp = chatService.sendMessage(buyerId, convId, req);
@@ -85,7 +90,12 @@ class ChatServiceUnitTest {
         assertThat(resp.senderType()).isEqualTo("BUYER");
         assertThat(resp.content()).isEqualTo("Shop oi, mau xanh con size M khong?");
         // 1 user message + 1 auto-reply message
-        verify(messages, times(2)).save(any(ChatMessage.class));
+        verify(messages, times(2)).save(captor.capture());
+        var autoReply = captor.getAllValues().get(1);
+        assertThat(autoReply.getSenderType()).isEqualTo("SELLER");
+        // Auto reply must come from a real shop member, not the shop row itself.
+        assertThat(autoReply.getSenderId()).isEqualTo(ownerId);
+        assertThat(autoReply.getContent()).isEqualTo("Xin chao, shop se phan hoi ban som nhat!");
     }
 
     @Test

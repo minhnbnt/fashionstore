@@ -4,9 +4,18 @@ import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.catalog.repository.CategoryRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
+import com.minhnbnt.fashionstore.features.chat.ChatService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
+import com.minhnbnt.fashionstore.features.order.OrderService;
+import com.minhnbnt.fashionstore.features.order.ReturnRequestService;
+import com.minhnbnt.fashionstore.features.order.RevenueService;
+import com.minhnbnt.fashionstore.features.order.repository.SellerSettlementRepository;
+import com.minhnbnt.fashionstore.features.order.repository.SellerWithdrawalRepository;
+import com.minhnbnt.fashionstore.features.review.ReviewService;
+import com.minhnbnt.fashionstore.features.shop.ShopDecorationService;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.features.shop.ShopStaffService;
 import com.minhnbnt.fashionstore.model.ShopStatus;
 
 import org.junit.jupiter.api.Test;
@@ -50,8 +59,52 @@ class DemoSeederTest {
     @Value("${s3.bucket}")
     private String bucket;
 
+    @Autowired
+    private OrderService orderService;
+
+    @Autowired
+    private ReviewService reviewService;
+
+    @Autowired
+    private ReturnRequestService returnRequestService;
+
+    @Autowired
+    private ChatService chatService;
+
+    @Autowired
+    private ShopStaffService shopStaffService;
+
+    @Autowired
+    private ShopDecorationService shopDecorationService;
+
+    @Autowired
+    private RevenueService revenueService;
+
+    @Autowired
+    private SellerSettlementRepository settlements;
+
+    @Autowired
+    private SellerWithdrawalRepository withdrawals;
+
     private DemoSeeder seeder() {
-        return new DemoSeeder(shopService, catalogService, userService, shops, categories, s3, bucket);
+        return new DemoSeeder(
+            shopService,
+            catalogService,
+            userService,
+            shops,
+            categories,
+            s3,
+            bucket,
+            orderService,
+            reviewService,
+            returnRequestService,
+            chatService,
+            shopStaffService,
+            shopDecorationService,
+            revenueService,
+            settlements,
+            withdrawals
+        );
     }
 
     @Test

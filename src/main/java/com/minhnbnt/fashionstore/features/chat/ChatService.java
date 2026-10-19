@@ -128,16 +128,19 @@ public class ChatService {
         if (isBuyer) {
             var shop = shops.findById(conv.getShopId()).orElse(null);
             if (shop != null && shop.getAutoReplyText() != null && !shop.getAutoReplyText().isBlank()) {
-                var autoMsg = ChatMessage.of(
-                    conversationId,
-                    shop.getId(),
-                    "SELLER",
-                    shop.getAutoReplyText(),
-                    null
-                );
-                messages.save(autoMsg);
-                conv.recordNewMessage(shop.getAutoReplyText(), false);
-                conversations.save(conv);
+                var ownerId = members.findOwner(conv.getShopId()).orElse(null);
+                if (ownerId != null) {
+                    var autoMsg = ChatMessage.of(
+                        conversationId,
+                        ownerId,
+                        "SELLER",
+                        shop.getAutoReplyText(),
+                        null
+                    );
+                    messages.save(autoMsg);
+                    conv.recordNewMessage(shop.getAutoReplyText(), false);
+                    conversations.save(conv);
+                }
             }
         }
 

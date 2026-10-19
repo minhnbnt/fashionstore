@@ -42,3 +42,7 @@ fashionstore-ui/
 
 # OpenCode local config
 opencode.json
+
+# Local agent/spec tooling
+.agents/
+openspec/
