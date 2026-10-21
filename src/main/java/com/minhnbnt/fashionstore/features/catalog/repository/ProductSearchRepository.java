@@ -222,11 +222,11 @@ public class ProductSearchRepository {
         var conditions = new ArrayList<String>();
 
         if (criteria.size() != null) {
-            conditions.add("v.size = :size");
+            conditions.add("lower(v.size) = lower(:size)");
             params.put("size", criteria.size());
         }
         if (criteria.color() != null) {
-            conditions.add("v.color = :color");
+            conditions.add("lower(v.color) = lower(:color)");
             params.put("color", criteria.color());
         }
         if (criteria.minPrice() != null) {
