@@ -46,6 +46,7 @@ opencode.json
 # Local browser profile, scraped manifests and downloaded marketplace images
 tools/marketplace-browser/.profile/
 data/marketplace-import/
+tools/marketplace-browser/node_modules/
 
 # Local agent/spec tooling
 .agents/
