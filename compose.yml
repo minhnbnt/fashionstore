@@ -11,7 +11,7 @@ services:
       - "5433:5432"
 
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
       - ./config/postgresql:/docker-entrypoint-initdb.d/
 
     healthcheck:
@@ -20,11 +20,31 @@ services:
       timeout: 5s
       retries: 5
 
+  pgbouncer:
+    image: registry.access.redhat.com/hi/pgbouncer:1.25
+
+    ports:
+      - "6432:6432"
+
+    volumes:
+      - ./config/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./config/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   gotrue:
     image: ghcr.io/supabase/gotrue:v2.197.0
 
     env_file:
       - ./config/gotrue.env
+      - path: .env
+        required: false
+
+    environment:
+      GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID: ${GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID:-}
+      GOTRUE_EXTERNAL_GOOGLE_SECRET: ${GOTRUE_EXTERNAL_GOOGLE_SECRET:-}
 
     ports:
       - "9999:9999"

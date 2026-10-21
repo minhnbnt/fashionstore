@@ -10,6 +10,7 @@ import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.model.ChatConversation;
 import com.minhnbnt.fashionstore.model.ChatMessage;
 import com.minhnbnt.fashionstore.model.MemberRole;
+import com.minhnbnt.fashionstore.model.Shop;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -128,16 +129,19 @@ public class ChatService {
         if (isBuyer) {
             var shop = shops.findById(conv.getShopId()).orElse(null);
             if (shop != null && shop.getAutoReplyText() != null && !shop.getAutoReplyText().isBlank()) {
-                var autoMsg = ChatMessage.of(
-                    conversationId,
-                    shop.getId(),
-                    "SELLER",
-                    shop.getAutoReplyText(),
-                    null
-                );
-                messages.save(autoMsg);
-                conv.recordNewMessage(shop.getAutoReplyText(), false);
-                conversations.save(conv);
+                var ownerId = members.findOwner(conv.getShopId()).orElse(null);
+                if (ownerId != null) {
+                    var autoMsg = ChatMessage.of(
+                        conversationId,
+                        ownerId,
+                        "SELLER",
+                        shop.getAutoReplyText(),
+                        null
+                    );
+                    messages.save(autoMsg);
+                    conv.recordNewMessage(shop.getAutoReplyText(), false);
+                    conversations.save(conv);
+                }
             }
         }
 
@@ -174,16 +178,19 @@ public class ChatService {
         }
     }
 
-    private static ChatConversationResponse toConversationResponse(ChatConversation c, boolean forSeller) {
+    private ChatConversationResponse toConversationResponse(ChatConversation c, boolean forSeller) {
         var unread = c.getBuyerUnreadCount();
         if (forSeller) {
             unread = c.getSellerUnreadCount();
         }
 
+        var shopName = shops.findById(c.getShopId()).map(Shop::getName).orElse(null);
+
         return new ChatConversationResponse(
             c.getId(),
             c.getShopId(),
             c.getBuyerId(),
+            shopName,
             c.getLastMessageText(),
             c.getLastMessageAt(),
             unread,

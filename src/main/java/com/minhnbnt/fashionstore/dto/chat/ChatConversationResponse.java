@@ -9,6 +9,7 @@ public record ChatConversationResponse(
     UUID id,
     UUID shopId,
     UUID buyerId,
+    @Nullable String shopName,
     @Nullable String lastMessageText,
     Instant lastMessageAt,
     int unreadCount,

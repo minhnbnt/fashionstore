@@ -80,8 +80,8 @@ Ngoài phạm vi: cổng khiếu nại chủ thương hiệu, thông báo kết 
 
 ## Code
 
-- Migration `V14__product_moderation.sql`: thêm `BANNED` vào CHECK, cột `violation_type`, `status_reason`, bảng `product_moderation_history`.
-- Migration `V15__product_reports.sql`: `product_report` (partial unique: 1 báo cáo mở/người/sản phẩm, 1 cờ hệ thống mở/sản phẩm), `banned_keyword` (unique theo `lower(keyword)`).
+- Migration `V13__product_moderation.sql`: thêm `BANNED` vào CHECK, cột `violation_type`, `status_reason`, bảng `product_moderation_history`.
+- Migration `V14__product_reports.sql`: `product_report` (partial unique: 1 báo cáo mở/người/sản phẩm, 1 cờ hệ thống mở/sản phẩm), `banned_keyword` (unique theo `lower(keyword)`).
 - `features/catalog/`: `ProductReportService` (báo cáo, bác bỏ), `BannedKeywordService` (CRUD + quét lại), `KeywordScanner` (so khớp + gắn cờ, `CatalogService` gọi khi tạo/sửa).
 - `model/Product`: `ban(type, reason)`, `restore()`; `activate()` chặn `BANNED`.
 - `features/catalog/`: luật gỡ/khôi phục + lịch sử trong `CatalogService`, read model admin ở `ProductAdminQueryRepository`.

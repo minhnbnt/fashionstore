@@ -8,9 +8,18 @@ import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
 import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.catalog.repository.CategoryRepository;
+import com.minhnbnt.fashionstore.features.chat.ChatService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
+import com.minhnbnt.fashionstore.features.order.OrderService;
+import com.minhnbnt.fashionstore.features.order.ReturnRequestService;
+import com.minhnbnt.fashionstore.features.order.RevenueService;
+import com.minhnbnt.fashionstore.features.order.repository.SellerSettlementRepository;
+import com.minhnbnt.fashionstore.features.order.repository.SellerWithdrawalRepository;
+import com.minhnbnt.fashionstore.features.review.ReviewService;
+import com.minhnbnt.fashionstore.features.shop.ShopDecorationService;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.features.shop.ShopStaffService;
 import com.minhnbnt.fashionstore.model.Category;
 
 import lombok.extern.slf4j.Slf4j;
@@ -38,7 +47,19 @@ import java.util.UUID;
 /**
  * Dev-only demo data. Enabled with {@code app.demo-seed=true} (local config only,
  * never production). Idempotent: skips when the demo shop already exists.
- * Reset with: {@code DELETE FROM shop WHERE slug = 'net-lab';}
+ *
+ * <p>Reset demo data (FK-safe order — {@code orders} is the only table referencing
+ * {@code shop} without {@code ON DELETE CASCADE}, everything else cascades):
+ *
+ * <pre>
+ * DELETE FROM orders WHERE shop_id IN (SELECT id FROM shop WHERE slug = 'net-lab');
+ * DELETE FROM shop WHERE slug = 'net-lab';
+ * DELETE FROM user_profile WHERE email LIKE '%@demo.local' OR email = 'demo-owner@local';
+ * </pre>
+ *
+ * <p>After resetting, restart with {@code app.demo-seed=true} to seed everything again
+ * (shop, catalog, buyers, orders across all statuses, reviews, returns, chat,
+ * decoration draft, staff, wallet history).
  */
 @Component
 @ConditionalOnProperty(name = "app.demo-seed", havingValue = "true")
@@ -65,6 +86,12 @@ public class DemoSeeder implements ApplicationRunner {
 
     private final String bucket;
 
+    private final DemoOrderSeeder orderSeeder;
+
+    private final DemoEngagementSeeder engagementSeeder;
+
+    private final DemoShopOpsSeeder opsSeeder;
+
     private final HttpClient http = HttpClient.newBuilder()
         .followRedirects(HttpClient.Redirect.NORMAL)
         .build();
@@ -76,7 +103,16 @@ public class DemoSeeder implements ApplicationRunner {
         ShopRepository shopRepository,
         CategoryRepository categoryRepository,
         S3Client s3,
-        @Value("${s3.bucket}") String bucket
+        @Value("${s3.bucket}") String bucket,
+        OrderService orderService,
+        ReviewService reviewService,
+        ReturnRequestService returnRequestService,
+        ChatService chatService,
+        ShopStaffService shopStaffService,
+        ShopDecorationService shopDecorationService,
+        RevenueService revenueService,
+        SellerSettlementRepository settlementRepository,
+        SellerWithdrawalRepository withdrawalRepository
     ) {
         this.shopService = shopService;
         this.catalogService = catalogService;
@@ -85,6 +121,17 @@ public class DemoSeeder implements ApplicationRunner {
         this.categoryRepository = categoryRepository;
         this.s3 = s3;
         this.bucket = bucket;
+        this.orderSeeder = new DemoOrderSeeder(userService, orderService);
+        this.engagementSeeder = new DemoEngagementSeeder(reviewService, returnRequestService, chatService);
+        this.opsSeeder = new DemoShopOpsSeeder(
+            shopService,
+            shopStaffService,
+            shopDecorationService,
+            revenueService,
+            settlementRepository,
+            withdrawalRepository,
+            userService
+        );
     }
 
     @Override
@@ -103,15 +150,22 @@ public class DemoSeeder implements ApplicationRunner {
             new CreateShopRequest(SHOP_NAME, SHOP_SLUG, "Mặc đẹp là nét riêng của bạn.", null, null)
         );
         shopService.approve(ownerId, shop.id());
+        opsSeeder.seedProfile(ownerId, shop.id());
 
         var categoryIds = seedCategories();
 
+        var variantIdBySku = new HashMap<String, UUID>();
+        var productIdBySlug = new HashMap<String, UUID>();
         int productCount = 0;
         int uploaded = 0;
         int skipped = 0;
         for (var item : DemoCatalog.ITEMS) {
             var product = catalogService.createProduct(ownerId, shop.id(), item.request(categoryIds));
             productCount++;
+            productIdBySlug.put(item.slug(), product.id());
+            for (var variant : product.variants()) {
+                variantIdBySku.put(variant.sku(), variant.id());
+            }
             var keys = uploadImages(item);
             uploaded += keys.size();
             skipped += item.imageCount() - keys.size();
@@ -120,6 +174,14 @@ public class DemoSeeder implements ApplicationRunner {
             }
             catalogService.attachImages(ownerId, shop.id(), product.id(), toImageRequest(keys));
         }
+
+        var buyers = orderSeeder.seedBuyers();
+        var orderIds = orderSeeder.seedOrders(ownerId, shop.id(), variantIdBySku, buyers);
+        engagementSeeder.seed(ownerId, shop.id(), productIdBySlug, buyers, orderIds);
+        opsSeeder.seedStaff(ownerId, shop.id());
+        opsSeeder.seedDecoration(ownerId, shop.id());
+        opsSeeder.seedRevenue(ownerId, shop.id(), orderIds.aoThunLinh());
+
         log.info("Demo seed done: {} products, images uploaded {}, skipped {}.", productCount, uploaded, skipped);
     }
 

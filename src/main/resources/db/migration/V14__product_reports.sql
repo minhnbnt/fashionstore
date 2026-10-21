@@ -1,4 +1,4 @@
--- V15__product_reports.sql
+-- V14__product_reports.sql
 -- Nguồn phát hiện sản phẩm vi phạm: người mua báo cáo (USER) + hệ thống gắn cờ theo từ khóa cấm (SYSTEM).
 
 CREATE TABLE product_report (
