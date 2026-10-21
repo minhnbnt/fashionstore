@@ -24,6 +24,7 @@ import com.minhnbnt.fashionstore.features.catalog.repository.CategoryRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductAdminQueryRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductImageRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductModerationHistoryRepository;
+import com.minhnbnt.fashionstore.features.catalog.repository.ProductReportRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductSearchRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepository;
@@ -38,6 +39,7 @@ import com.minhnbnt.fashionstore.model.ProductModerationHistory;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.model.ProductVariant;
 import com.minhnbnt.fashionstore.model.ProductViolationType;
+import com.minhnbnt.fashionstore.model.ReportStatus;
 import com.minhnbnt.fashionstore.model.StockMovement;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
@@ -77,6 +79,10 @@ public class CatalogService {
     private final ProductAdminQueryRepository adminQueries;
 
     private final ProductModerationHistoryRepository moderationHistories;
+
+    private final ProductReportRepository productReports;
+
+    private final KeywordScanner keywordScanner;
 
     private final OrderService orderService;
 
@@ -136,6 +142,8 @@ public class CatalogService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "SKU already taken");
         }
 
+        keywordScanner.scan(product.getId(), product.getName(), product.getDescription());
+
         return toResponse(product);
     }
 
@@ -167,7 +175,10 @@ public class CatalogService {
             applyVariantUpdates(product, request.variants());
         }
 
-        return toResponse(products.save(product));
+        var saved = products.save(product);
+        keywordScanner.scan(saved.getId(), saved.getName(), saved.getDescription());
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -276,11 +287,12 @@ public class CatalogService {
         @Nullable ProductStatus status,
         @Nullable UUID shopId,
         @Nullable String query,
+        boolean reported,
         int page,
         int size
     ) {
-        var items = adminQueries.search(status, shopId, query, page, size);
-        var total = adminQueries.count(status, shopId, query);
+        var items = adminQueries.search(status, shopId, query, reported, page, size);
+        var total = adminQueries.count(status, shopId, query, reported);
         return new PageResponse<>(items, total, page, size);
     }
 
@@ -301,12 +313,14 @@ public class CatalogService {
             product.getDescription(),
             variantResponses,
             imageResponses,
-            adminQueries.history(productId)
+            adminQueries.history(productId),
+            adminQueries.reports(productId)
         );
     }
 
     /**
      * Admin gỡ sản phẩm vi phạm: biến mất khỏi search/PDP/checkout ngay, đơn đang xử lý vẫn tiếp tục.
+     * Mọi báo cáo đang mở của sản phẩm được đóng là ACTION_TAKEN với lý do gỡ.
      */
     @Transactional
     public AdminProductResponse banProduct(
@@ -324,6 +338,7 @@ public class CatalogService {
         moderationHistories.save(ProductModerationHistory.record(
             productId, from, product.getStatus(), violationType, adminId, reason
         ));
+        productReports.resolveOpen(productId, ReportStatus.ACTION_TAKEN.name(), adminId, reason);
         return requireAdminProduct(productId);
     }
 

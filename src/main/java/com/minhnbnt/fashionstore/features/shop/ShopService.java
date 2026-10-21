@@ -279,6 +279,11 @@ public class ShopService {
     }
 
     @Transactional(readOnly = true)
+    public boolean isMember(@NonNull UUID shopId, @NonNull UUID userId) {
+        return members.findRole(shopId, userId).isPresent();
+    }
+
+    @Transactional(readOnly = true)
     public boolean isShopApproved(@NonNull UUID shopId) {
         var shop = shops.findById(shopId).orElse(null);
         if (shop == null) {

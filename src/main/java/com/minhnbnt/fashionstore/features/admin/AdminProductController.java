@@ -3,6 +3,8 @@ package com.minhnbnt.fashionstore.features.admin;
 import com.minhnbnt.fashionstore.dto.admin.AdminProductDetailResponse;
 import com.minhnbnt.fashionstore.dto.admin.AdminProductResponse;
 import com.minhnbnt.fashionstore.dto.admin.BanProductRequest;
+import com.minhnbnt.fashionstore.dto.admin.DismissReportsRequest;
+import com.minhnbnt.fashionstore.dto.admin.DismissReportsResponse;
 import com.minhnbnt.fashionstore.dto.common.PageResponse;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import io.swagger.v3.oas.annotations.Operation;
@@ -53,12 +55,14 @@ public class AdminProductController {
         @RequestParam(required = false) @Nullable UUID shopId,
         @Parameter(description = "Từ khóa: tên/slug sản phẩm, tên shop hoặc SKU")
         @RequestParam(required = false) @Nullable String q,
+        @Parameter(description = "true = hàng đợi báo cáo: chỉ sản phẩm có báo cáo đang mở, nhiều báo cáo nhất trước")
+        @RequestParam(defaultValue = "false") boolean reported,
         @Parameter(description = "Trang, đếm từ 0")
         @RequestParam(defaultValue = "0") @Min(0) int page,
         @Parameter(description = "Số sản phẩm mỗi trang, tối đa 100")
         @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) {
-        return adminProducts.search(status, shopId, q, page, size);
+        return adminProducts.search(status, shopId, q, reported, page, size);
     }
 
     @GetMapping("/{id}")
@@ -115,6 +119,32 @@ public class AdminProductController {
         @Parameter(description = "id sản phẩm") @PathVariable UUID id
     ) {
         return adminProducts.restore(adminIdOf(jwt), id);
+    }
+
+    @PatchMapping("/{id}/reports/dismiss")
+    @Operation(
+        operationId = "dismissProductReports",
+        summary = "Bác bỏ báo cáo",
+        description = "Đóng mọi báo cáo đang mở của sản phẩm là DISMISSED (không vi phạm). "
+            + "Sản phẩm giữ nguyên trạng thái."
+    )
+    @ApiResponse(responseCode = "200", description = "Số báo cáo đã đóng")
+    @ApiResponse(responseCode = "400", description = "Ghi chú quá dài")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải admin")
+    @ApiResponse(responseCode = "404", description = "Sản phẩm không tồn tại")
+    @ApiResponse(responseCode = "409", description = "Sản phẩm không có báo cáo đang mở")
+    @SecurityRequirement(name = "bearerAuth")
+    public DismissReportsResponse dismissReports(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id sản phẩm") @PathVariable UUID id,
+        @Valid @RequestBody(required = false) @Nullable DismissReportsRequest request
+    ) {
+        String note = null;
+        if (request != null) {
+            note = request.note();
+        }
+        return adminProducts.dismissReports(adminIdOf(jwt), id, note);
     }
 
     private static UUID adminIdOf(Jwt jwt) {

@@ -227,7 +227,7 @@ class AdminControllerTest {
             10, 1, 6, 3, 1,
             5, 2, 2, 1, 0,
             17, 4, 3, 2, 7, 1,
-            1600000L, 700000L,
+            1600000L, 700000L, 6L,
             trend
         ));
 
@@ -236,6 +236,7 @@ class AdminControllerTest {
             .andExpect(jsonPath("$.pendingShops").value(2))
             .andExpect(jsonPath("$.totalOrders").value(17))
             .andExpect(jsonPath("$.collectedRevenue").value(700000))
+            .andExpect(jsonPath("$.openProductReports").value(6))
             .andExpect(jsonPath("$.dailyTrend[0].date").value("2026-10-16"))
             .andExpect(jsonPath("$.dailyTrend[0].orderValue").value(450000));
 

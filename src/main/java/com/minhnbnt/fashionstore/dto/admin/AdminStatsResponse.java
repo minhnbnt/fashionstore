@@ -59,6 +59,9 @@ public record AdminStatsResponse(
     @Schema(description = "Doanh thu COD đã thu (VND)")
     long collectedRevenue,
 
+    @Schema(description = "Số báo cáo sản phẩm đang chờ xử lý (người mua + hệ thống)")
+    long openProductReports,
+
     @Schema(description = "Số liệu theo ngày (giờ Việt Nam), 14 ngày gần nhất, cũ trước mới sau, ngày cuối là hôm nay")
     List<AdminDailyStatResponse> dailyTrend
 ) {

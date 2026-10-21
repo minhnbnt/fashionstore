@@ -16,6 +16,9 @@ public record AdminProductDetailResponse(
     List<ImageResponse> images,
 
     @Schema(description = "Lịch sử kiểm duyệt, cũ nhất trước")
-    List<ProductModerationHistoryResponse> history
+    List<ProductModerationHistoryResponse> history,
+
+    @Schema(description = "Báo cáo của sản phẩm (mọi trạng thái), mới nhất trước, tối đa 100")
+    List<AdminProductReportResponse> reports
 ) {
 }
