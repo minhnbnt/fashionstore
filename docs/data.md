@@ -15,6 +15,8 @@
 - `V1__marketplace.sql`: user, shop (duyệt `PENDING` → `APPROVED`), catalog full variant (SKU unique theo shop), order COD 1-checkout-1-shop, CHECK toán học (`total = subtotal + shipping`), partial unique (1 OWNER/shop, 1 default variant).
 - `V2__product_search.sql`: index BM25 (`idx_product_bm25`, xem Search).
 - `V10__product_moderation.sql`: product thêm `BANNED` + `violation_type`/`status_reason` (lần gỡ gần nhất), bảng `product_moderation_history` (audit gỡ/khôi phục).
+- `V13__wishlist.sql`: wishlist (đổi từ V10 bị trùng sau khi merge; V10 đã phát hành tuyệt đối không đổi nội dung).
+- `V15__product_reports.sql`: `product_report` (USER/SYSTEM, OPEN → ACTION_TAKEN/DISMISSED; partial unique 1 báo cáo mở/người/sản phẩm, 1 cờ hệ thống mở/sản phẩm), `banned_keyword` (unique `lower(keyword)`).
 - `V12__site_content.sql`: `site_banner`, `site_popup` (lịch chạy `starts_at`/`ends_at`, CHECK kết thúc sau bắt đầu), `site_page` (slug unique, `DRAFT`/`PUBLISHED`), `faq_item`; seed 5 trang chính sách + vài FAQ. V11 thuộc nhánh giám sát đơn.
 - Repository Spring Data JDBC: derived query sắp nhiều cột (`OrderByAAscBAsc`) làm AOT repository sinh code không compile được → viết `@Query` SQL tay.
 
@@ -39,6 +41,30 @@
 - Idempotent: skip khi shop slug `net-lab` đã tồn tại. Reset: `DELETE FROM shop WHERE slug = 'net-lab';` (cascade kéo product/variant/image).
 - Nội dung: 1 shop APPROVED, 5 category, 9 product ACTIVE (giá/tồn thật, 1 món hết hàng demo), ảnh picsum tự tải + up S3 (lỗi thì warn + bỏ qua, UI rớt placeholder).
 - Search test tay gõ **có dấu** ("áo" là keyword mặc định của Home).
+
+## Tiki catalog import (dev-only)
+
+- `infrastructure/TikiCatalogImporter` đọc các danh mục thời trang công khai của Tiki khi
+  `TIKI_IMPORT_ENABLED=true`; mặc định tắt để production không phụ thuộc mạng ngoài lúc khởi động.
+- Mỗi ảnh được tải thành byte, kiểm tra HTTP status, MIME `image/*` và giới hạn 10 MiB trước khi upload
+  vào S3 dưới prefix `imports/tiki/`. Bảng `product_image` chỉ lưu S3 key, không lưu hotlink CDN.
+- Import dùng lại shop slug `tiki-fashion-import`, phân trang và bỏ qua sản phẩm đã tồn tại theo source ID trong slug.
+  Có thể tăng dần số lượng rồi chạy lại mà không phải xóa dữ liệu. Số sản phẩm mục tiêu mỗi danh mục cấu hình bằng
+  `TIKI_IMPORT_PRODUCTS_PER_CATEGORY` (1–500, mặc định 5).
+- Chạy local sau khi `docker compose up -d`: PowerShell
+  `$env:TIKI_IMPORT_ENABLED='true'; ./gradlew bootRun`. Sau lần import đầu có thể tắt biến này.
+
+## Shopee/Lazada browser import (dev-only)
+
+- Hai sàn trả CAPTCHA/403 cho HTTP client server-side, nên `tools/marketplace-browser` dùng Chrome hiển thị để người
+  dùng tự đăng nhập hoặc xác minh. Tool không tự vượt CAPTCHA và giữ browser profile trong thư mục đã gitignore.
+- Chạy `cd tools/marketplace-browser`, `npm install`, rồi
+  `npm run scrape -- --source all --limit 100`. Làm theo prompt trong terminal cho từng sàn. `--limit` áp dụng
+  cho mỗi nhóm: áo thun, sơ mi, polo, áo khoác, hoodie, quần jean/dài/short, váy đầm và chân váy.
+- Tool tải file ảnh thật và tạo `data/marketplace-import/products.json`; toàn bộ thư mục này được gitignore.
+- Sau đó bật `$env:BROWSER_IMPORT_ENABLED='true'` và chạy backend. `BrowserMarketplaceImporter` upload bytes ảnh
+  vào S3, gán đúng category `ao`/`ao-khoac`/`quan`/`vay-dam`, tạo shop `browser-marketplace-import`, đồng thời
+  bỏ qua sản phẩm đã có khi chạy lại.
 
 ## Test DB
 

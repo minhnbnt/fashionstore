@@ -222,14 +222,14 @@ class AdminProductServiceTest {
         var banned = product(ownerId, shopId, "ban-search-gone");
         adminProducts.ban(adminId, banned.id(), ProductViolationType.SPAM, "Đăng trùng lặp");
 
-        var bannedPage = adminProducts.search(ProductStatus.BANNED, shopId, null, 0, 20);
+        var bannedPage = adminProducts.search(ProductStatus.BANNED, shopId, null, false, 0, 20);
         assertThat(bannedPage.total()).isEqualTo(1);
         assertThat(bannedPage.items().get(0).id()).isEqualTo(banned.id());
 
-        var allInShop = adminProducts.search(null, shopId, null, 0, 20);
+        var allInShop = adminProducts.search(null, shopId, null, false, 0, 20);
         assertThat(allInShop.total()).isEqualTo(2);
 
-        var bySku = adminProducts.search(null, null, "sku-ban-search-kept", 0, 20);
+        var bySku = adminProducts.search(null, null, "sku-ban-search-kept", false, 0, 20);
         assertThat(bySku.items()).extracting(item -> item.id()).containsExactly(kept.id());
     }
 

@@ -2,6 +2,7 @@ package com.minhnbnt.fashionstore.features.admin;
 
 import com.minhnbnt.fashionstore.dto.admin.DailyOrderTotals;
 import com.minhnbnt.fashionstore.dto.admin.OrderRevenueTotals;
+import com.minhnbnt.fashionstore.features.catalog.ProductReportService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
@@ -38,6 +39,8 @@ class AdminStatsServiceTest {
 
     private OrderService orders;
 
+    private ProductReportService productReports;
+
     private AdminStatsService stats;
 
     @BeforeEach
@@ -45,7 +48,8 @@ class AdminStatsServiceTest {
         shops = mock(ShopService.class);
         users = mock(UserService.class);
         orders = mock(OrderService.class);
-        stats = new AdminStatsService(shops, users, orders, Clock.fixed(NOW, ZoneOffset.UTC));
+        productReports = mock(ProductReportService.class);
+        stats = new AdminStatsService(shops, users, orders, productReports, Clock.fixed(NOW, ZoneOffset.UTC));
 
         when(shops.countByStatus()).thenReturn(Map.of(
             ShopStatus.PENDING, 2L,

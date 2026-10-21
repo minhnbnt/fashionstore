@@ -81,8 +81,13 @@ Chi tiết luồng này xem `docs/catalog.md`.
 | [x] | 28c | GET | `/api/admin/products/{id}` | Chi tiết + shop + biến thể + ảnh + lịch sử kiểm duyệt |
 | [x] | 28d | PATCH | `/api/admin/products/{id}/ban` | Gỡ kèm `{violationType, reason}`: `ACTIVE`/`HIDDEN` → `BANNED` |
 | [x] | 28e | PATCH | `/api/admin/products/{id}/restore` | Khôi phục `BANNED` → `HIDDEN`, shop tự đăng bán lại |
+| [x] | 28f | POST | `/api/products/{id}/reports` | Người mua báo cáo sản phẩm `{reason, description}`; 1 báo cáo mở/người/sản phẩm |
+| [x] | 28g | GET | `/api/admin/products?reported=true` | Hàng đợi báo cáo: nhiều báo cáo nhất trước, kèm lý do bị báo nhiều nhất, cờ hệ thống |
+| [x] | 28h | PATCH | `/api/admin/products/{id}/reports/dismiss` | Bác bỏ (không vi phạm): đóng báo cáo đang mở, ghi chú tùy chọn |
+| [x] | 28i | GET/POST | `/api/admin/banned-keywords` | Danh sách / thêm từ khóa cấm; thêm thì quét lại hàng đang bán/đang ẩn |
+| [x] | 28j | DELETE | `/api/admin/banned-keywords/{id}` | Xóa từ khóa (không đóng cờ đã tạo) |
 
-Sản phẩm `BANNED` biến mất khỏi search/PDP, checkout trả `409`; shop không `activate` được nhưng vẫn sửa/xóa mềm được, đơn đang xử lý vẫn tiếp tục. Chi tiết xem `docs/superpowers/specs/2026-10-17-admin-product-moderation-design.md`.
+Sản phẩm `BANNED` biến mất khỏi search/PDP, checkout trả `409`; shop không `activate` được nhưng vẫn sửa/xóa mềm được, đơn đang xử lý vẫn tiếp tục. Nguồn vào hàng đợi: người mua báo cáo + hệ thống tự gắn cờ khi tên/mô tả chứa từ khóa cấm (chỉ gắn cờ, không tự gỡ). Gỡ thì báo cáo đang mở chuyển `ACTION_TAKEN`. Chi tiết xem `docs/superpowers/specs/2026-10-17-admin-product-moderation-design.md`.
 
 ### Nội dung sàn (banner, popup, trang tĩnh, FAQ)
 

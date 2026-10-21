@@ -3,6 +3,7 @@ package com.minhnbnt.fashionstore.features.admin;
 import com.minhnbnt.fashionstore.dto.admin.AdminDailyStatResponse;
 import com.minhnbnt.fashionstore.dto.admin.AdminStatsResponse;
 import com.minhnbnt.fashionstore.dto.admin.DailyOrderTotals;
+import com.minhnbnt.fashionstore.features.catalog.ProductReportService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
@@ -41,6 +42,8 @@ public class AdminStatsService {
 
     private final OrderService orders;
 
+    private final ProductReportService productReports;
+
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -70,6 +73,7 @@ public class AdminStatsService {
             countOf(orderCounts, OrderStatus.CANCELLED),
             revenue.grossMerchandiseValue(),
             revenue.collected(),
+            productReports.countOpen(),
             dailyTrend()
         );
     }

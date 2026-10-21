@@ -52,9 +52,37 @@ Lý do bắt buộc 5–500 ký tự (giống kiểm duyệt shop). Đồng th�
 
 `GET /api/seller/shops/{shopId}/products` trả thêm `violationType`, `statusReason`; lọc `status=BANNED` để xem hàng bị gỡ.
 
+## Nguồn phát hiện vi phạm (2026-10-18)
+
+Admin không tự lướt tìm vi phạm: sản phẩm nghi vấn được đưa vào **hàng đợi "Bị báo cáo"** từ 2 nguồn.
+
+### GĐ1 — Người mua báo cáo
+
+- `POST /api/products/{id}/reports` body `{reason, description}` (đăng nhập). `reason` dùng chung 7 loại vi phạm, mô tả ≤ 1000 ký tự.
+- Chỉ báo cáo được sản phẩm đang hiển thị (ACTIVE + shop APPROVED), không thì `404`. Thành viên shop không tự báo cáo hàng của shop mình (`409`).
+- Mỗi người 1 báo cáo **đang mở** / sản phẩm (`409` nếu trùng); báo cáo cũ đã xử lý thì báo lại được.
+
+### GĐ2 — Hệ thống tự gắn cờ theo từ khóa cấm
+
+- Admin quản lý danh sách từ khóa (`/api/admin/banned-keywords`), mỗi từ khóa gắn 1 loại vi phạm.
+- Shop tạo/sửa/import sản phẩm → quét tên + mô tả: khớp nguyên từ, không phân biệt hoa thường, chuẩn hóa Unicode NFC ("fake" không khớp "fakebook"). Khớp thì tạo báo cáo `source=SYSTEM` (mỗi sản phẩm tối đa 1 cờ hệ thống đang mở), mô tả = các từ khóa khớp.
+- Thêm từ khóa mới thì quét luôn sản phẩm ACTIVE/HIDDEN hiện có, trả số sản phẩm bị gắn cờ.
+- Chỉ gắn cờ, **không tự gỡ**: admin vẫn là người quyết định (tránh gỡ nhầm vì từ khóa đa nghĩa).
+
+### Xử lý ở phía admin
+
+- `GET /api/admin/products?reported=true`: chỉ sản phẩm có báo cáo đang mở, xếp nhiều báo cáo nhất → mới nhất. Mỗi dòng có `openReportCount`, `topReportReason` (lý do bị báo nhiều nhất), `lastReportedAt`, `systemFlagged`.
+- Chi tiết sản phẩm kèm danh sách báo cáo (ai báo, lý do, mô tả, trạng thái xử lý).
+- **Gỡ** → mọi báo cáo đang mở chuyển `ACTION_TAKEN`. **Bác bỏ** (`PATCH /api/admin/products/{id}/reports/dismiss`, ghi chú tùy chọn) → `DISMISSED`, sản phẩm giữ nguyên.
+- Dashboard: số báo cáo chờ xử lý (`openProductReports`).
+
+Ngoài phạm vi: cổng khiếu nại chủ thương hiệu, thông báo kết quả cho người báo cáo, tự gắn cờ theo đánh giá/tỉ lệ trả hàng.
+
 ## Code
 
-- Migration `V10__product_moderation.sql`: thêm `BANNED` vào CHECK, cột `violation_type`, `status_reason`, bảng `product_moderation_history`.
+- Migration `V14__product_moderation.sql`: thêm `BANNED` vào CHECK, cột `violation_type`, `status_reason`, bảng `product_moderation_history`.
+- Migration `V15__product_reports.sql`: `product_report` (partial unique: 1 báo cáo mở/người/sản phẩm, 1 cờ hệ thống mở/sản phẩm), `banned_keyword` (unique theo `lower(keyword)`).
+- `features/catalog/`: `ProductReportService` (báo cáo, bác bỏ), `BannedKeywordService` (CRUD + quét lại), `KeywordScanner` (so khớp + gắn cờ, `CatalogService` gọi khi tạo/sửa).
 - `model/Product`: `ban(type, reason)`, `restore()`; `activate()` chặn `BANNED`.
 - `features/catalog/`: luật gỡ/khôi phục + lịch sử trong `CatalogService`, read model admin ở `ProductAdminQueryRepository`.
 - `features/admin/`: `AdminProductController` + `AdminProductService` điều phối, giống `AdminShopService`.

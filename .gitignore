@@ -42,3 +42,7 @@ fashionstore-ui/
 
 # OpenCode local config
 opencode.json
+
+# Local browser profile, scraped manifests and downloaded marketplace images
+tools/marketplace-browser/.profile/
+data/marketplace-import/

@@ -1,0 +1,11 @@
+{
+  "name": "fashionstore-marketplace-browser",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "scrape": "node scrape.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.56.1"
+  }
+}

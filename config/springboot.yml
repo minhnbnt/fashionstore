@@ -4,7 +4,7 @@ spring:
       enabled: false
 
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/fashionstore}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5433/fashionstore}
     username: ${DATABASE_USERNAME:postgres}
     password: ${DATABASE_PASSWORD:postgres}
 
@@ -36,6 +36,16 @@ gotrue:
 
 app:
   demo-seed: true
+
+  # Bật thủ công để đồng bộ sản phẩm/ảnh thật từ Tiki. Chạy lại sẽ bỏ qua sản phẩm đã có.
+  tiki-import:
+    enabled: ${TIKI_IMPORT_ENABLED:true}
+    products-per-category: ${TIKI_IMPORT_PRODUCTS_PER_CATEGORY:1000}
+
+  # Import manifest + ảnh do tools/marketplace-browser tạo sau khi người dùng tự xử lý CAPTCHA trong Chrome.
+  browser-import:
+    enabled: ${BROWSER_IMPORT_ENABLED:false}
+    manifest: ${BROWSER_IMPORT_MANIFEST:data/marketplace-import/products.json}
 
   # Tài khoản admin tạo sẵn lúc khởi động (idempotent). Đổi mật khẩu qua ADMIN_PASSWORD.
   bootstrap-admin:

@@ -63,6 +63,24 @@ public record AdminProductResponse(
 
     Instant createdAt,
 
-    Instant updatedAt
+    Instant updatedAt,
+
+    @Schema(description = "Số báo cáo đang chờ xử lý (người mua + hệ thống)")
+    long openReportCount,
+
+    @Schema(
+        description = "Lý do bị báo cáo nhiều nhất trong các báo cáo đang mở",
+        nullable = true,
+        example = "COUNTERFEIT"
+    )
+    @Nullable
+    String topReportReason,
+
+    @Schema(description = "Lần bị báo cáo gần nhất (báo cáo đang mở)", nullable = true)
+    @Nullable
+    Instant lastReportedAt,
+
+    @Schema(description = "Có cờ hệ thống (từ khóa cấm) đang mở")
+    boolean systemFlagged
 ) {
 }
