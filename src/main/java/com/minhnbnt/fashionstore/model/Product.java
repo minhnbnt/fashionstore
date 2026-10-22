@@ -38,6 +38,28 @@ public class Product implements Persistable<UUID> {
 
     private @Nullable UUID createdBy;
 
+    private @Nullable String videoKey;
+
+    private @Nullable String garmentKey;
+
+    private boolean tryOnEnabled;
+
+    private @Nullable String material;
+
+    private @Nullable String origin;
+
+    private @Nullable String careInstructions;
+
+    private @Nullable String sizeGuide;
+
+    private @Nullable Integer weightGrams;
+
+    private @Nullable Integer lengthCm;
+
+    private @Nullable Integer widthCm;
+
+    private @Nullable Integer heightCm;
+
     private Instant createdAt;
 
     private Instant updatedAt;
@@ -57,6 +79,17 @@ public class Product implements Persistable<UUID> {
         @Nullable ProductViolationType violationType,
         @Nullable String statusReason,
         @Nullable UUID createdBy,
+        @Nullable String videoKey,
+        @Nullable String garmentKey,
+        @Nullable Boolean tryOnEnabled,
+        @Nullable String material,
+        @Nullable String origin,
+        @Nullable String careInstructions,
+        @Nullable String sizeGuide,
+        @Nullable Integer weightGrams,
+        @Nullable Integer lengthCm,
+        @Nullable Integer widthCm,
+        @Nullable Integer heightCm,
         Instant createdAt,
         Instant updatedAt
     ) {
@@ -70,9 +103,42 @@ public class Product implements Persistable<UUID> {
         this.violationType = violationType;
         this.statusReason = statusReason;
         this.createdBy = createdBy;
+        this.videoKey = videoKey;
+        this.garmentKey = garmentKey;
+        this.tryOnEnabled = tryOnEnabled != null && tryOnEnabled;
+        this.material = material;
+        this.origin = origin;
+        this.careInstructions = careInstructions;
+        this.sizeGuide = sizeGuide;
+        this.weightGrams = weightGrams;
+        this.lengthCm = lengthCm;
+        this.widthCm = widthCm;
+        this.heightCm = heightCm;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.newRecord = false;
+    }
+
+    public Product(
+        UUID id,
+        UUID shopId,
+        @Nullable UUID categoryId,
+        String name,
+        String slug,
+        String description,
+        ProductStatus status,
+        @Nullable ProductViolationType violationType,
+        @Nullable String statusReason,
+        @Nullable UUID createdBy,
+        Instant createdAt,
+        Instant updatedAt
+    ) {
+        this(
+            id, shopId, categoryId, name, slug, description, status,
+            violationType, statusReason, createdBy,
+            null, null, false, null, null, null, null, null, null, null, null,
+            createdAt, updatedAt
+        );
     }
 
     public static Product create(
@@ -81,6 +147,18 @@ public class Product implements Persistable<UUID> {
         String name,
         String slug,
         String description,
+        ProductStatus initialStatus,
+        @Nullable String videoKey,
+        @Nullable String garmentKey,
+        boolean tryOnEnabled,
+        @Nullable String material,
+        @Nullable String origin,
+        @Nullable String careInstructions,
+        @Nullable String sizeGuide,
+        @Nullable Integer weightGrams,
+        @Nullable Integer lengthCm,
+        @Nullable Integer widthCm,
+        @Nullable Integer heightCm,
         @Nullable UUID createdBy
     ) {
         var now = Instant.now();
@@ -91,15 +169,42 @@ public class Product implements Persistable<UUID> {
             name,
             slug,
             description,
-            ProductStatus.ACTIVE,
+            initialStatus,
             null,
             null,
             createdBy,
+            videoKey,
+            garmentKey,
+            tryOnEnabled,
+            material,
+            origin,
+            careInstructions,
+            sizeGuide,
+            weightGrams,
+            lengthCm,
+            widthCm,
+            heightCm,
             now,
             now
         );
         product.newRecord = true;
         return product;
+    }
+
+    public static Product create(
+        UUID shopId,
+        @Nullable UUID categoryId,
+        String name,
+        String slug,
+        String description,
+        @Nullable UUID createdBy
+    ) {
+        return create(
+            shopId, categoryId, name, slug, description,
+            ProductStatus.ACTIVE,
+            null, null, false, null, null, null, null, null, null, null, null,
+            createdBy
+        );
     }
 
     public void hide() {
@@ -158,6 +263,32 @@ public class Product implements Persistable<UUID> {
         status = ProductStatus.HIDDEN;
         violationType = null;
         statusReason = null;
+        updatedAt = Instant.now();
+    }
+
+    /**
+     * Admin phê duyệt sản phẩm mới từ PENDING sang ACTIVE.
+     */
+    public void approve() {
+        if (status != ProductStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending products can be approved");
+        }
+        status = ProductStatus.ACTIVE;
+        statusReason = null;
+        violationType = null;
+        updatedAt = Instant.now();
+    }
+
+    /**
+     * Admin từ chối phê duyệt sản phẩm mới.
+     */
+    public void reject(String reason) {
+        if (status != ProductStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending products can be rejected");
+        }
+        status = ProductStatus.BANNED;
+        violationType = ProductViolationType.OTHER;
+        statusReason = reason;
         updatedAt = Instant.now();
     }
 

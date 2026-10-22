@@ -36,6 +36,21 @@ public record CreateVariantRequest(
 
     @Schema(description = "Đúng 1 variant default mỗi product")
     @NotNull
-    Boolean defaultVariant
+    Boolean defaultVariant,
+
+    @Schema(description = "S3 key ảnh riêng cho màu/biến thể này", nullable = true)
+    @Nullable
+    String imageKey
 ) {
+    public CreateVariantRequest(
+        String sku,
+        String size,
+        String color,
+        Long price,
+        @Nullable Long compareAtPrice,
+        Integer stockQuantity,
+        Boolean defaultVariant
+    ) {
+        this(sku, size, color, price, compareAtPrice, stockQuantity, defaultVariant, null);
+    }
 }

@@ -22,8 +22,8 @@ public record CreateProductRequest(
     @Pattern(regexp = "^[a-z0-9-]+$")
     String slug,
 
-    @Schema(nullable = true)
-    @Size(max = 5000)
+    @Schema(description = "Mô tả chi tiết rich text", nullable = true)
+    @Size(max = 20000)
     @Nullable
     String description,
 
@@ -34,6 +34,74 @@ public record CreateProductRequest(
     @Schema(description = "Ít nhất 1 variant, đúng 1 default")
     @NotEmpty
     @Valid
-    List<CreateVariantRequest> variants
+    List<CreateVariantRequest> variants,
+
+    @Schema(description = "Danh sách ảnh sản phẩm (tối thiểu 3, tối đa 9 ảnh)", nullable = true)
+    @Nullable
+    @Valid
+    List<ImageItemRequest> images,
+
+    @Schema(description = "S3 key video giới thiệu sản phẩm (tối đa 60s)", nullable = true)
+    @Nullable
+    String videoKey,
+
+    @Schema(description = "S3 key ảnh sản phẩm phẳng (nền trắng) cho Virtual Try-On", nullable = true)
+    @Nullable
+    String garmentKey,
+
+    @Schema(description = "Bật tính năng thử đồ ảo (Virtual Try-On)", nullable = true)
+    @Nullable
+    Boolean tryOnEnabled,
+
+    @Schema(description = "Chất liệu sản phẩm", nullable = true, example = "100% Cotton")
+    @Nullable
+    String material,
+
+    @Schema(description = "Xuất xứ sản phẩm", nullable = true, example = "Việt Nam")
+    @Nullable
+    String origin,
+
+    @Schema(description = "Hướng dẫn bảo quản", nullable = true, example = "Giặt máy ở nhiệt độ thường")
+    @Nullable
+    String careInstructions,
+
+    @Schema(description = "Bảng hướng dẫn chọn size", nullable = true)
+    @Nullable
+    String sizeGuide,
+
+    @Schema(description = "Cân nặng đóng gói tính bằng grams", nullable = true, example = "250")
+    @Nullable
+    Integer weightGrams,
+
+    @Schema(description = "Chiều dài đóng gói (cm)", nullable = true, example = "25")
+    @Nullable
+    Integer lengthCm,
+
+    @Schema(description = "Chiều rộng đóng gói (cm)", nullable = true, example = "18")
+    @Nullable
+    Integer widthCm,
+
+    @Schema(description = "Chiều cao đóng gói (cm)", nullable = true, example = "5")
+    @Nullable
+    Integer heightCm,
+
+    @Schema(description = "Trạng thái mong muốn khi đăng bán: ACTIVE (Đang bán) hoặc HIDDEN (Tạm ẩn)", nullable = true, example = "ACTIVE")
+    @Nullable
+    String status
 ) {
+    public CreateProductRequest(
+        String name,
+        String slug,
+        @Nullable String description,
+        @Nullable UUID categoryId,
+        List<CreateVariantRequest> variants
+    ) {
+        this(
+            name, slug, description, categoryId, variants,
+            null, null, null, false,
+            null, null, null, null,
+            null, null, null, null,
+            null
+        );
+    }
 }

@@ -117,8 +117,58 @@ public record ShopResponse(
     @Nullable
     String kycRejectionReason,
 
+    @Schema(description = "Shop uy tín (được duyệt sản phẩm tự động)")
+    Boolean isTrusted,
+
     Instant createdAt
 ) {
+    public ShopResponse(
+        UUID id,
+        String name,
+        String slug,
+        String description,
+        @Nullable String logoKey,
+        @Nullable String bannerKey,
+        String status,
+        @Nullable String statusReason,
+        @Nullable String phone,
+        @Nullable String address,
+        @Nullable String returnPolicy,
+        int processingDays,
+        String sellerType,
+        @Nullable Double rating,
+        int ratingCount,
+        int followerCount,
+        @Nullable String bankName,
+        @Nullable String bankAccount,
+        @Nullable String bankHolder,
+        @Nullable String autoReplyText,
+        @Nullable String workingHours,
+        @Nullable String legalName,
+        @Nullable String idNumber,
+        @Nullable String idIssuedDate,
+        @Nullable String idIssuedPlace,
+        @Nullable String taxCode,
+        @Nullable String idFrontKey,
+        @Nullable String idBackKey,
+        @Nullable String idSelfieKey,
+        @Nullable String businessCertKey,
+        String kycStatus,
+        @Nullable String kycRejectionReason,
+        Instant createdAt
+    ) {
+        this(
+            id, name, slug, description, logoKey, bannerKey, status, statusReason,
+            phone, address, returnPolicy, processingDays, sellerType, rating, ratingCount, followerCount,
+            bankName, bankAccount, bankHolder, autoReplyText, workingHours,
+            legalName, idNumber, idIssuedDate, idIssuedPlace, taxCode,
+            idFrontKey, idBackKey, idSelfieKey, businessCertKey,
+            kycStatus, kycRejectionReason,
+            false,
+            createdAt
+        );
+    }
+
     public ShopResponse(
         UUID id,
         String name,
@@ -136,6 +186,7 @@ public record ShopResponse(
             null, null, null, null, null,
             null, null, null, null,
             "PENDING_REVIEW", null,
+            false,
             createdAt
         );
     }

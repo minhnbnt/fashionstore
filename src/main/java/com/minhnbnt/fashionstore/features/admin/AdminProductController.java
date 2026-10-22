@@ -5,6 +5,7 @@ import com.minhnbnt.fashionstore.dto.admin.AdminProductResponse;
 import com.minhnbnt.fashionstore.dto.admin.BanProductRequest;
 import com.minhnbnt.fashionstore.dto.admin.DismissReportsRequest;
 import com.minhnbnt.fashionstore.dto.admin.DismissReportsResponse;
+import com.minhnbnt.fashionstore.dto.admin.RejectProductRequest;
 import com.minhnbnt.fashionstore.dto.common.PageResponse;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import io.swagger.v3.oas.annotations.Operation;
@@ -119,6 +120,46 @@ public class AdminProductController {
         @Parameter(description = "id sản phẩm") @PathVariable UUID id
     ) {
         return adminProducts.restore(adminIdOf(jwt), id);
+    }
+
+    @PatchMapping("/{id}/approve")
+    @Operation(
+        operationId = "approveProduct",
+        summary = "Phê duyệt sản phẩm mới",
+        description = "PENDING → ACTIVE. Sản phẩm được phê duyệt và bắt đầu hiển thị trên sàn."
+    )
+    @ApiResponse(responseCode = "200", description = "Sản phẩm đã được duyệt")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải admin")
+    @ApiResponse(responseCode = "404", description = "Sản phẩm không tồn tại")
+    @ApiResponse(responseCode = "409", description = "Sản phẩm không ở trạng thái PENDING")
+    @SecurityRequirement(name = "bearerAuth")
+    public AdminProductResponse approve(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id sản phẩm") @PathVariable UUID id
+    ) {
+        return adminProducts.approve(adminIdOf(jwt), id);
+    }
+
+    @PatchMapping("/{id}/reject")
+    @Operation(
+        operationId = "rejectProduct",
+        summary = "Từ chối phê duyệt sản phẩm mới",
+        description = "PENDING → BANNED kèm lý do. Sản phẩm bị từ chối duyệt, shop thấy lý do từ chối."
+    )
+    @ApiResponse(responseCode = "200", description = "Sản phẩm đã bị từ chối")
+    @ApiResponse(responseCode = "400", description = "Thiếu hoặc sai lý do từ chối")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải admin")
+    @ApiResponse(responseCode = "404", description = "Sản phẩm không tồn tại")
+    @ApiResponse(responseCode = "409", description = "Sản phẩm không ở trạng thái PENDING")
+    @SecurityRequirement(name = "bearerAuth")
+    public AdminProductResponse reject(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id sản phẩm") @PathVariable UUID id,
+        @Valid @RequestBody RejectProductRequest request
+    ) {
+        return adminProducts.reject(adminIdOf(jwt), id, request.reason());
     }
 
     @PatchMapping("/{id}/reports/dismiss")

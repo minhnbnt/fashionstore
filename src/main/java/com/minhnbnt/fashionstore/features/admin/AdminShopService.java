@@ -88,4 +88,9 @@ public class AdminShopService {
     public ShopResponse reinstate(@NonNull UUID adminId, @NonNull UUID shopId) {
         return shops.reinstate(adminId, shopId);
     }
+
+    @Transactional
+    public ShopResponse setTrusted(@NonNull UUID adminId, @NonNull UUID shopId, boolean trusted) {
+        return shops.setTrusted(adminId, shopId, trusted);
+    }
 }

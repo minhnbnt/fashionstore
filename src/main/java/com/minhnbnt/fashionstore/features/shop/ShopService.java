@@ -150,6 +150,11 @@ public class ShopService {
     }
 
     @Transactional
+    public ShopResponse setTrusted(@NonNull UUID adminId, @NonNull UUID id, boolean trusted) {
+        return transition(adminId, id, "", shop -> shop.setTrusted(trusted));
+    }
+
+    @Transactional
     public ShopResponse resubmit(@NonNull UUID ownerId, @NonNull UUID id) {
         return transition(ownerId, id, "", shop -> {
             access.requireShopRole(ownerId, id, MemberRole.OWNER);
@@ -378,6 +383,7 @@ public class ShopService {
             shop.getBusinessCertKey(),
             shop.getKycStatus(),
             shop.getKycRejectionReason(),
+            shop.isTrusted(),
             shop.getCreatedAt()
         );
     }

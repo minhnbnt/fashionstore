@@ -31,6 +31,7 @@ import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepos
 import com.minhnbnt.fashionstore.features.catalog.repository.StockMovementRepository;
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.review.ReviewService;
+import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.Product;
@@ -88,6 +89,8 @@ public class CatalogService {
 
     private final ShopService shops;
 
+    private final ShopRepository shopRepository;
+
     private final ReviewService reviews;
 
     private final ShopAccessChecker access;
@@ -108,12 +111,62 @@ public class CatalogService {
 
         requireCategoryExists(request.categoryId());
 
+        if (Boolean.TRUE.equals(request.tryOnEnabled())) {
+            if (request.garmentKey() == null || request.garmentKey().isBlank()) {
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Ảnh garment (nền trắng) là bắt buộc khi bật tính năng thử đồ ảo"
+                );
+            }
+        }
+
+        if (request.images() != null && !request.images().isEmpty()) {
+            if (request.images().size() < 3) {
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Sản phẩm cần tối thiểu 3 ảnh sản phẩm"
+                );
+            }
+            if (request.images().size() > 9) {
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Sản phẩm chỉ được tải lên tối đa 9 ảnh"
+                );
+            }
+        }
+
+        var shop = shopRepository.findById(shopId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found"));
+
+        ProductStatus initialStatus;
+        if (shop.isTrusted()) {
+            if ("HIDDEN".equalsIgnoreCase(request.status())) {
+                initialStatus = ProductStatus.HIDDEN;
+            } else {
+                initialStatus = ProductStatus.ACTIVE;
+            }
+        } else {
+            initialStatus = ProductStatus.PENDING;
+        }
+
         var product = Product.create(
             shopId,
             request.categoryId(),
             request.name(),
             request.slug(),
             Objects.requireNonNullElse(request.description(), ""),
+            initialStatus,
+            request.videoKey(),
+            request.garmentKey(),
+            Boolean.TRUE.equals(request.tryOnEnabled()),
+            request.material(),
+            request.origin(),
+            request.careInstructions(),
+            request.sizeGuide(),
+            request.weightGrams(),
+            request.lengthCm(),
+            request.widthCm(),
+            request.heightCm(),
             userId
         );
         try {
@@ -140,6 +193,35 @@ public class CatalogService {
             variants.saveAll(createdVariants);
         } catch (DataIntegrityViolationException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "SKU already taken");
+        }
+
+        if (request.images() != null && !request.images().isEmpty()) {
+            var imageEntities = request.images().stream()
+                .map(img -> ProductImage.create(
+                    product.getId(),
+                    img.variantId(),
+                    img.s3Key(),
+                    img.sortOrder()
+                ))
+                .toList();
+            images.saveAll(imageEntities);
+        }
+
+        var variantImages = new ArrayList<ProductImage>();
+        for (int i = 0; i < request.variants().size(); i++) {
+            var reqVar = request.variants().get(i);
+            var createdVar = createdVariants.get(i);
+            if (reqVar.imageKey() != null && !reqVar.imageKey().isBlank()) {
+                variantImages.add(ProductImage.create(
+                    product.getId(),
+                    createdVar.getId(),
+                    reqVar.imageKey(),
+                    0
+                ));
+            }
+        }
+        if (!variantImages.isEmpty()) {
+            images.saveAll(variantImages);
         }
 
         keywordScanner.scan(product.getId(), product.getName(), product.getDescription());
@@ -314,7 +396,18 @@ public class CatalogService {
             variantResponses,
             imageResponses,
             adminQueries.history(productId),
-            adminQueries.reports(productId)
+            adminQueries.reports(productId),
+            product.getVideoKey(),
+            product.getGarmentKey(),
+            product.isTryOnEnabled(),
+            product.getMaterial(),
+            product.getOrigin(),
+            product.getCareInstructions(),
+            product.getSizeGuide(),
+            product.getWeightGrams(),
+            product.getLengthCm(),
+            product.getWidthCm(),
+            product.getHeightCm()
         );
     }
 
@@ -352,6 +445,34 @@ public class CatalogService {
 
         moderationHistories.save(ProductModerationHistory.record(
             productId, from, product.getStatus(), null, adminId, ""
+        ));
+        return requireAdminProduct(productId);
+    }
+
+    @Transactional
+    public AdminProductResponse approveProduct(@NonNull UUID adminId, @NonNull UUID productId) {
+        var product = lockedProduct(productId);
+        var from = product.getStatus();
+
+        product.approve();
+        products.save(product);
+
+        moderationHistories.save(ProductModerationHistory.record(
+            productId, from, product.getStatus(), null, adminId, "Phê duyệt sản phẩm mới"
+        ));
+        return requireAdminProduct(productId);
+    }
+
+    @Transactional
+    public AdminProductResponse rejectProduct(@NonNull UUID adminId, @NonNull UUID productId, @NonNull String reason) {
+        var product = lockedProduct(productId);
+        var from = product.getStatus();
+
+        product.reject(reason);
+        products.save(product);
+
+        moderationHistories.save(ProductModerationHistory.record(
+            productId, from, product.getStatus(), ProductViolationType.OTHER, adminId, reason
         ));
         return requireAdminProduct(productId);
     }

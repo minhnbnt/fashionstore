@@ -38,7 +38,18 @@ public final class CatalogMapper {
             images,
             product.getUpdatedAt(),
             averageRating,
-            reviewCount
+            reviewCount,
+            product.getVideoKey(),
+            product.getGarmentKey(),
+            product.isTryOnEnabled(),
+            product.getMaterial(),
+            product.getOrigin(),
+            product.getCareInstructions(),
+            product.getSizeGuide(),
+            product.getWeightGrams(),
+            product.getLengthCm(),
+            product.getWidthCm(),
+            product.getHeightCm()
         );
     }
 
