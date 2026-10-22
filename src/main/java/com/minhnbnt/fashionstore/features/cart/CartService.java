@@ -222,6 +222,7 @@ public class CartService {
 
             responses.add(new CartItemResponse(
                 item.getVariantId(),
+                variant.getProductId(),
                 product.getName(),
                 variant.getSize() + " / " + variant.getColor(),
                 variant.getSku(),
