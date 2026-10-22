@@ -206,7 +206,7 @@ Buyer tạo/sửa/xóa đánh giá đã chuyển hẳn về Flow 14 (`review`, b
 | [x] | 82 | PUT | `/api/cart/items/{variantId}` | Đổi số lượng (tối thiểu 1) |
 | [x] | 83 | DELETE | `/api/cart/items/{variantId}` | Xóa item |
 | [x] | 84 | DELETE | `/api/cart` | Xóa sạch giỏ |
-| [x] | 85 | POST | `/api/cart/checkout` | Kiểm tra hết rồi đặt, mỗi shop 1 đơn, hỏng thì 409 kèm từng item lỗi |
+| [x] | 85 | POST | `/api/cart/checkout` | Kiểm tra hết rồi đặt, mỗi shop 1 đơn; `variantIds` tùy chọn để chỉ đặt item đã tick, hỏng thì 409 kèm từng item lỗi |
 
 Chi tiết luồng này xem `docs/cart.md`. Địa chỉ giao hàng vẫn là text thuần (cart chưa dùng tới sổ địa chỉ `V5__address_book`) — xem mục "Nâng cấp sau" trong đó.
 
