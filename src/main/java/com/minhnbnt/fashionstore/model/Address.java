@@ -2,7 +2,6 @@ package com.minhnbnt.fashionstore.model;
 
 import lombok.AccessLevel;
 import lombok.Getter;
-import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.PersistenceCreator;
 import org.springframework.data.annotation.Transient;
@@ -26,17 +25,7 @@ public class Address implements Persistable<UUID> {
 
     private String phoneNumber;
 
-    private @Nullable String detailAddress;
-
-    private @Nullable String houseNumber;
-
-    private @Nullable String street;
-
-    private @Nullable String ward;
-
-    private @Nullable String district;
-
-    private @Nullable String city;
+    private String fullAddress;
 
     private AddressLabel label;
 
@@ -57,12 +46,7 @@ public class Address implements Persistable<UUID> {
         UUID userId,
         String recipientName,
         String phoneNumber,
-        @Nullable String detailAddress,
-        @Nullable String houseNumber,
-        @Nullable String street,
-        @Nullable String ward,
-        @Nullable String district,
-        @Nullable String city,
+        String fullAddress,
         AddressLabel label,
         boolean defaultAddress,
         Instant createdAt,
@@ -72,12 +56,7 @@ public class Address implements Persistable<UUID> {
         this.userId = userId;
         this.recipientName = recipientName;
         this.phoneNumber = phoneNumber;
-        this.detailAddress = detailAddress;
-        this.houseNumber = houseNumber;
-        this.street = street;
-        this.ward = ward;
-        this.district = district;
-        this.city = city;
+        this.fullAddress = fullAddress;
         this.label = label;
         this.defaultAddress = defaultAddress;
         this.createdAt = createdAt;
@@ -89,12 +68,7 @@ public class Address implements Persistable<UUID> {
         UUID userId,
         String recipientName,
         String phoneNumber,
-        @Nullable String detailAddress,
-        @Nullable String houseNumber,
-        @Nullable String street,
-        @Nullable String ward,
-        @Nullable String district,
-        @Nullable String city,
+        String fullAddress,
         AddressLabel label,
         boolean defaultAddress
     ) {
@@ -104,12 +78,7 @@ public class Address implements Persistable<UUID> {
             userId,
             recipientName,
             phoneNumber,
-            detailAddress,
-            houseNumber,
-            street,
-            ward,
-            district,
-            city,
+            fullAddress,
             label,
             defaultAddress,
             now,
@@ -120,43 +89,15 @@ public class Address implements Persistable<UUID> {
     }
 
     public void updateDetails(
-        @Nullable String recipientName,
-        @Nullable String phoneNumber,
-        @Nullable String detailAddress,
-        @Nullable String houseNumber,
-        @Nullable String street,
-        @Nullable String ward,
-        @Nullable String district,
-        @Nullable String city,
-        @Nullable AddressLabel label
+        String recipientName,
+        String phoneNumber,
+        String fullAddress,
+        AddressLabel label
     ) {
-        if (recipientName != null && !recipientName.isBlank()) {
-            this.recipientName = recipientName.trim();
-        }
-        if (phoneNumber != null && !phoneNumber.isBlank()) {
-            this.phoneNumber = phoneNumber.trim();
-        }
-        if (!isEmpty(detailAddress)) {
-            this.detailAddress = detailAddress;
-        }
-        if (!isEmpty(houseNumber)) {
-            this.houseNumber = houseNumber;
-        }
-        if (!isEmpty(street)) {
-            this.street = street;
-        }
-        if (!isEmpty(ward)) {
-            this.ward = ward;
-        }
-        if (!isEmpty(district)) {
-            this.district = district;
-        }
-        if (!isEmpty(city)) {
-            this.city = city;
-        }
-        if (label != null) {
-            this.label = label;
-        }
+        this.recipientName = recipientName;
+        this.phoneNumber = phoneNumber;
+        this.fullAddress = fullAddress;
+        this.label = label;
         updatedAt = Instant.now();
     }
 
@@ -168,14 +109,6 @@ public class Address implements Persistable<UUID> {
     public void clearDefault() {
         defaultAddress = false;
         updatedAt = Instant.now();
-    }
-
-    private static boolean isEmpty(@Nullable String value) {
-        if (value == null) {
-            return true;
-        }
-
-        return value.isBlank();
     }
 
     @Override

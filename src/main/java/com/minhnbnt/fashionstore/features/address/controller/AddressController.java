@@ -65,7 +65,8 @@ public class AddressController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Sua dia chi", description = "Field trong thi giu gia tri cu, ke ca dia chi default.")
+    @Operation(summary = "Sua dia chi", description = "Gửi đủ các field, thay thế toàn bộ địa chỉ. "
+        + "Giữ default như cũ trừ khi defaultAddress = true.")
     @ApiResponse(responseCode = "200", description = "Dia chi sau khi sua")
     @ApiResponse(responseCode = "400", description = "Du lieu khong hop le")
     @ApiResponse(responseCode = "401", description = "Thieu hoac sai JWT")

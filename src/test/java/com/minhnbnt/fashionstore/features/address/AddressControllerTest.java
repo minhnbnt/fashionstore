@@ -44,12 +44,7 @@ class AddressControllerTest {
             id,
             "Nguyen Van A",
             "0912345678",
-            "12 Nguyen Trai",
-            "12",
-            "Nguyen Trai",
-            "Ben Thanh",
-            "Quan 1",
-            "Sai Gon",
+            "12 Nguyen Trai, Phuong Ben Thanh, Sai Gon",
             AddressLabel.HOME,
             true
         );
@@ -64,10 +59,11 @@ class AddressControllerTest {
         mockMvc.perform(get("/api/users/me/addresses")
                 .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].city").value("Sai Gon"))
+            .andExpect(jsonPath("$[0].fullAddress").value("12 Nguyen Trai, Phuong Ben Thanh, Sai Gon"))
             .andExpect(jsonPath("$[0].recipientName").value("Nguyen Van A"))
             .andExpect(jsonPath("$[0].phoneNumber").value("0912345678"))
-            .andExpect(jsonPath("$[0].label").value("HOME"));
+            .andExpect(jsonPath("$[0].label").value("HOME"))
+            .andExpect(jsonPath("$[0].defaultAddress").value(true));
     }
 
     @Test
@@ -83,13 +79,51 @@ class AddressControllerTest {
                     {
                         "recipientName": "Nguyen Van A",
                         "phoneNumber": "0912345678",
-                        "city": "Sai Gon",
-                        "label": "HOME"
+                        "fullAddress": "12 Nguyen Trai, Phuong Ben Thanh, Sai Gon",
+                        "label": "HOME",
+                        "defaultAddress": false
                     }
                     """))
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.city").value("Sai Gon"))
+            .andExpect(jsonPath("$.fullAddress").value("12 Nguyen Trai, Phuong Ben Thanh, Sai Gon"))
             .andExpect(jsonPath("$.recipientName").value("Nguyen Van A"));
+    }
+
+    @Test
+    void addsAddressRejectsBlankFullAddress() throws Exception {
+        var userId = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/users/me/addresses")
+                .with(jwt().jwt(builder -> builder.subject(userId.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                        "recipientName": "Nguyen Van A",
+                        "phoneNumber": "0912345678",
+                        "fullAddress": "   ",
+                        "label": "HOME",
+                        "defaultAddress": false
+                    }
+                    """))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void addsAddressRejectsMissingField() throws Exception {
+        var userId = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/users/me/addresses")
+                .with(jwt().jwt(builder -> builder.subject(userId.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                        "recipientName": "Nguyen Van A",
+                        "phoneNumber": "0912345678",
+                        "fullAddress": "So 18 Duy Tan, Phuong Dich Vong, Ha Noi",
+                        "label": "HOME"
+                    }
+                    """))
+            .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -103,8 +137,11 @@ class AddressControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                        "city": "Da Nang",
-                        "label": "OFFICE"
+                        "recipientName": "Tran Thi B",
+                        "phoneNumber": "0987654321",
+                        "fullAddress": "Toa nha Keangnam, Phuong Me Tri, Ha Noi",
+                        "label": "OFFICE",
+                        "defaultAddress": true
                     }
                     """))
             .andExpect(status().isOk());
@@ -139,7 +176,7 @@ class AddressControllerTest {
 
         mockMvc.perform(post("/api/users/me/addresses")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"city\": \"Sai Gon\"}"))
+                .content("{\"fullAddress\": \"Sai Gon\"}"))
             .andExpect(status().isUnauthorized());
     }
 }
