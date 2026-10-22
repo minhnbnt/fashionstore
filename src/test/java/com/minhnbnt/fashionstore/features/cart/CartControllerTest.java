@@ -45,7 +45,7 @@ class CartControllerTest {
 
     private static CartResponse cart(UUID variantId) {
         return new CartResponse(
-            List.of(new CartItemResponse(variantId, "Ao thun", "M / Den", "SKU-1", 100000L, 2, 10)),
+            List.of(new CartItemResponse(variantId, UUID.randomUUID(), "Ao thun", "M / Den", "SKU-1", 100000L, 2, 10)),
             2,
             200000L
         );
