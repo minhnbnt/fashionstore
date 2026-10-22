@@ -4,6 +4,7 @@ import com.minhnbnt.fashionstore.dto.address.AddressRequest;
 import com.minhnbnt.fashionstore.dto.address.AddressResponse;
 import com.minhnbnt.fashionstore.features.address.repository.AddressRepository;
 import com.minhnbnt.fashionstore.model.Address;
+import com.minhnbnt.fashionstore.model.AddressLabel;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,6 +19,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class AddressService {
+
+    public static final int MAX_ADDRESSES_PER_USER = 10;
 
     private final AddressRepository addresses;
 
@@ -34,22 +37,60 @@ public class AddressService {
 
     @Transactional
     public AddressResponse addAddress(@NonNull UUID userId, @NonNull AddressRequest request) {
-        var hasDefault = false;
-        for (var address : addresses.findByUserIdOrderByCreatedAtAsc(userId)) {
-            if (address.isDefaultAddress()) {
-                hasDefault = true;
-                break;
+        if (addresses.countByUserId(userId) >= MAX_ADDRESSES_PER_USER) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Maximum of 10 addresses reached");
+        }
+
+        var isFirst = addresses.countByUserId(userId) == 0;
+        var makeDefault = isFirst;
+        if (Boolean.TRUE.equals(request.defaultAddress())) {
+            makeDefault = true;
+            addresses.clearDefaults(userId);
+        }
+
+        var recipient = "Khách hàng";
+        if (request.recipientName() != null && !request.recipientName().isBlank()) {
+            recipient = request.recipientName().trim();
+        }
+
+        var phone = "0900000000";
+        if (request.phoneNumber() != null && !request.phoneNumber().isBlank()) {
+            phone = request.phoneNumber().trim();
+        }
+
+        var detail = request.detailAddress();
+        if (detail == null || detail.isBlank()) {
+            var house = "";
+            if (request.houseNumber() != null) {
+                house = request.houseNumber().trim();
             }
+            var street = "";
+            if (request.street() != null) {
+                street = request.street().trim();
+            }
+            var combined = (house + " " + street).trim();
+            if (!combined.isEmpty()) {
+                detail = combined;
+            }
+        }
+
+        var label = AddressLabel.HOME;
+        if (request.label() != null) {
+            label = request.label();
         }
 
         var created = Address.create(
             userId,
+            recipient,
+            phone,
+            detail,
             request.houseNumber(),
             request.street(),
             request.ward(),
             request.district(),
             request.city(),
-            !hasDefault
+            label,
+            makeDefault
         );
 
         return toResponse(addresses.save(created));
@@ -58,13 +99,39 @@ public class AddressService {
     @Transactional
     public AddressResponse updateAddress(@NonNull UUID userId, @NonNull UUID id, @NonNull AddressRequest request) {
         var address = requireUserAddress(userId, id);
+
+        var detail = request.detailAddress();
+        if (detail == null || detail.isBlank()) {
+            var house = "";
+            if (request.houseNumber() != null) {
+                house = request.houseNumber().trim();
+            }
+            var street = "";
+            if (request.street() != null) {
+                street = request.street().trim();
+            }
+            var combined = (house + " " + street).trim();
+            if (!combined.isEmpty()) {
+                detail = combined;
+            }
+        }
+
         address.updateDetails(
+            request.recipientName(),
+            request.phoneNumber(),
+            detail,
             request.houseNumber(),
             request.street(),
             request.ward(),
             request.district(),
-            request.city()
+            request.city(),
+            request.label()
         );
+
+        if (Boolean.TRUE.equals(request.defaultAddress())) {
+            addresses.clearDefaults(userId);
+            address.makeDefault();
+        }
 
         return toResponse(addresses.save(address));
     }
@@ -110,11 +177,15 @@ public class AddressService {
     private static AddressResponse toResponse(Address address) {
         return new AddressResponse(
             address.getId(),
+            address.getRecipientName(),
+            address.getPhoneNumber(),
+            address.getDetailAddress(),
             address.getHouseNumber(),
             address.getStreet(),
             address.getWard(),
             address.getDistrict(),
             address.getCity(),
+            address.getLabel(),
             address.isDefaultAddress()
         );
     }
