@@ -17,91 +17,83 @@ public record CreateShopRequest(
     @Pattern(regexp = "^[a-z0-9-]+$")
     String slug,
 
-    @Schema(nullable = true)
+    @Schema(description = "Mô tả giới thiệu phong cách gian hàng")
+    @NotBlank
     @Size(max = 2000)
-    @Nullable
     String description,
 
-    @Schema(description = "S3 key logo, null nếu chưa có", nullable = true)
-    @Nullable
+    @Schema(description = "S3 key logo gian hàng")
+    @NotBlank
     String logoKey,
 
-    @Schema(description = "S3 key banner, null nếu chưa có", nullable = true)
-    @Nullable
+    @Schema(description = "S3 key ảnh bìa gian hàng")
+    @NotBlank
     String bannerKey,
 
-    @Schema(description = "Số điện thoại kho / hotline", nullable = true)
-    @Nullable
+    @Schema(description = "Số điện thoại kho / hotline")
+    @NotBlank
+    @Size(max = 20)
     String phone,
 
-    @Schema(description = "Địa chỉ kho lấy hàng", nullable = true)
-    @Nullable
+    @Schema(description = "Địa chỉ kho lấy hàng")
+    @NotBlank
+    @Size(max = 500)
     String address,
 
     @Schema(description = "Loại hình người bán: INDIVIDUAL hoặc CORPORATE", example = "INDIVIDUAL", nullable = true)
     @Nullable
     String sellerType,
 
-    @Schema(description = "Họ và tên thật của chủ shop theo CCCD", example = "NGUYEN HOANG HIEP", nullable = true)
-    @Nullable
+    @Schema(description = "Họ và tên thật của chủ shop theo CCCD", example = "NGUYEN HOANG HIEP")
+    @NotBlank
+    @Size(max = 200)
     String legalName,
 
-    @Schema(description = "Số Căn cước công dân (12 số)", example = "001202001234", nullable = true)
-    @Nullable
+    @Schema(description = "Số Căn cước công dân (9 hoặc 12 số)", example = "001202001234")
+    @NotBlank
     String idNumber,
 
-    @Schema(description = "Ngày cấp CCCD", example = "20/05/2021", nullable = true)
-    @Nullable
+    @Schema(description = "Ngày cấp CCCD", example = "20/05/2021")
+    @NotBlank
     String idIssuedDate,
 
-    @Schema(description = "Nơi cấp CCCD", example = "Cục Cảnh sát QLHC về TTXH", nullable = true)
-    @Nullable
+    @Schema(description = "Nơi cấp CCCD", example = "Cục Cảnh sát QLHC về TTXH")
+    @NotBlank
     String idIssuedPlace,
 
-    @Schema(description = "Mã số thuế cá nhân hoặc doanh nghiệp", nullable = true)
+    @Schema(description = "Mã số thuế cá nhân hoặc doanh nghiệp (nếu có)", nullable = true)
     @Nullable
     String taxCode,
 
-    @Schema(description = "S3 key ảnh mặt trước CCCD", nullable = true)
-    @Nullable
+    @Schema(description = "S3 key ảnh mặt trước CCCD")
+    @NotBlank
     String idFrontKey,
 
-    @Schema(description = "S3 key ảnh mặt sau CCCD", nullable = true)
-    @Nullable
+    @Schema(description = "S3 key ảnh mặt sau CCCD")
+    @NotBlank
     String idBackKey,
 
-    @Schema(description = "S3 key ảnh chân dung cầm CCCD", nullable = true)
-    @Nullable
+    @Schema(description = "S3 key ảnh chân dung cầm CCCD")
+    @NotBlank
     String idSelfieKey,
 
-    @Schema(description = "S3 key giấy chứng nhận ĐKKD (nếu là doanh nghiệp)", nullable = true)
+    @Schema(description = "S3 key giấy chứng nhận ĐKKD (nếu có)", nullable = true)
     @Nullable
     String businessCertKey,
 
-    @Schema(description = "Tên ngân hàng thụ hưởng", example = "Vietcombank", nullable = true)
-    @Nullable
+    @Schema(description = "Tên ngân hàng thụ hưởng", example = "Vietcombank")
+    @NotBlank
+    @Size(max = 100)
     String bankName,
 
-    @Schema(description = "Số tài khoản ngân hàng", example = "0123456789", nullable = true)
-    @Nullable
+    @Schema(description = "Số tài khoản ngân hàng", example = "0123456789")
+    @NotBlank
+    @Size(max = 50)
     String bankAccount,
 
-    @Schema(description = "Tên chủ tài khoản ngân hàng (phải khớp legalName)", example = "NGUYEN HOANG HIEP", nullable = true)
-    @Nullable
+    @Schema(description = "Tên chủ tài khoản ngân hàng (phải khớp legalName)", example = "NGUYEN HOANG HIEP")
+    @NotBlank
+    @Size(max = 100)
     String bankHolder
 ) {
-    public CreateShopRequest(
-        String name,
-        String slug,
-        @Nullable String description,
-        @Nullable String logoKey,
-        @Nullable String bannerKey
-    ) {
-        this(
-            name, slug, description, logoKey, bannerKey,
-            null, null, "INDIVIDUAL", null, null,
-            null, null, null, null, null,
-            null, null, null, null, null
-        );
-    }
 }

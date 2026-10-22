@@ -66,7 +66,7 @@ class AdminServicesTest {
     }
 
     private UUID registerShop(UUID ownerId, String slug) {
-        return shops.register(ownerId, new CreateShopRequest("Shop " + slug, slug, null, null, null)).id();
+        return shops.register(ownerId, com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop " + slug, slug)).id();
     }
 
     @Test

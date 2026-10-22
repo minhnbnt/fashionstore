@@ -135,8 +135,23 @@ public class TikiCatalogImporter implements ApplicationRunner {
                 "Tiki Fashion Import",
                 SHOP_SLUG,
                 "Dữ liệu tham khảo được nhập từ danh mục công khai của Tiki.",
+                "seeds/tiki-logo.webp",
+                "seeds/tiki-banner.webp",
+                "0909888999",
+                "Kho tổng Tiki, TP. Hồ Chí Minh",
+                "INDIVIDUAL",
+                "TIKI TRADING",
+                "079202009876",
+                "15/03/2020",
+                "Cục Cảnh sát QLHC về TTXH",
                 null,
-                null
+                "seeds/id-front.webp",
+                "seeds/id-back.webp",
+                "seeds/id-selfie.webp",
+                null,
+                "Techcombank",
+                "19036668889999",
+                "TIKI TRADING"
             )
         );
         shopService.approve(ownerId, created.id());

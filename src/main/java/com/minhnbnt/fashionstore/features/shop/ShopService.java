@@ -51,45 +51,58 @@ public class ShopService {
 
     @Transactional
     public ShopResponse register(@NonNull UUID ownerId, @NonNull CreateShopRequest request) {
-        // Fraud prevention check 1: CCCD format
-        if (request.idNumber() != null && !request.idNumber().isBlank()) {
-            var cleanedId = request.idNumber().trim();
-            if (!cleanedId.matches("^\\d{9}$|^\\d{12}$")) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số CCCD/CMND không đúng định dạng (9 hoặc 12 chữ số).");
-            }
+        validateRequired(request.name(), "Tên gian hàng (name)");
+        validateRequired(request.slug(), "Định danh gian hàng (slug)");
+        validateRequired(request.description(), "Mô tả gian hàng (description)");
+        validateRequired(request.logoKey(), "Logo gian hàng (logoKey)");
+        validateRequired(request.bannerKey(), "Ảnh bìa gian hàng (bannerKey)");
+        validateRequired(request.phone(), "Số điện thoại kho (phone)");
+        validateRequired(request.address(), "Địa chỉ kho lấy hàng (address)");
+        validateRequired(request.legalName(), "Họ và tên chủ shop (legalName)");
+        validateRequired(request.idNumber(), "Số CCCD/CMND (idNumber)");
+        validateRequired(request.idIssuedDate(), "Ngày cấp CCCD (idIssuedDate)");
+        validateRequired(request.idIssuedPlace(), "Nơi cấp CCCD (idIssuedPlace)");
+        validateRequired(request.idFrontKey(), "Ảnh mặt trước CCCD (idFrontKey)");
+        validateRequired(request.idBackKey(), "Ảnh mặt sau CCCD (idBackKey)");
+        validateRequired(request.idSelfieKey(), "Ảnh selfie cầm CCCD (idSelfieKey)");
+        validateRequired(request.bankName(), "Tên ngân hàng (bankName)");
+        validateRequired(request.bankAccount(), "Số tài khoản ngân hàng (bankAccount)");
+        validateRequired(request.bankHolder(), "Tên chủ tài khoản ngân hàng (bankHolder)");
+
+        // Fraud prevention check 1: CCCD format (9 or 12 digits)
+        var cleanedId = request.idNumber().trim();
+        if (!cleanedId.matches("^\\d{9}$|^\\d{12}$")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số CCCD/CMND không đúng định dạng (9 hoặc 12 chữ số).");
         }
 
         // Fraud prevention check 2: Bank holder name MUST match legal name
-        if (request.bankHolder() != null && request.legalName() != null
-            && !request.bankHolder().isBlank() && !request.legalName().isBlank()) {
-            var normHolder = normalizeName(request.bankHolder());
-            var normLegal = normalizeName(request.legalName());
-            if (!normHolder.equalsIgnoreCase(normLegal)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên chủ tài khoản ngân hàng phải trùng khớp với Họ và tên trên Căn cước công dân để chống gian lận.");
-            }
+        var normHolder = normalizeName(request.bankHolder());
+        var normLegal = normalizeName(request.legalName());
+        if (!normHolder.equalsIgnoreCase(normLegal)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên chủ tài khoản ngân hàng phải trùng khớp với Họ và tên trên Căn cước công dân để chống gian lận.");
         }
 
         var shop = Shop.create(
-            request.name(),
-            request.slug(),
-            descriptionOf(request.description()),
-            request.logoKey(),
-            request.bannerKey(),
-            request.phone(),
-            request.address(),
-            request.sellerType(),
-            request.legalName(),
-            request.idNumber(),
-            request.idIssuedDate(),
-            request.idIssuedPlace(),
-            request.taxCode(),
-            request.idFrontKey(),
-            request.idBackKey(),
-            request.idSelfieKey(),
-            request.businessCertKey(),
-            request.bankName(),
-            request.bankAccount(),
-            request.bankHolder()
+            request.name().trim(),
+            request.slug().trim(),
+            request.description().trim(),
+            request.logoKey().trim(),
+            request.bannerKey().trim(),
+            request.phone().trim(),
+            request.address().trim(),
+            (request.sellerType() != null && !request.sellerType().isBlank()) ? request.sellerType().trim() : "INDIVIDUAL",
+            request.legalName().trim(),
+            cleanedId,
+            request.idIssuedDate().trim(),
+            request.idIssuedPlace().trim(),
+            request.taxCode() != null ? request.taxCode().trim() : null,
+            request.idFrontKey().trim(),
+            request.idBackKey().trim(),
+            request.idSelfieKey().trim(),
+            request.businessCertKey() != null ? request.businessCertKey().trim() : null,
+            request.bankName().trim(),
+            request.bankAccount().trim(),
+            request.bankHolder().trim()
         );
         try {
             shops.save(shop);
@@ -314,13 +327,6 @@ public class ShopService {
         return shop;
     }
 
-    private static String descriptionOf(@Nullable String description) {
-        if (description == null) {
-            return "";
-        }
-        return description;
-    }
-
     private static String normalizeName(String name) {
         if (name == null) {
             return "";
@@ -330,6 +336,12 @@ public class ShopService {
             .replaceAll("[đĐ]", "d")
             .replaceAll("\\s+", " ")
             .toUpperCase(java.util.Locale.ROOT);
+    }
+
+    private static void validateRequired(@Nullable String value, String fieldName) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + " là bắt buộc và không được để trống.");
+        }
     }
 
     public static ShopResponse toResponse(Shop shop) {

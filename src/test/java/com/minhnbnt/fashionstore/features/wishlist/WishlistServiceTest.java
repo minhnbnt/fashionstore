@@ -61,13 +61,13 @@ class WishlistServiceTest {
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = user();
-        var shop = shops.register(ownerId, new CreateShopRequest("Shop " + slug, slug, null, null, null));
+        var shop = shops.register(ownerId, com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }
 
     private UUID pendingShop(UUID ownerId, String slug) {
-        var shop = shops.register(ownerId, new CreateShopRequest("Shop " + slug, slug, null, null, null));
+        var shop = shops.register(ownerId, com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop " + slug, slug));
         return shop.id();
     }
 

@@ -38,6 +38,30 @@ class ShopControllerTest {
         return new ShopResponse(id, "Shop", "shop", "Mo ta", null, null, status, null, Instant.now());
     }
 
+    private static String validRegisterJson(String name, String slug) {
+        return """
+            {
+              "name": "%s",
+              "slug": "%s",
+              "description": "Mo ta shop hop le",
+              "logoKey": "logo.webp",
+              "bannerKey": "banner.webp",
+              "phone": "0912345678",
+              "address": "123 Pho Hue, Ha Noi",
+              "legalName": "NGUYEN VAN A",
+              "idNumber": "001202001234",
+              "idIssuedDate": "01/01/2021",
+              "idIssuedPlace": "Cuc Canh sat QLHC ve TTXH",
+              "idFrontKey": "front.webp",
+              "idBackKey": "back.webp",
+              "idSelfieKey": "selfie.webp",
+              "bankName": "Vietcombank",
+              "bankAccount": "0123456789",
+              "bankHolder": "NGUYEN VAN A"
+            }
+            """.formatted(name, slug);
+    }
+
     @Test
     void registerShopReturns201() throws Exception {
         var id = UUID.randomUUID();
@@ -46,7 +70,7 @@ class ShopControllerTest {
         mockMvc.perform(post("/api/shops")
                 .with(jwt().jwt(builder -> builder.subject(id.toString())))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Shop\",\"slug\":\"shop\"}"))
+                .content(validRegisterJson("Shop", "shop")))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.status").value("PENDING"));
     }
@@ -56,7 +80,54 @@ class ShopControllerTest {
         mockMvc.perform(post("/api/shops")
                 .with(jwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Shop\",\"slug\":\"Shop Co Dau Cach\"}"))
+                .content(validRegisterJson("Shop", "Shop Co Dau Cach")))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void registerShopRejectsMissingMandatoryFields() throws Exception {
+        mockMvc.perform(post("/api/shops")
+                .with(jwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Shop\",\"slug\":\"shop\"}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void registerShopRejectsNullImportantFields() throws Exception {
+        mockMvc.perform(post("/api/shops")
+                .with(jwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "name": "Shop",
+                      "slug": "shop",
+                      "description": "desc",
+                      "logoKey": "logo",
+                      "bannerKey": "banner",
+                      "phone": null,
+                      "address": null,
+                      "legalName": "NGUYEN VAN A",
+                      "idNumber": "001202001234",
+                      "idIssuedDate": "01/01/2021",
+                      "idIssuedPlace": "Cuc QLHC",
+                      "idFrontKey": "front",
+                      "idBackKey": "back",
+                      "idSelfieKey": "selfie",
+                      "bankName": "VCB",
+                      "bankAccount": null,
+                      "bankHolder": "NGUYEN VAN A"
+                    }
+                    """))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void registerShopRejectsEmptyBody() throws Exception {
+        mockMvc.perform(post("/api/shops")
+                .with(jwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
             .andExpect(status().isBadRequest());
     }
 
@@ -88,3 +159,5 @@ class ShopControllerTest {
             .andExpect(status().isUnauthorized());
     }
 }
+
+
