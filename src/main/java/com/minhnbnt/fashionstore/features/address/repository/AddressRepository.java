@@ -19,4 +19,6 @@ public interface AddressRepository extends CrudRepository<Address, UUID> {
     @Modifying
     @Query("UPDATE address SET is_default = false WHERE user_id = :userId")
     void clearDefaults(@Param("userId") UUID userId);
+
+    long countByUserId(UUID userId);
 }

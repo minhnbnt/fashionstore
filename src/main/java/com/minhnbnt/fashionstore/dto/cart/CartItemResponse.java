@@ -8,6 +8,9 @@ public record CartItemResponse(
     @Schema(description = "Variant id")
     UUID variantId,
 
+    @Schema(description = "Product id")
+    UUID productId,
+
     @Schema(description = "Ten product hien tai")
     String productName,
 
