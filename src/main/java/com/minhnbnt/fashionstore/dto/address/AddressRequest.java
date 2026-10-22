@@ -29,7 +29,7 @@ public record AddressRequest(
     @NotNull
     AddressLabel label,
 
-    @Schema(description = "Dat lam dia chi mac dinh")
+    @Schema(description = "Dat lam dia chi mac dinh", requiredMode = Schema.RequiredMode.REQUIRED)
     boolean defaultAddress
 ) {
 }
