@@ -3,6 +3,7 @@ package com.minhnbnt.fashionstore.features.address;
 import com.minhnbnt.fashionstore.config.SecurityConfig;
 import com.minhnbnt.fashionstore.dto.address.AddressResponse;
 import com.minhnbnt.fashionstore.features.address.controller.AddressController;
+import com.minhnbnt.fashionstore.model.AddressLabel;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -39,7 +40,19 @@ class AddressControllerTest {
     private AddressService addresses;
 
     private static AddressResponse response(UUID id) {
-        return new AddressResponse(id, "12", "Nguyen Trai", "Ben Thanh", "Quan 1", "Sai Gon", true);
+        return new AddressResponse(
+            id,
+            "Nguyen Van A",
+            "0912345678",
+            "12 Nguyen Trai",
+            "12",
+            "Nguyen Trai",
+            "Ben Thanh",
+            "Quan 1",
+            "Sai Gon",
+            AddressLabel.HOME,
+            true
+        );
     }
 
     @Test
@@ -51,7 +64,10 @@ class AddressControllerTest {
         mockMvc.perform(get("/api/users/me/addresses")
                 .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].city").value("Sai Gon"));
+            .andExpect(jsonPath("$[0].city").value("Sai Gon"))
+            .andExpect(jsonPath("$[0].recipientName").value("Nguyen Van A"))
+            .andExpect(jsonPath("$[0].phoneNumber").value("0912345678"))
+            .andExpect(jsonPath("$[0].label").value("HOME"));
     }
 
     @Test
@@ -63,9 +79,17 @@ class AddressControllerTest {
         mockMvc.perform(post("/api/users/me/addresses")
                 .with(jwt().jwt(builder -> builder.subject(userId.toString())))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"city\": \"Sai Gon\"}"))
+                .content("""
+                    {
+                        "recipientName": "Nguyen Van A",
+                        "phoneNumber": "0912345678",
+                        "city": "Sai Gon",
+                        "label": "HOME"
+                    }
+                    """))
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.city").value("Sai Gon"));
+            .andExpect(jsonPath("$.city").value("Sai Gon"))
+            .andExpect(jsonPath("$.recipientName").value("Nguyen Van A"));
     }
 
     @Test
@@ -77,7 +101,12 @@ class AddressControllerTest {
         mockMvc.perform(put("/api/users/me/addresses/{id}", id)
                 .with(jwt().jwt(builder -> builder.subject(userId.toString())))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"city\": \"Da Nang\"}"))
+                .content("""
+                    {
+                        "city": "Da Nang",
+                        "label": "OFFICE"
+                    }
+                    """))
             .andExpect(status().isOk());
     }
 

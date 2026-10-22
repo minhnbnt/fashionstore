@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -48,13 +49,14 @@ public class AddressController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Them dia chi", description = "Dia chi dau tien tu thanh default.")
+    @Operation(summary = "Them dia chi", description = "Toi da 10 dia chi. Dia chi dau tien tu thanh default.")
     @ApiResponse(responseCode = "201", description = "Dia chi vua tao")
+    @ApiResponse(responseCode = "400", description = "Du lieu khong hop le hoac da dat gioi han 10 dia chi")
     @ApiResponse(responseCode = "401", description = "Thieu hoac sai JWT")
     @SecurityRequirement(name = "bearerAuth")
     public AddressResponse add(
         @AuthenticationPrincipal Jwt jwt,
-        @RequestBody AddressRequest request
+        @Valid @RequestBody AddressRequest request
     ) {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var userId = UUID.fromString(subject);
@@ -65,13 +67,14 @@ public class AddressController {
     @PutMapping("/{id}")
     @Operation(summary = "Sua dia chi", description = "Field trong thi giu gia tri cu, ke ca dia chi default.")
     @ApiResponse(responseCode = "200", description = "Dia chi sau khi sua")
+    @ApiResponse(responseCode = "400", description = "Du lieu khong hop le")
     @ApiResponse(responseCode = "401", description = "Thieu hoac sai JWT")
     @ApiResponse(responseCode = "404", description = "Dia chi khong ton tai hoac khong phai cua ban")
     @SecurityRequirement(name = "bearerAuth")
     public AddressResponse update(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "id dia chi") @PathVariable UUID id,
-        @RequestBody AddressRequest request
+        @Valid @RequestBody AddressRequest request
     ) {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var userId = UUID.fromString(subject);
