@@ -93,7 +93,7 @@ Luật:
 - Xóa cái cuối cùng: danh sách rỗng, không default; địa chỉ thêm tiếp theo thành default.
 - `id` lạ hoặc của shopper khác → `404`.
 
-## Lưới DB cuối (migration `V5__address_book` + `V23__address_full_address`)
+## Lưới DB cuối (migration `V5__address_book` + `V24__address_full_address`)
 
 - Bảng `address`: `user_id` UUID NOT NULL REFERENCES `user_profile (id)` ON DELETE CASCADE (xóa profile thì địa chỉ đi theo), `recipient_name`/`phone_number`/`full_address` TEXT NOT NULL, `label` TEXT NOT NULL DEFAULT 'HOME' CHECK IN ('HOME','OFFICE','OTHER') (từ `V22`), `is_default` NOT NULL DEFAULT FALSE, `created_at`/`updated_at`.
 - `V23` drop các cột hành chính rời (`house_number`, `street`, `ward`, `district`, `city` — sinh thời `V5`/`V22`), rename `detail_address` → `full_address` + `SET NOT NULL`; dev rows placeholder từ `V22` bị xóa sạch.
