@@ -26,7 +26,7 @@ var key = UUID.randomUUID() + "." + extensionOf(contentType);
 
 ## Lombok — allowlist, không phải thích gì dùng nấy
 
-- Được dùng: `@Getter`, `@RequiredArgsConstructor`, `@NonNull` (param service), `@Slf4j` (chỗ log thật).
+- Được dùng: `@Getter`, `@RequiredArgsConstructor`, `@AllArgsConstructor(onConstructor_ = @PersistenceCreator)` (persistence constructor all-args của model), `@NonNull` (param service), `@Slf4j` (chỗ log thật).
 - Cấm trên entity: `@Data`, `@EqualsAndHashCode` (hashCode đổi theo field mutable, bỏ vào Set là mất dấu), `@Setter` (phá behavior method), `@Builder` (entity dùng factory `create(...)` + `@PersistenceCreator`).
 
 ## NullAway — mặc định non-null

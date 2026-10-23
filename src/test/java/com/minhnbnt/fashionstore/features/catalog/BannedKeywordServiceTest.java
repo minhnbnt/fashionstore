@@ -8,7 +8,7 @@ import com.minhnbnt.fashionstore.dto.catalog.ProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
-import com.minhnbnt.fashionstore.features.admin.AdminProductService;
+import com.minhnbnt.fashionstore.features.admin.service.AdminProductService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.ProductViolationType;

@@ -19,6 +19,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AddressService {
 
+    public static final int MAX_ADDRESSES_PER_USER = 10;
+
     private final AddressRepository addresses;
 
     @Transactional(readOnly = true)
@@ -34,22 +36,24 @@ public class AddressService {
 
     @Transactional
     public AddressResponse addAddress(@NonNull UUID userId, @NonNull AddressRequest request) {
-        var hasDefault = false;
-        for (var address : addresses.findByUserIdOrderByCreatedAtAsc(userId)) {
-            if (address.isDefaultAddress()) {
-                hasDefault = true;
-                break;
-            }
+        if (addresses.countByUserId(userId) >= MAX_ADDRESSES_PER_USER) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Maximum of 10 addresses reached");
+        }
+
+        var isFirst = addresses.countByUserId(userId) == 0;
+        var makeDefault = isFirst;
+        if (request.defaultAddress()) {
+            makeDefault = true;
+            addresses.clearDefaults(userId);
         }
 
         var created = Address.create(
             userId,
-            request.houseNumber(),
-            request.street(),
-            request.ward(),
-            request.district(),
-            request.city(),
-            !hasDefault
+            request.recipientName().trim(),
+            request.phoneNumber().trim(),
+            request.fullAddress().trim(),
+            request.label(),
+            makeDefault
         );
 
         return toResponse(addresses.save(created));
@@ -58,13 +62,18 @@ public class AddressService {
     @Transactional
     public AddressResponse updateAddress(@NonNull UUID userId, @NonNull UUID id, @NonNull AddressRequest request) {
         var address = requireUserAddress(userId, id);
+
         address.updateDetails(
-            request.houseNumber(),
-            request.street(),
-            request.ward(),
-            request.district(),
-            request.city()
+            request.recipientName().trim(),
+            request.phoneNumber().trim(),
+            request.fullAddress().trim(),
+            request.label()
         );
+
+        if (request.defaultAddress()) {
+            addresses.clearDefaults(userId);
+            address.makeDefault();
+        }
 
         return toResponse(addresses.save(address));
     }
@@ -110,11 +119,10 @@ public class AddressService {
     private static AddressResponse toResponse(Address address) {
         return new AddressResponse(
             address.getId(),
-            address.getHouseNumber(),
-            address.getStreet(),
-            address.getWard(),
-            address.getDistrict(),
-            address.getCity(),
+            address.getRecipientName(),
+            address.getPhoneNumber(),
+            address.getFullAddress(),
+            address.getLabel(),
             address.isDefaultAddress()
         );
     }

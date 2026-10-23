@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -12,6 +13,7 @@ import java.util.UUID;
 
 @Table("order_item")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class OrderItem implements Persistable<UUID> {
 
     @Id
@@ -38,32 +40,6 @@ public class OrderItem implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public OrderItem(
-        UUID id,
-        UUID orderId,
-        @Nullable UUID productId,
-        @Nullable UUID variantId,
-        String productName,
-        String variantLabel,
-        String sku,
-        long unitPrice,
-        int quantity,
-        long lineTotal
-    ) {
-        this.id = id;
-        this.orderId = orderId;
-        this.productId = productId;
-        this.variantId = variantId;
-        this.productName = productName;
-        this.variantLabel = variantLabel;
-        this.sku = sku;
-        this.unitPrice = unitPrice;
-        this.quantity = quantity;
-        this.lineTotal = lineTotal;
-        this.newRecord = false;
-    }
-
     public static OrderItem snapshot(
         UUID orderId,
         @Nullable UUID productId,
@@ -74,7 +50,7 @@ public class OrderItem implements Persistable<UUID> {
         long unitPrice,
         int quantity
     ) {
-        var item = new OrderItem(
+        return new OrderItem(
             UUID.randomUUID(),
             orderId,
             productId,
@@ -84,10 +60,9 @@ public class OrderItem implements Persistable<UUID> {
             sku,
             unitPrice,
             quantity,
-            unitPrice * quantity
+            unitPrice * quantity,
+            true
         );
-        item.newRecord = true;
-        return item;
     }
 
     @Override

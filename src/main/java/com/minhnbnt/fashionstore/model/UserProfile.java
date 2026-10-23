@@ -1,6 +1,7 @@
 package com.minhnbnt.fashionstore.model;
 
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -16,6 +17,7 @@ import java.util.UUID;
 
 @Table("user_profile")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class UserProfile implements Persistable<UUID> {
 
     @Id
@@ -39,35 +41,9 @@ public class UserProfile implements Persistable<UUID> {
     @Getter(AccessLevel.NONE)
     private boolean newRecord;
 
-    @PersistenceCreator
-    public UserProfile(
-        UUID id,
-        String email,
-        String displayName,
-        @Nullable String avatarKey,
-        UserRole role,
-        AccountStatus status,
-        @Nullable String statusReason,
-        Instant createdAt
-    ) {
-        this.id = id;
-        this.email = email;
-        this.displayName = displayName;
-        this.avatarKey = avatarKey;
-        this.role = role;
-        this.status = status;
-        this.statusReason = statusReason;
-        this.createdAt = createdAt;
-        this.newRecord = false;
-    }
-
     public static UserProfile create(UUID id, String email, String displayName, @Nullable String avatarKey) {
-        var profile = new UserProfile(
-            id, email, displayName, avatarKey,
-            UserRole.CUSTOMER, AccountStatus.ACTIVE, null, Instant.now()
-        );
-        profile.newRecord = true;
-        return profile;
+        return new UserProfile(
+            id, email, displayName, avatarKey, UserRole.CUSTOMER, AccountStatus.ACTIVE, null, Instant.now(), true);
     }
 
     public void rename(String displayName) {

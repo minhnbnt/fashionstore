@@ -76,10 +76,12 @@ Luật:
 
 ```json
 {"shippingName": "An", "shippingPhone": "0900000000",
- "shippingAddress": "12 Nguyễn Trãi, Sài Gòn", "shippingFee": null}
+ "shippingAddress": "12 Nguyễn Trãi, Sài Gòn", "shippingFee": null,
+ "variantIds": ["uuid"]}
 ```
 
 `shippingFee` tùy chọn (null = 0), áp cho **mỗi** đơn được tạo — cùng ngữ nghĩa với buy-now.
+`variantIds` tùy chọn: null/rỗng = cả giỏ; có giá trị thì chỉ đặt các variant đó, xong chỉ xóa đúng các item đã đặt (item không tick nằm lại giỏ). Variant không có trong giỏ → `400`.
 
 Luật cổng (chạy hết trước khi đặt, hỏng 1 item là dừng cả đợt):
 
@@ -93,7 +95,7 @@ Luật cổng (chạy hết trước khi đặt, hỏng 1 item là dừng cả �
  "items": [{"variantId": "uuid", "reason": "Insufficient stock, available: 0"}]}
 ```
 
-- Qua cổng → đặt từng shop bằng đúng logic buy-now (`OrderService.checkout`: snapshot tên/giá/SKU theo giá lúc đặt, trừ kho ở bước seller confirm chứ không trừ ở đây), địa chỉ giao hàng chụp nguyên văn vào từng đơn (sửa sổ địa chỉ sau này không viết lại lịch sử đơn), xong xóa sạch giỏ.
+- Qua cổng → đặt từng shop bằng đúng logic buy-now (`OrderService.checkout`: snapshot tên/giá/SKU theo giá lúc đặt, trừ kho ở bước seller confirm chứ không trừ ở đây), địa chỉ giao hàng chụp nguyên văn vào từng đơn (sửa sổ địa chỉ sau này không viết lại lịch sử đơn), xong xóa các item đã đặt khỏi giỏ.
 
 ## Sơ đồ code
 

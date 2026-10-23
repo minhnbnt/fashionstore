@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -14,6 +15,7 @@ import java.util.UUID;
 
 @Table("seller_settlement")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class SellerSettlement implements Persistable<UUID> {
 
     @Id
@@ -40,35 +42,9 @@ public class SellerSettlement implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public SellerSettlement(
-        UUID id,
-        UUID shopId,
-        UUID orderId,
-        long grossAmount,
-        long platformFee,
-        long netAmount,
-        SettlementStatus status,
-        Instant holdUntil,
-        @Nullable Instant releasedAt,
-        Instant createdAt
-    ) {
-        this.id = id;
-        this.shopId = shopId;
-        this.orderId = orderId;
-        this.grossAmount = grossAmount;
-        this.platformFee = platformFee;
-        this.netAmount = netAmount;
-        this.status = status;
-        this.holdUntil = holdUntil;
-        this.releasedAt = releasedAt;
-        this.createdAt = createdAt;
-        this.newRecord = false;
-    }
-
     public static SellerSettlement create(UUID shopId, UUID orderId, long grossAmount, long platformFee) {
         var now = Instant.now();
-        var settlement = new SellerSettlement(
+        return new SellerSettlement(
             UUID.randomUUID(),
             shopId,
             orderId,
@@ -78,10 +54,8 @@ public class SellerSettlement implements Persistable<UUID> {
             SettlementStatus.HOLDING,
             now.plus(3, ChronoUnit.DAYS),
             null,
-            now
-        );
-        settlement.newRecord = true;
-        return settlement;
+            now,
+            true);
     }
 
     public void release() {

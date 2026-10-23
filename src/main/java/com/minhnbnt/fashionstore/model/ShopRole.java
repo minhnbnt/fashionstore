@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.PersistenceCreator;
@@ -12,6 +13,7 @@ import java.util.UUID;
 
 @Table("shop_role")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class ShopRole implements Persistable<UUID> {
 
     @Id
@@ -30,40 +32,8 @@ public class ShopRole implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public ShopRole(
-        UUID id,
-        UUID shopId,
-        String name,
-        String[] permissions,
-        boolean isSystem,
-        Instant createdAt
-    ) {
-        this.id = id;
-        this.shopId = shopId;
-        this.name = name;
-        this.permissions = permissions;
-        this.isSystem = isSystem;
-        this.createdAt = createdAt;
-        this.newRecord = false;
-    }
-
-    public static ShopRole create(
-        UUID shopId,
-        String name,
-        String[] permissions,
-        boolean isSystem
-    ) {
-        var role = new ShopRole(
-            UUID.randomUUID(),
-            shopId,
-            name,
-            permissions,
-            isSystem,
-            Instant.now()
-        );
-        role.newRecord = true;
-        return role;
+    public static ShopRole create(UUID shopId, String name, String[] permissions, boolean isSystem) {
+        return new ShopRole(UUID.randomUUID(), shopId, name, permissions, isSystem, Instant.now(), true);
     }
 
     public void update(String name, String[] permissions) {

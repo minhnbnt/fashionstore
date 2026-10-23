@@ -15,5 +15,7 @@ public interface ReturnRequestRepository extends CrudRepository<ReturnRequest, U
 
     List<ReturnRequest> findByOrderId(UUID orderId);
 
+    List<ReturnRequest> findByOrderIdOrderByCreatedAtDesc(UUID orderId);
+
     List<ReturnRequest> findByBuyerIdOrderByCreatedAtDesc(UUID buyerId);
 }
