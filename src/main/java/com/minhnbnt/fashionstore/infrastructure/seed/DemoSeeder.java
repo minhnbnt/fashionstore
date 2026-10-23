@@ -147,7 +147,28 @@ public class DemoSeeder implements ApplicationRunner {
 
         var shop = shopService.register(
             ownerId,
-            new CreateShopRequest(SHOP_NAME, SHOP_SLUG, "Mặc đẹp là nét riêng của bạn.", null, null)
+            new CreateShopRequest(
+                SHOP_NAME,
+                SHOP_SLUG,
+                "Mặc đẹp là nét riêng của bạn.",
+                "demo/logo.webp",
+                "demo/banner.webp",
+                "0901234567",
+                "123 Đường Thời Trang, Hà Nội",
+                "INDIVIDUAL",
+                "NGUYEN HOANG HIEP",
+                "001202001234",
+                "01/01/2021",
+                "Cục Cảnh sát QLHC về TTXH",
+                null,
+                "demo/id-front.webp",
+                "demo/id-back.webp",
+                "demo/id-selfie.webp",
+                null,
+                "Vietcombank",
+                "0123456789",
+                "NGUYEN HOANG HIEP"
+            )
         );
         shopService.approve(ownerId, shop.id());
         opsSeeder.seedProfile(ownerId, shop.id());

@@ -55,6 +55,69 @@ public record AdminShopResponse(
 
     Instant createdAt,
 
-    Instant updatedAt
+    Instant updatedAt,
+
+    @Schema(description = "Số điện thoại kho", nullable = true)
+    @Nullable
+    String phone,
+
+    @Schema(description = "Địa chỉ lấy hàng", nullable = true)
+    @Nullable
+    String address,
+
+    @Schema(description = "Họ tên thật chủ shop theo CCCD", nullable = true)
+    @Nullable
+    String legalName,
+
+    @Schema(description = "Số CCCD/CMND", nullable = true)
+    @Nullable
+    String idNumber,
+
+    @Schema(description = "Ngày cấp CCCD", nullable = true)
+    @Nullable
+    String idIssuedDate,
+
+    @Schema(description = "Nơi cấp CCCD", nullable = true)
+    @Nullable
+    String idIssuedPlace,
+
+    @Schema(description = "Mã số thuế", nullable = true)
+    @Nullable
+    String taxCode,
+
+    @Schema(description = "S3 key ảnh mặt trước CCCD", nullable = true)
+    @Nullable
+    String idFrontKey,
+
+    @Schema(description = "S3 key ảnh mặt sau CCCD", nullable = true)
+    @Nullable
+    String idBackKey,
+
+    @Schema(description = "S3 key ảnh selfie cầm CCCD", nullable = true)
+    @Nullable
+    String idSelfieKey,
+
+    @Schema(description = "S3 key giấy chứng nhận ĐKKD (nếu có)", nullable = true)
+    @Nullable
+    String businessCertKey,
+
+    @Schema(description = "Tên ngân hàng thụ hưởng", nullable = true)
+    @Nullable
+    String bankName,
+
+    @Schema(description = "Số tài khoản ngân hàng", nullable = true)
+    @Nullable
+    String bankAccount,
+
+    @Schema(description = "Tên chủ tài khoản ngân hàng", nullable = true)
+    @Nullable
+    String bankHolder,
+
+    @Schema(description = "Trạng thái định danh eKYC: PENDING_REVIEW, VERIFIED, REJECTED", example = "PENDING_REVIEW")
+    String kycStatus,
+
+    @Schema(description = "Lý do từ chối định danh nếu có", nullable = true)
+    @Nullable
+    String kycRejectionReason
 ) {
 }

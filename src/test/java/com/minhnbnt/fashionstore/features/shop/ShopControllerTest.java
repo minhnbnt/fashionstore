@@ -2,6 +2,7 @@ package com.minhnbnt.fashionstore.features.shop;
 
 import com.minhnbnt.fashionstore.config.SecurityConfig;
 import com.minhnbnt.fashionstore.dto.shop.ShopResponse;
+import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -11,7 +12,6 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.Instant;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -35,7 +35,31 @@ class ShopControllerTest {
     private ShopService shops;
 
     private static ShopResponse response(UUID id, String status) {
-        return new ShopResponse(id, "Shop", "shop", "Mo ta", null, null, status, null, Instant.now());
+        return ShopTestFixtures.response(id, status);
+    }
+
+    private static String validRegisterJson(String name, String slug) {
+        return """
+            {
+              "name": "%s",
+              "slug": "%s",
+              "description": "Mo ta shop hop le",
+              "logoKey": "logo.webp",
+              "bannerKey": "banner.webp",
+              "phone": "0912345678",
+              "address": "123 Pho Hue, Ha Noi",
+              "legalName": "NGUYEN VAN A",
+              "idNumber": "001202001234",
+              "idIssuedDate": "01/01/2021",
+              "idIssuedPlace": "Cuc Canh sat QLHC ve TTXH",
+              "idFrontKey": "front.webp",
+              "idBackKey": "back.webp",
+              "idSelfieKey": "selfie.webp",
+              "bankName": "Vietcombank",
+              "bankAccount": "0123456789",
+              "bankHolder": "NGUYEN VAN A"
+            }
+            """.formatted(name, slug);
     }
 
     @Test
@@ -46,7 +70,7 @@ class ShopControllerTest {
         mockMvc.perform(post("/api/shops")
                 .with(jwt().jwt(builder -> builder.subject(id.toString())))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Shop\",\"slug\":\"shop\"}"))
+                .content(validRegisterJson("Shop", "shop")))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.status").value("PENDING"));
     }
@@ -56,7 +80,54 @@ class ShopControllerTest {
         mockMvc.perform(post("/api/shops")
                 .with(jwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Shop\",\"slug\":\"Shop Co Dau Cach\"}"))
+                .content(validRegisterJson("Shop", "Shop Co Dau Cach")))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void registerShopRejectsMissingMandatoryFields() throws Exception {
+        mockMvc.perform(post("/api/shops")
+                .with(jwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Shop\",\"slug\":\"shop\"}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void registerShopRejectsNullImportantFields() throws Exception {
+        mockMvc.perform(post("/api/shops")
+                .with(jwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "name": "Shop",
+                      "slug": "shop",
+                      "description": "desc",
+                      "logoKey": "logo",
+                      "bannerKey": "banner",
+                      "phone": null,
+                      "address": null,
+                      "legalName": "NGUYEN VAN A",
+                      "idNumber": "001202001234",
+                      "idIssuedDate": "01/01/2021",
+                      "idIssuedPlace": "Cuc QLHC",
+                      "idFrontKey": "front",
+                      "idBackKey": "back",
+                      "idSelfieKey": "selfie",
+                      "bankName": "VCB",
+                      "bankAccount": null,
+                      "bankHolder": "NGUYEN VAN A"
+                    }
+                    """))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void registerShopRejectsEmptyBody() throws Exception {
+        mockMvc.perform(post("/api/shops")
+                .with(jwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
             .andExpect(status().isBadRequest());
     }
 
@@ -87,4 +158,65 @@ class ShopControllerTest {
         mockMvc.perform(post("/api/shops/{id}/resubmit", UUID.randomUUID()))
             .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void registerShopRejectsBadIdIssuedDateFormat() throws Exception {
+        mockMvc.perform(post("/api/shops")
+                .with(jwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "name": "Shop",
+                      "slug": "shop-bad-date",
+                      "description": "Mo ta shop hop le",
+                      "logoKey": "logo.webp",
+                      "bannerKey": "banner.webp",
+                      "phone": "0912345678",
+                      "address": "123 Pho Hue, Ha Noi",
+                      "legalName": "NGUYEN VAN A",
+                      "idNumber": "001202001234",
+                      "idIssuedDate": "2021-01-01",
+                      "idIssuedPlace": "Cuc Canh sat QLHC ve TTXH",
+                      "idFrontKey": "front.webp",
+                      "idBackKey": "back.webp",
+                      "idSelfieKey": "selfie.webp",
+                      "bankName": "Vietcombank",
+                      "bankAccount": "0123456789",
+                      "bankHolder": "NGUYEN VAN A"
+                    }
+                    """))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void registerShopRejectsUnknownSellerType() throws Exception {
+        mockMvc.perform(post("/api/shops")
+                .with(jwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "name": "Shop",
+                      "slug": "shop-bad-type",
+                      "description": "Mo ta shop hop le",
+                      "logoKey": "logo.webp",
+                      "bannerKey": "banner.webp",
+                      "phone": "0912345678",
+                      "address": "123 Pho Hue, Ha Noi",
+                      "sellerType": "PERSONAL",
+                      "legalName": "NGUYEN VAN A",
+                      "idNumber": "001202001234",
+                      "idIssuedDate": "01/01/2021",
+                      "idIssuedPlace": "Cuc Canh sat QLHC ve TTXH",
+                      "idFrontKey": "front.webp",
+                      "idBackKey": "back.webp",
+                      "idSelfieKey": "selfie.webp",
+                      "bankName": "Vietcombank",
+                      "bankAccount": "0123456789",
+                      "bankHolder": "NGUYEN VAN A"
+                    }
+                    """))
+            .andExpect(status().isBadRequest());
+    }
 }
+
+

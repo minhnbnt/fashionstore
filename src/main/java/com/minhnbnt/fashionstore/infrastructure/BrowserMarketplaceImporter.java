@@ -127,8 +127,23 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
                 "Shopee & Lazada Import",
                 SHOP_SLUG,
                 "Dữ liệu nhập qua phiên Chrome tương tác trên máy phát triển.",
+                "seeds/market-logo.webp",
+                "seeds/market-banner.webp",
+                "0907777888",
+                "Kho tổng liên sàn, Hà Nội",
+                "INDIVIDUAL",
+                "MARKETPLACE SELLER",
+                "001202008888",
+                "10/10/2020",
+                "Cục Cảnh sát QLHC về TTXH",
                 null,
-                null
+                "seeds/id-front.webp",
+                "seeds/id-back.webp",
+                "seeds/id-selfie.webp",
+                null,
+                "VietinBank",
+                "108877665544",
+                "MARKETPLACE SELLER"
             )
         );
         shopService.approve(ownerId, shop.id());

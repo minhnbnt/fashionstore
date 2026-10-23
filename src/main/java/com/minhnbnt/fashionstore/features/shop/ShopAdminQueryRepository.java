@@ -40,7 +40,10 @@ public class ShopAdminQueryRepository {
     private static final String SELECT = """
         SELECT s.id, s.name, s.slug, s.description, s.logo_key, s.banner_key, s.status, s.status_reason,
                u.id AS owner_id, u.email AS owner_email, u.display_name AS owner_name, u.status AS owner_status,
-               s.submitted_at, s.approved_at, s.created_at, s.updated_at
+               s.submitted_at, s.approved_at, s.created_at, s.updated_at,
+               s.phone, s.address, s.legal_name, s.id_number, s.id_issued_date, s.id_issued_place,
+               s.tax_code, s.id_front_key, s.id_back_key, s.id_selfie_key, s.business_cert_key,
+               s.bank_name, s.bank_account, s.bank_holder, s.kyc_status, s.kyc_rejection_reason
         """ + BASE_FROM;
 
     private final JdbcClient jdbc;
@@ -186,6 +189,10 @@ public class ShopAdminQueryRepository {
     }
 
     private static AdminShopResponse toAdminShop(ResultSet rs, int rowNum) throws SQLException {
+        var kycStatus = rs.getString("kyc_status");
+        if (kycStatus == null) {
+            kycStatus = "PENDING_REVIEW";
+        }
         return new AdminShopResponse(
             rs.getObject("id", UUID.class),
             rs.getString("name"),
@@ -202,7 +209,23 @@ public class ShopAdminQueryRepository {
             instantOf(rs, "submitted_at"),
             nullableInstantOf(rs, "approved_at"),
             instantOf(rs, "created_at"),
-            instantOf(rs, "updated_at")
+            instantOf(rs, "updated_at"),
+            rs.getString("phone"),
+            rs.getString("address"),
+            rs.getString("legal_name"),
+            rs.getString("id_number"),
+            rs.getString("id_issued_date"),
+            rs.getString("id_issued_place"),
+            rs.getString("tax_code"),
+            rs.getString("id_front_key"),
+            rs.getString("id_back_key"),
+            rs.getString("id_selfie_key"),
+            rs.getString("business_cert_key"),
+            rs.getString("bank_name"),
+            rs.getString("bank_account"),
+            rs.getString("bank_holder"),
+            kycStatus,
+            rs.getString("kyc_rejection_reason")
         );
     }
 

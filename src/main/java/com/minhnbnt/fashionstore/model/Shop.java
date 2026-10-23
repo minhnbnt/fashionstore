@@ -149,8 +149,10 @@ public class Shop implements Persistable<UUID> {
         this.approvedAt = approvedAt;
         if (submittedAt != null) {
             this.submittedAt = submittedAt;
+        } else if (createdAt != null) {
+            this.submittedAt = createdAt;
         } else {
-            this.submittedAt = createdAt != null ? createdAt : Instant.now();
+            this.submittedAt = Instant.now();
         }
         this.phone = phone;
         this.address = address;
@@ -192,30 +194,6 @@ public class Shop implements Persistable<UUID> {
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.newRecord = false;
-    }
-
-    public static Shop create(
-        String name, String slug, String description, @Nullable String logoKey, @Nullable String bannerKey) {
-        return create(name,
-            slug,
-            description,
-            logoKey,
-            bannerKey,
-            null,
-            null,
-            "INDIVIDUAL",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null);
     }
 
     public static Shop create(
@@ -323,6 +301,8 @@ public class Shop implements Persistable<UUID> {
         }
         status = ShopStatus.PENDING;
         statusReason = null;
+        kycStatus = "PENDING_REVIEW";
+        kycRejectionReason = null;
         submittedAt = Instant.now();
         updatedAt = Instant.now();
     }

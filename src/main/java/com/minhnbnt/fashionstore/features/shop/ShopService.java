@@ -28,6 +28,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -51,45 +52,45 @@ public class ShopService {
 
     @Transactional
     public ShopResponse register(@NonNull UUID ownerId, @NonNull CreateShopRequest request) {
-        // Fraud prevention check 1: CCCD format
-        if (request.idNumber() != null && !request.idNumber().isBlank()) {
-            var cleanedId = request.idNumber().trim();
-            if (!cleanedId.matches("^\\d{9}$|^\\d{12}$")) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Số CCCD/CMND không đúng định dạng (9 hoặc 12 chữ số).");
-            }
+        // Fraud prevention check 1: CCCD format (9 or 12 digits)
+        var cleanedId = request.idNumber().trim();
+        if (!cleanedId.matches("^\\d{9}$|^\\d{12}$")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID number must be 9 or 12 digits.");
         }
 
         // Fraud prevention check 2: Bank holder name MUST match legal name
-        if (request.bankHolder() != null && request.legalName() != null
-            && !request.bankHolder().isBlank() && !request.legalName().isBlank()) {
-            var normHolder = normalizeName(request.bankHolder());
-            var normLegal = normalizeName(request.legalName());
-            if (!normHolder.equalsIgnoreCase(normLegal)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tên chủ tài khoản ngân hàng phải trùng khớp với Họ và tên trên Căn cước công dân để chống gian lận.");
-            }
+        var normHolder = normalizeName(request.bankHolder());
+        var normLegal = normalizeName(request.legalName());
+        if (!normHolder.equalsIgnoreCase(normLegal)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Bank holder name must match the legal name on the national ID.");
         }
 
+        var sellerType = trimOrNull(request.sellerType());
+        if (sellerType == null) {
+            sellerType = "INDIVIDUAL";
+        }
         var shop = Shop.create(
-            request.name(),
-            request.slug(),
-            descriptionOf(request.description()),
-            request.logoKey(),
-            request.bannerKey(),
-            request.phone(),
-            request.address(),
-            request.sellerType(),
-            request.legalName(),
-            request.idNumber(),
-            request.idIssuedDate(),
-            request.idIssuedPlace(),
-            request.taxCode(),
-            request.idFrontKey(),
-            request.idBackKey(),
-            request.idSelfieKey(),
-            request.businessCertKey(),
-            request.bankName(),
-            request.bankAccount(),
-            request.bankHolder()
+            request.name().trim(),
+            request.slug().trim(),
+            request.description().trim(),
+            request.logoKey().trim(),
+            request.bannerKey().trim(),
+            request.phone().trim(),
+            request.address().trim(),
+            sellerType,
+            request.legalName().trim(),
+            cleanedId,
+            request.idIssuedDate().trim(),
+            request.idIssuedPlace().trim(),
+            trimOrNull(request.taxCode()),
+            request.idFrontKey().trim(),
+            request.idBackKey().trim(),
+            request.idSelfieKey().trim(),
+            trimOrNull(request.businessCertKey()),
+            request.bankName().trim(),
+            request.bankAccount().trim(),
+            request.bankHolder().trim()
         );
         try {
             shops.save(shop);
@@ -314,13 +315,6 @@ public class ShopService {
         return shop;
     }
 
-    private static String descriptionOf(@Nullable String description) {
-        if (description == null) {
-            return "";
-        }
-        return description;
-    }
-
     private static String normalizeName(String name) {
         if (name == null) {
             return "";
@@ -329,7 +323,18 @@ public class ShopService {
         return normalized.replaceAll("\\p{M}", "")
             .replaceAll("[đĐ]", "d")
             .replaceAll("\\s+", " ")
-            .toUpperCase(java.util.Locale.ROOT);
+            .toUpperCase(Locale.ROOT);
+    }
+
+    private static @Nullable String trimOrNull(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        var trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed;
     }
 
     public static ShopResponse toResponse(Shop shop) {

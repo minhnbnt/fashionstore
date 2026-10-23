@@ -119,46 +119,4 @@ public record ShopResponse(
 
     Instant createdAt
 ) {
-    public ShopResponse(
-        UUID id,
-        String name,
-        String slug,
-        String description,
-        @Nullable String logoKey,
-        @Nullable String bannerKey,
-        String status,
-        Instant createdAt
-    ) {
-        this(
-            id, name, slug, description, logoKey, bannerKey, status, null,
-            null, null, null, 2, "INDIVIDUAL", null, 0, 0,
-            null, null, null, null, null,
-            null, null, null, null, null,
-            null, null, null, null,
-            "PENDING_REVIEW", null,
-            createdAt
-        );
-    }
-
-    public ShopResponse(
-        UUID id,
-        String name,
-        String slug,
-        String description,
-        @Nullable String logoKey,
-        @Nullable String bannerKey,
-        String status,
-        @Nullable String statusReason,
-        Instant createdAt
-    ) {
-        this(
-            id, name, slug, description, logoKey, bannerKey, status, statusReason,
-            null, null, null, 2, "INDIVIDUAL", null, 0, 0,
-            null, null, null, null, null,
-            null, null, null, null, null,
-            null, null, null, null,
-            "PENDING_REVIEW", null,
-            createdAt
-        );
-    }
 }

@@ -13,6 +13,7 @@ import com.minhnbnt.fashionstore.dto.common.PageResponse;
 import com.minhnbnt.fashionstore.dto.identity.UserResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopResponse;
 import com.minhnbnt.fashionstore.model.ShopStatus;
+import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,12 +73,16 @@ class AdminControllerTest {
         var now = Instant.now();
         return new AdminShopResponse(
             id, "Shop", "shop", "", null, null, status, null,
-            UUID.randomUUID(), "an@t.local", "An", "ACTIVE", now, null, now, now
+            UUID.randomUUID(), "an@t.local", "An", "ACTIVE", now, null, now, now,
+            "0901234567", "123 Pho Hue", "NGUYEN VAN A", "001202001234",
+            "01/01/2021", "Cuc QLHC", null, "front.webp", "back.webp", "selfie.webp",
+            null, "Vietcombank", "0123456789", "NGUYEN VAN A",
+            "PENDING_REVIEW", null
         );
     }
 
     private static ShopResponse shop(UUID id, String status, @Nullable String reason) {
-        return new ShopResponse(id, "Shop", "shop", "", null, null, status, reason, Instant.now());
+        return ShopTestFixtures.response(id, status, reason);
     }
 
     private static UserResponse user(UUID id, String status) {

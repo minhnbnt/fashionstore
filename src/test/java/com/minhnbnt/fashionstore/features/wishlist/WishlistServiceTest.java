@@ -15,6 +15,7 @@ import com.minhnbnt.fashionstore.features.wishlist.repository.WishlistRepository
 import com.minhnbnt.fashionstore.model.Product;
 import com.minhnbnt.fashionstore.model.ProductVariant;
 import com.minhnbnt.fashionstore.model.WishlistItem;
+import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -61,13 +62,13 @@ class WishlistServiceTest {
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = user();
-        var shop = shops.register(ownerId, new CreateShopRequest("Shop " + slug, slug, null, null, null));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }
 
     private UUID pendingShop(UUID ownerId, String slug) {
-        var shop = shops.register(ownerId, new CreateShopRequest("Shop " + slug, slug, null, null, null));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
         return shop.id();
     }
 
