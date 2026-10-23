@@ -59,13 +59,23 @@ public class OrderStatusHistory implements Persistable<UUID> {
         OrderStatus to,
         @Nullable UUID changedBy
     ) {
+        return record(orderId, from, to, changedBy, "");
+    }
+
+    public static OrderStatusHistory record(
+        UUID orderId,
+        @Nullable OrderStatus from,
+        OrderStatus to,
+        @Nullable UUID changedBy,
+        String note
+    ) {
         var history = new OrderStatusHistory(
             UUID.randomUUID(),
             orderId,
             from == null ? null : from.name(),
             to.name(),
             changedBy,
-            "",
+            note,
             Instant.now()
         );
         history.newRecord = true;

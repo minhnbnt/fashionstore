@@ -16,7 +16,9 @@
 - `V2__product_search.sql`: index BM25 (`idx_product_bm25`, xem Search).
 - `V13__product_moderation.sql`: product thêm `BANNED` + `violation_type`/`status_reason` (lần gỡ gần nhất), bảng `product_moderation_history` (audit gỡ/khôi phục). Ban đầu merge về với version V10, đã đánh số lại thành V13 do trùng với `V10__wishlist.sql`.
 - `V14__product_reports.sql`: `product_report` (USER/SYSTEM, OPEN → ACTION_TAKEN/DISMISSED; partial unique 1 báo cáo mở/người/sản phẩm, 1 cờ hệ thống mở/sản phẩm), `banned_keyword` (unique `lower(keyword)`).
-- `V12__site_content.sql`: `site_banner`, `site_popup` (lịch chạy `starts_at`/`ends_at`, CHECK kết thúc sau bắt đầu), `site_page` (slug unique, `DRAFT`/`PUBLISHED`), `faq_item`; seed 5 trang chính sách + vài FAQ. V11 thuộc nhánh giám sát đơn.
+- `V12__site_content.sql`: `site_banner`, `site_popup` (lịch chạy `starts_at`/`ends_at`, CHECK kết thúc sau bắt đầu), `site_page` (slug unique, `DRAFT`/`PUBLISHED`), `faq_item`; seed 5 trang chính sách + vài FAQ.
+- `V15__admin_order_monitoring.sql`: ghi nhận bên hủy đơn (`BUYER`/`SELLER`/`ADMIN`) và index phục vụ màn giám sát toàn sàn.
+- `V16__public_holiday.sql`: lịch nghỉ/ngày làm bù cho SLA đơn hàng + trạng thái đồng bộ Calendarific; seed lịch 2026–2027.
 - Repository Spring Data JDBC: derived query sắp nhiều cột (`OrderByAAscBAsc`) làm AOT repository sinh code không compile được → viết `@Query` SQL tay.
 
 ## Search BM25 (pg_textsearch)
