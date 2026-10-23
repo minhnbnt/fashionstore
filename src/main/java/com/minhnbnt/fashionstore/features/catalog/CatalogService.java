@@ -16,7 +16,12 @@ import com.minhnbnt.fashionstore.dto.catalog.SearchFacetsResponse;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateVariantRequest;
 import com.minhnbnt.fashionstore.dto.catalog.AdjustStockRequest;
+import com.minhnbnt.fashionstore.dto.catalog.BulkDeleteProductsRequest;
 import com.minhnbnt.fashionstore.dto.catalog.BulkImportResult;
+import com.minhnbnt.fashionstore.dto.catalog.BulkOperationResult;
+import com.minhnbnt.fashionstore.dto.catalog.BulkUpdatePriceRequest;
+import com.minhnbnt.fashionstore.dto.catalog.BulkUpdateProductStatusRequest;
+import com.minhnbnt.fashionstore.dto.catalog.BulkUpdateStockRequest;
 import com.minhnbnt.fashionstore.dto.catalog.InventoryItemResponse;
 import com.minhnbnt.fashionstore.dto.catalog.SellerProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.StockMovementResponse;
@@ -60,6 +65,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -1048,31 +1054,389 @@ public class CatalogService {
         int page,
         int limit
     ) {
+        return listSellerProducts(userId, shopId, statusFilter, null, null, null, null, q, "createdAt", "desc", page, limit);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SellerProductResponse> listSellerProducts(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        @Nullable String statusFilter,
+        @Nullable UUID categoryId,
+        @Nullable String stockLevel,
+        @Nullable Long minPrice,
+        @Nullable Long maxPrice,
+        @Nullable String q,
+        @Nullable String sortBy,
+        @Nullable String sortDir,
+        int page,
+        int limit
+    ) {
         access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
         List<Product> all;
-        if (statusFilter != null && !statusFilter.isBlank()) {
-            all = products.findByShopIdAndStatusOrderByCreatedAtDesc(
-                shopId,
-                ProductStatus.valueOf(statusFilter.toUpperCase(Locale.ROOT))
-            );
+        if (statusFilter != null && !statusFilter.isBlank() && !"ALL".equalsIgnoreCase(statusFilter) && !"OUT_OF_STOCK".equalsIgnoreCase(statusFilter)) {
+            try {
+                var targetStatus = ProductStatus.valueOf(statusFilter.toUpperCase(Locale.ROOT));
+                all = products.findByShopIdAndStatusOrderByCreatedAtDesc(shopId, targetStatus);
+            } catch (IllegalArgumentException e) {
+                all = products.findByShopIdOrderByCreatedAtDesc(shopId);
+            }
         } else {
             all = products.findByShopIdOrderByCreatedAtDesc(shopId);
         }
 
+        if (statusFilter == null || (!statusFilter.equalsIgnoreCase("DELETED"))) {
+            all = all.stream()
+                .filter(p -> p.getStatus() != ProductStatus.DELETED)
+                .toList();
+        }
+
+        if (categoryId != null) {
+            all = all.stream()
+                .filter(p -> p.getCategoryId() != null && p.getCategoryId().equals(categoryId))
+                .toList();
+        }
+
+        var responses = all.stream()
+            .map(this::toSellerResponse)
+            .toList();
+
         if (q != null && !q.isBlank()) {
             var lower = q.toLowerCase(Locale.ROOT).strip();
-            all = all.stream()
-                .filter(p -> p.getName().toLowerCase(Locale.ROOT).contains(lower) || p.getSlug().toLowerCase(Locale.ROOT).contains(lower))
+            responses = responses.stream()
+                .filter(p -> {
+                    if (p.name().toLowerCase(Locale.ROOT).contains(lower)) {
+                        return true;
+                    }
+                    if (p.slug().toLowerCase(Locale.ROOT).contains(lower)) {
+                        return true;
+                    }
+                    if (p.variants() != null) {
+                        for (var v : p.variants()) {
+                            if (v.sku() != null && v.sku().toLowerCase(Locale.ROOT).contains(lower)) {
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                })
                 .toList();
+        }
+
+        if ("OUT_OF_STOCK".equalsIgnoreCase(statusFilter)) {
+            responses = responses.stream()
+                .filter(p -> p.totalStock() == 0)
+                .toList();
+        }
+
+        if (stockLevel != null && !stockLevel.isBlank()) {
+            if ("OUT_OF_STOCK".equalsIgnoreCase(stockLevel)) {
+                responses = responses.stream()
+                    .filter(p -> p.totalStock() == 0)
+                    .toList();
+            } else if ("LOW_STOCK".equalsIgnoreCase(stockLevel)) {
+                responses = responses.stream()
+                    .filter(p -> p.totalStock() <= 15)
+                    .toList();
+            }
+        }
+
+        if (minPrice != null) {
+            responses = responses.stream()
+                .filter(p -> p.maxPrice() >= minPrice)
+                .toList();
+        }
+
+        if (maxPrice != null) {
+            responses = responses.stream()
+                .filter(p -> p.minPrice() <= maxPrice)
+                .toList();
+        }
+
+        Comparator<SellerProductResponse> comparator;
+        if ("stock".equalsIgnoreCase(sortBy)) {
+            comparator = Comparator.comparingInt(SellerProductResponse::totalStock);
+        } else if ("sold".equalsIgnoreCase(sortBy)) {
+            comparator = Comparator.comparingInt(SellerProductResponse::soldCount);
+        } else if ("price".equalsIgnoreCase(sortBy)) {
+            comparator = Comparator.comparingLong(SellerProductResponse::minPrice);
+        } else {
+            comparator = Comparator.comparing(SellerProductResponse::createdAt);
+        }
+
+        if ("asc".equalsIgnoreCase(sortDir)) {
+            responses = responses.stream().sorted(comparator).toList();
+        } else {
+            responses = responses.stream().sorted(comparator.reversed()).toList();
         }
 
         var pageSize = Math.clamp(limit, 1, 100);
         var offset = (long) Math.max(page, 0) * pageSize;
-        return all.stream()
+        return responses.stream()
             .skip(offset)
             .limit(pageSize)
-            .map(this::toSellerResponse)
             .toList();
+    }
+
+    @Transactional
+    public BulkOperationResult bulkUpdateProductStatus(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        @NonNull BulkUpdateProductStatusRequest request
+    ) {
+        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        var targetStatus = ProductStatus.valueOf(request.status());
+        var successCount = 0;
+        var failedCount = 0;
+        var messages = new ArrayList<String>();
+
+        for (var productId : request.productIds()) {
+            var product = products.findByShopIdAndId(shopId, productId).orElse(null);
+            if (product == null) {
+                failedCount++;
+                messages.add("Sản phẩm ID " + productId + " không tồn tại");
+                continue;
+            }
+            if (product.getStatus() == ProductStatus.DELETED) {
+                failedCount++;
+                messages.add("Sản phẩm '" + product.getName() + "' đã bị xóa, không thể cập nhật");
+                continue;
+            }
+            if (product.getStatus() == ProductStatus.BANNED) {
+                failedCount++;
+                messages.add("Sản phẩm '" + product.getName() + "' bị cấm vi phạm chính sách, chỉ Admin mới có quyền mở");
+                continue;
+            }
+
+            if (product.getStatus() == targetStatus) {
+                successCount++;
+                continue;
+            }
+
+            var oldStatus = product.getStatus().name();
+            if (targetStatus == ProductStatus.ACTIVE) {
+                if (product.getStatus() == ProductStatus.HIDDEN) {
+                    product.activate();
+                } else {
+                    failedCount++;
+                    messages.add("Sản phẩm '" + product.getName() + "' ở trạng thái " + oldStatus + ", không thể bật bán");
+                    continue;
+                }
+            } else if (targetStatus == ProductStatus.HIDDEN) {
+                if (product.getStatus() == ProductStatus.ACTIVE) {
+                    product.hide();
+                } else {
+                    failedCount++;
+                    messages.add("Sản phẩm '" + product.getName() + "' ở trạng thái " + oldStatus + ", không thể ẩn");
+                    continue;
+                }
+            }
+
+            products.save(product);
+            auditLogs.save(ProductAuditLog.record(
+                product.getId(),
+                shopId,
+                userId,
+                "BULK_UPDATE_STATUS",
+                "Cập nhật hàng loạt trạng thái: " + oldStatus + " -> " + targetStatus.name(),
+                "{\"status\":\"" + oldStatus + "\"}",
+                "{\"status\":\"" + targetStatus.name() + "\"}"
+            ));
+            successCount++;
+        }
+
+        return new BulkOperationResult(successCount, failedCount, messages);
+    }
+
+    @Transactional
+    public BulkOperationResult bulkDeleteProducts(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        @NonNull BulkDeleteProductsRequest request
+    ) {
+        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        var successCount = 0;
+        var failedCount = 0;
+        var messages = new ArrayList<String>();
+
+        for (var productId : request.productIds()) {
+            var product = products.findByShopIdAndId(shopId, productId).orElse(null);
+            if (product == null) {
+                failedCount++;
+                messages.add("Sản phẩm ID " + productId + " không tồn tại");
+                continue;
+            }
+            if (product.getStatus() == ProductStatus.DELETED) {
+                successCount++;
+                continue;
+            }
+            if (orderService.hasActiveOrdersForProduct(productId)) {
+                failedCount++;
+                messages.add("Sản phẩm '" + product.getName() + "' đang có đơn hàng xử lý, không thể xóa");
+                continue;
+            }
+
+            product.delete();
+            products.save(product);
+
+            var variantList = variants.findByProductIdOrderByCreatedAtAsc(productId);
+            var delSuffix = "-del-" + UUID.randomUUID().toString().substring(0, 8);
+            for (var v : variantList) {
+                v.archiveSku(delSuffix);
+            }
+            variants.saveAll(variantList);
+
+            auditLogs.save(ProductAuditLog.record(
+                productId,
+                shopId,
+                userId,
+                "BULK_DELETE",
+                "Xóa mềm sản phẩm hàng loạt",
+                null,
+                null
+            ));
+            successCount++;
+        }
+
+        return new BulkOperationResult(successCount, failedCount, messages);
+    }
+
+    @Transactional
+    public BulkOperationResult bulkUpdatePrices(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        @NonNull BulkUpdatePriceRequest request
+    ) {
+        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        var successCount = 0;
+        var failedCount = 0;
+        var messages = new ArrayList<String>();
+
+        for (var productId : request.productIds()) {
+            var product = products.findByShopIdAndId(shopId, productId).orElse(null);
+            if (product == null) {
+                failedCount++;
+                messages.add("Sản phẩm ID " + productId + " không tồn tại");
+                continue;
+            }
+            if (product.getStatus() == ProductStatus.DELETED) {
+                failedCount++;
+                messages.add("Sản phẩm '" + product.getName() + "' đã bị xóa");
+                continue;
+            }
+            if (product.getStatus() == ProductStatus.BANNED) {
+                failedCount++;
+                messages.add("Sản phẩm '" + product.getName() + "' bị cấm vi phạm chính sách");
+                continue;
+            }
+
+            var variantList = variants.findByProductIdOrderByCreatedAtAsc(productId);
+            if (variantList.isEmpty()) {
+                failedCount++;
+                messages.add("Sản phẩm '" + product.getName() + "' không có biến thể");
+                continue;
+            }
+
+            for (var v : variantList) {
+                long newPrice;
+                if (request.fixedPrice() != null) {
+                    newPrice = request.fixedPrice();
+                } else if (request.percentChange() != null) {
+                    var factor = 1.0 + (request.percentChange() / 100.0);
+                    newPrice = Math.max(1000L, Math.round(v.getPrice() * factor));
+                } else {
+                    continue;
+                }
+                v.setPrice(newPrice);
+            }
+            variants.saveAll(variantList);
+
+            var summary = "Cập nhật giá hàng loạt: ";
+            if (request.fixedPrice() != null) {
+                summary = summary + "giá cố định " + request.fixedPrice() + " VND";
+            } else if (request.percentChange() != null) {
+                summary = summary + "thay đổi " + request.percentChange() + "%";
+            }
+            auditLogs.save(ProductAuditLog.record(
+                productId,
+                shopId,
+                userId,
+                "BULK_UPDATE_PRICE",
+                summary,
+                null,
+                null
+            ));
+            successCount++;
+        }
+
+        return new BulkOperationResult(successCount, failedCount, messages);
+    }
+
+    @Transactional
+    public BulkOperationResult bulkUpdateStocks(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        @NonNull BulkUpdateStockRequest request
+    ) {
+        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        var successCount = 0;
+        var failedCount = 0;
+        var messages = new ArrayList<String>();
+
+        for (var productId : request.productIds()) {
+            var product = products.findByShopIdAndId(shopId, productId).orElse(null);
+            if (product == null) {
+                failedCount++;
+                messages.add("Sản phẩm ID " + productId + " không tồn tại");
+                continue;
+            }
+            if (product.getStatus() == ProductStatus.DELETED) {
+                failedCount++;
+                messages.add("Sản phẩm '" + product.getName() + "' đã bị xóa");
+                continue;
+            }
+
+            var variantList = variants.findByProductIdOrderByCreatedAtAsc(productId);
+            if (variantList.isEmpty()) {
+                failedCount++;
+                messages.add("Sản phẩm '" + product.getName() + "' không có biến thể");
+                continue;
+            }
+
+            for (var v : variantList) {
+                int newStock;
+                if (request.fixedStock() != null) {
+                    newStock = request.fixedStock();
+                } else if (request.deltaStock() != null) {
+                    newStock = Math.max(0, v.getStockQuantity() + request.deltaStock());
+                } else {
+                    continue;
+                }
+                var delta = newStock - v.getStockQuantity();
+                v.setStockQuantity(newStock);
+                movements.save(StockMovement.record(v.getId(), shopId, delta, "BULK_ADJUST", null));
+            }
+            variants.saveAll(variantList);
+
+            var summary = "Cập nhật tồn kho hàng loạt: ";
+            if (request.fixedStock() != null) {
+                summary = summary + "tồn cố định " + request.fixedStock();
+            } else if (request.deltaStock() != null) {
+                summary = summary + "thay đổi " + request.deltaStock();
+            }
+            auditLogs.save(ProductAuditLog.record(
+                productId,
+                shopId,
+                userId,
+                "BULK_UPDATE_STOCK",
+                summary,
+                null,
+                null
+            ));
+            successCount++;
+        }
+
+        return new BulkOperationResult(successCount, failedCount, messages);
     }
 
     @Transactional(readOnly = true)
@@ -1263,6 +1627,7 @@ public class CatalogService {
             defaultImg = imgList.getFirst().getS3Key();
         }
         var variantResponses = varList.stream().map(CatalogMapper::toVariantResponse).toList();
+        var soldCount = orderService.getSoldQuantityForProduct(product.getId());
 
         return new SellerProductResponse(
             product.getId(),
@@ -1280,7 +1645,8 @@ public class CatalogService {
             defaultImg,
             variantResponses,
             product.getCreatedAt(),
-            product.getUpdatedAt()
+            product.getUpdatedAt(),
+            soldCount
         );
     }
 

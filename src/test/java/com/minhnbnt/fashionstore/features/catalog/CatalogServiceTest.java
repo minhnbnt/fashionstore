@@ -2,6 +2,11 @@ package com.minhnbnt.fashionstore.features.catalog;
 
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.catalog.AttachImagesRequest;
+import com.minhnbnt.fashionstore.dto.catalog.BulkDeleteProductsRequest;
+import com.minhnbnt.fashionstore.dto.catalog.BulkOperationResult;
+import com.minhnbnt.fashionstore.dto.catalog.BulkUpdatePriceRequest;
+import com.minhnbnt.fashionstore.dto.catalog.BulkUpdateProductStatusRequest;
+import com.minhnbnt.fashionstore.dto.catalog.BulkUpdateStockRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ImageItemRequest;
@@ -741,5 +746,149 @@ class CatalogServiceTest {
         // Buyer can see active product again
         var detail = catalog.getDetail(created.id());
         assertThat(detail.status()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void bulkUpdateProductStatusSuccess() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-bulk-status");
+        var p1 = catalog.createProduct(ownerId, shopId, productRequest("bulk-status-1"));
+        var p2 = catalog.createProduct(ownerId, shopId, productRequest("bulk-status-2"));
+
+        var hideResult = catalog.bulkUpdateProductStatus(
+            ownerId,
+            shopId,
+            new BulkUpdateProductStatusRequest(List.of(p1.id(), p2.id()), "HIDDEN")
+        );
+        assertThat(hideResult.successCount()).isEqualTo(2);
+        assertThat(hideResult.failedCount()).isEqualTo(0);
+
+        var sellerList = catalog.listSellerProducts(ownerId, shopId, "HIDDEN", null, 0, 10);
+        assertThat(sellerList).extracting(SellerProductResponse::id).contains(p1.id(), p2.id());
+
+        var activateResult = catalog.bulkUpdateProductStatus(
+            ownerId,
+            shopId,
+            new BulkUpdateProductStatusRequest(List.of(p1.id(), p2.id()), "ACTIVE")
+        );
+        assertThat(activateResult.successCount()).isEqualTo(2);
+        assertThat(activateResult.failedCount()).isEqualTo(0);
+    }
+
+    @Test
+    void bulkDeleteProductsProtectsActiveOrders() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-bulk-del");
+        var p1 = catalog.createProduct(ownerId, shopId, productRequest("bulk-del-safe"));
+        var p2 = catalog.createProduct(ownerId, shopId, productRequest("bulk-del-active"));
+        var p2VariantId = p2.variants().getFirst().id();
+
+        var buyerId = mirroredUser();
+        orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(p2VariantId, 1)), "Bình", "0912345678", "Hanoi", 0L)
+        );
+
+        var delResult = catalog.bulkDeleteProducts(
+            ownerId,
+            shopId,
+            new BulkDeleteProductsRequest(List.of(p1.id(), p2.id()))
+        );
+        assertThat(delResult.successCount()).isEqualTo(1);
+        assertThat(delResult.failedCount()).isEqualTo(1);
+        assertThat(delResult.messages()).isNotEmpty();
+
+        var activeList = catalog.listSellerProducts(ownerId, shopId, "ACTIVE", null, 0, 10);
+        assertThat(activeList).extracting(SellerProductResponse::id).contains(p2.id());
+        assertThat(activeList).extracting(SellerProductResponse::id).doesNotContain(p1.id());
+    }
+
+    @Test
+    void bulkUpdatePricesFixedAndPercent() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-bulk-price");
+        var p1 = catalog.createProduct(ownerId, shopId, productRequest("bulk-price-1"));
+        var p2 = catalog.createProduct(ownerId, shopId, productRequest("bulk-price-2"));
+
+        var fixedResult = catalog.bulkUpdatePrices(
+            ownerId,
+            shopId,
+            new BulkUpdatePriceRequest(List.of(p1.id(), p2.id()), 250000L, null)
+        );
+        assertThat(fixedResult.successCount()).isEqualTo(2);
+        assertThat(fixedResult.failedCount()).isEqualTo(0);
+
+        var listAfterFixed = catalog.listSellerProducts(ownerId, shopId, "ACTIVE", null, 0, 10);
+        for (var item : listAfterFixed) {
+            assertThat(item.minPrice()).isEqualTo(250000L);
+        }
+
+        var percentResult = catalog.bulkUpdatePrices(
+            ownerId,
+            shopId,
+            new BulkUpdatePriceRequest(List.of(p1.id(), p2.id()), null, -20.0)
+        );
+        assertThat(percentResult.successCount()).isEqualTo(2);
+        assertThat(percentResult.failedCount()).isEqualTo(0);
+
+        var listAfterPercent = catalog.listSellerProducts(ownerId, shopId, "ACTIVE", null, 0, 10);
+        for (var item : listAfterPercent) {
+            assertThat(item.minPrice()).isEqualTo(200000L);
+        }
+    }
+
+    @Test
+    void bulkUpdateStocksFixedAndDelta() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-bulk-stock");
+        var p1 = catalog.createProduct(ownerId, shopId, productRequest("bulk-stock-1"));
+        var p2 = catalog.createProduct(ownerId, shopId, productRequest("bulk-stock-2"));
+
+        var fixedResult = catalog.bulkUpdateStocks(
+            ownerId,
+            shopId,
+            new BulkUpdateStockRequest(List.of(p1.id(), p2.id()), 80, null)
+        );
+        assertThat(fixedResult.successCount()).isEqualTo(2);
+
+        var listAfterFixed = catalog.listSellerProducts(ownerId, shopId, "ACTIVE", null, 0, 10);
+        for (var item : listAfterFixed) {
+            assertThat(item.totalStock()).isEqualTo(80);
+        }
+
+        var deltaResult = catalog.bulkUpdateStocks(
+            ownerId,
+            shopId,
+            new BulkUpdateStockRequest(List.of(p1.id(), p2.id()), null, -10)
+        );
+        assertThat(deltaResult.successCount()).isEqualTo(2);
+
+        var listAfterDelta = catalog.listSellerProducts(ownerId, shopId, "ACTIVE", null, 0, 10);
+        for (var item : listAfterDelta) {
+            assertThat(item.totalStock()).isEqualTo(70);
+        }
+    }
+
+    @Test
+    void listSellerProductsMultiFilterAndSorting() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-filter-sort");
+        var p1 = catalog.createProduct(ownerId, shopId, productRequest("filter-alpha"));
+        var p2 = catalog.createProduct(ownerId, shopId, productRequest("filter-beta"));
+
+        catalog.bulkUpdateStocks(ownerId, shopId, new BulkUpdateStockRequest(List.of(p1.id()), 5, null));
+        catalog.bulkUpdateStocks(ownerId, shopId, new BulkUpdateStockRequest(List.of(p2.id()), 100, null));
+
+        var lowStockList = catalog.listSellerProducts(
+            ownerId, shopId, "ALL", null, "LOW_STOCK", null, null, null, "stock", "asc", 0, 20
+        );
+        assertThat(lowStockList).extracting(SellerProductResponse::id).contains(p1.id());
+        assertThat(lowStockList).extracting(SellerProductResponse::id).doesNotContain(p2.id());
+
+        var searchBySku = catalog.listSellerProducts(
+            ownerId, shopId, "ALL", null, null, null, null, "filter-beta", "createdAt", "desc", 0, 20
+        );
+        assertThat(searchBySku).extracting(SellerProductResponse::id).contains(p2.id());
+        assertThat(searchBySku).extracting(SellerProductResponse::id).doesNotContain(p1.id());
     }
 }

@@ -1,7 +1,12 @@
 package com.minhnbnt.fashionstore.features.catalog.controller;
 
 import com.minhnbnt.fashionstore.dto.catalog.AdjustStockRequest;
+import com.minhnbnt.fashionstore.dto.catalog.BulkDeleteProductsRequest;
 import com.minhnbnt.fashionstore.dto.catalog.BulkImportResult;
+import com.minhnbnt.fashionstore.dto.catalog.BulkOperationResult;
+import com.minhnbnt.fashionstore.dto.catalog.BulkUpdatePriceRequest;
+import com.minhnbnt.fashionstore.dto.catalog.BulkUpdateProductStatusRequest;
+import com.minhnbnt.fashionstore.dto.catalog.BulkUpdateStockRequest;
 import com.minhnbnt.fashionstore.dto.catalog.InventoryItemResponse;
 import com.minhnbnt.fashionstore.dto.catalog.SellerProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.StockMovementResponse;
@@ -43,7 +48,7 @@ public class SellerProductController {
     private final CatalogService catalog;
 
     @GetMapping("/products")
-    @Operation(summary = "Danh sách sản phẩm của shop (Seller view)", description = "Bao gồm cả hàng ACTIVE, HIDDEN, DELETED cùng số lượng tồn và khoảng giá.")
+    @Operation(summary = "Danh sách sản phẩm của shop (Seller view)", description = "Bao gồm cả hàng ACTIVE, HIDDEN, DELETED, PENDING, BANNED cùng số lượng tồn và khoảng giá.")
     @ApiResponse(responseCode = "200", description = "Danh sách sản phẩm")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
@@ -51,15 +56,93 @@ public class SellerProductController {
     public List<SellerProductResponse> listProducts(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "Id shop") @PathVariable UUID shopId,
-        @Parameter(description = "Lọc theo status (ACTIVE, HIDDEN, DELETED)") @RequestParam(required = false) String status,
-        @Parameter(description = "Tìm theo tên hoặc slug") @RequestParam(required = false) String q,
+        @Parameter(description = "Lọc theo status (ALL, ACTIVE, HIDDEN, OUT_OF_STOCK, PENDING, BANNED, DELETED)") @RequestParam(required = false) String status,
+        @Parameter(description = "Lọc theo danh mục") @RequestParam(required = false) UUID categoryId,
+        @Parameter(description = "Lọc mức tồn kho (ALL, LOW_STOCK, OUT_OF_STOCK)") @RequestParam(required = false) String stockLevel,
+        @Parameter(description = "Giá tối thiểu") @RequestParam(required = false) Long minPrice,
+        @Parameter(description = "Giá tối đa") @RequestParam(required = false) Long maxPrice,
+        @Parameter(description = "Tìm theo tên, slug hoặc SKU") @RequestParam(required = false) String q,
+        @Parameter(description = "Sắp xếp theo: createdAt, stock, sold, price") @RequestParam(defaultValue = "createdAt") String sortBy,
+        @Parameter(description = "Thứ tự sắp xếp: asc hoặc desc") @RequestParam(defaultValue = "desc") String sortDir,
         @Parameter(description = "Trang bắt đầu từ 0") @RequestParam(defaultValue = "0") int page,
-        @Parameter(description = "Số lượng mỗi trang") @RequestParam(defaultValue = "20") int limit
+        @Parameter(description = "Số lượng mỗi trang") @RequestParam(defaultValue = "50") int limit
     ) {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var userId = UUID.fromString(subject);
 
-        return catalog.listSellerProducts(userId, shopId, status, q, page, limit);
+        return catalog.listSellerProducts(userId, shopId, status, categoryId, stockLevel, minPrice, maxPrice, q, sortBy, sortDir, page, limit);
+    }
+
+    @PatchMapping("/products/bulk-status")
+    @Operation(summary = "Thao tác hàng loạt: Ẩn / Hiện sản phẩm", description = "Cập nhật trạng thái ACTIVE hoặc HIDDEN cho danh sách sản phẩm.")
+    @ApiResponse(responseCode = "200", description = "Kết quả cập nhật hàng loạt")
+    @ApiResponse(responseCode = "400", description = "Dữ liệu yêu cầu không hợp lệ")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc shop chưa duyệt")
+    @SecurityRequirement(name = "bearerAuth")
+    public BulkOperationResult bulkUpdateStatus(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Valid @RequestBody BulkUpdateProductStatusRequest request
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return catalog.bulkUpdateProductStatus(userId, shopId, request);
+    }
+
+    @PostMapping("/products/bulk-delete")
+    @Operation(summary = "Thao tác hàng loạt: Xóa mềm sản phẩm", description = "Xóa mềm danh sách sản phẩm (bảo vệ các sản phẩm đang có đơn hàng xử lý).")
+    @ApiResponse(responseCode = "200", description = "Kết quả xóa hàng loạt")
+    @ApiResponse(responseCode = "400", description = "Dữ liệu yêu cầu không hợp lệ")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc shop chưa duyệt")
+    @SecurityRequirement(name = "bearerAuth")
+    public BulkOperationResult bulkDeleteProducts(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Valid @RequestBody BulkDeleteProductsRequest request
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return catalog.bulkDeleteProducts(userId, shopId, request);
+    }
+
+    @PatchMapping("/products/bulk-price")
+    @Operation(summary = "Thao tác hàng loạt: Thay đổi giá sản phẩm", description = "Cập nhật giá cố định hoặc điều chỉnh theo phần trăm cho tất cả biến thể của danh sách sản phẩm.")
+    @ApiResponse(responseCode = "200", description = "Kết quả đổi giá hàng loạt")
+    @ApiResponse(responseCode = "400", description = "Dữ liệu yêu cầu không hợp lệ")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc shop chưa duyệt")
+    @SecurityRequirement(name = "bearerAuth")
+    public BulkOperationResult bulkUpdatePrice(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Valid @RequestBody BulkUpdatePriceRequest request
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return catalog.bulkUpdatePrices(userId, shopId, request);
+    }
+
+    @PatchMapping("/products/bulk-stock")
+    @Operation(summary = "Thao tác hàng loạt: Cập nhật tồn kho", description = "Gán tồn kho cố định hoặc cộng/trừ số lượng tồn cho tất cả biến thể của danh sách sản phẩm.")
+    @ApiResponse(responseCode = "200", description = "Kết quả cập nhật tồn kho hàng loạt")
+    @ApiResponse(responseCode = "400", description = "Dữ liệu yêu cầu không hợp lệ")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc shop chưa duyệt")
+    @SecurityRequirement(name = "bearerAuth")
+    public BulkOperationResult bulkUpdateStock(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Valid @RequestBody BulkUpdateStockRequest request
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return catalog.bulkUpdateStocks(userId, shopId, request);
     }
 
     @GetMapping("/inventory")

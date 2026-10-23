@@ -30,6 +30,8 @@ public record SellerProductResponse(
     @Nullable String defaultImageKey,
     List<VariantResponse> variants,
     Instant createdAt,
-    Instant updatedAt
+    Instant updatedAt,
+    @Schema(description = "Số lượng sản phẩm đã bán thành công", example = "15")
+    int soldCount
 ) {
 }
