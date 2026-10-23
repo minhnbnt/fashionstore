@@ -47,6 +47,7 @@ import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import jakarta.validation.Validator;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -98,12 +99,20 @@ public class CatalogService {
 
     private final VideoMetadataService videoMetadataService;
 
+    private final Validator validator;
+
     @Transactional
     public ProductResponse createProduct(
         @NonNull UUID userId,
         @NonNull UUID shopId,
         @NonNull CreateProductRequest request
     ) {
+        var violations = validator.validate(request);
+        if (!violations.isEmpty()) {
+            var violation = violations.iterator().next();
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, violation.getMessage());
+        }
+
         access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
 
         requireSingleDefault(request.variants());
@@ -226,6 +235,12 @@ public class CatalogService {
         @NonNull UUID productId,
         @NonNull UpdateProductRequest request
     ) {
+        var violations = validator.validate(request);
+        if (!violations.isEmpty()) {
+            var violation = violations.iterator().next();
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, violation.getMessage());
+        }
+
         var product = products.findByShopIdAndId(shopId, productId).orElse(null);
         if (product == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
