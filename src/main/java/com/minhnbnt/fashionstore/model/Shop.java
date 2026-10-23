@@ -323,6 +323,8 @@ public class Shop implements Persistable<UUID> {
         }
         status = ShopStatus.PENDING;
         statusReason = null;
+        kycStatus = "PENDING_REVIEW";
+        kycRejectionReason = null;
         submittedAt = Instant.now();
         updatedAt = Instant.now();
     }

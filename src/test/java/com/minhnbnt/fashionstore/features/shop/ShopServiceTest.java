@@ -8,6 +8,7 @@ import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
 import com.minhnbnt.fashionstore.dto.shop.UpdateShopRequest;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.model.ShopStatus;
+import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -195,6 +196,19 @@ class ShopServiceTest {
 
         assertThat(resubmitted.status()).isEqualTo("PENDING");
         assertThat(resubmitted.statusReason()).isNull();
+    }
+
+    @Test
+    void resubmitResetsKycStatusToPendingReview() {
+        var ownerId = mirroredUser();
+        var adminId = mirroredUser();
+        var created = shops.register(ownerId, ShopTestFixtures.createRequest("Gui Lai Kyc", "gui-lai-kyc"));
+        shops.reject(adminId, created.id(), "Anh CCCD khong ro mat");
+
+        var resubmitted = shops.resubmit(ownerId, created.id());
+
+        assertThat(resubmitted.kycStatus()).isEqualTo("PENDING_REVIEW");
+        assertThat(resubmitted.kycRejectionReason()).isNull();
     }
 
     @Test
