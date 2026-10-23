@@ -6,7 +6,6 @@ import com.minhnbnt.fashionstore.features.order.repository.SellerSettlementRepos
 import com.minhnbnt.fashionstore.features.order.repository.SellerWithdrawalRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.model.MemberRole;
-import com.minhnbnt.fashionstore.model.Order;
 import com.minhnbnt.fashionstore.model.SellerWithdrawal;
 import com.minhnbnt.fashionstore.model.Shop;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
@@ -17,7 +16,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -53,21 +51,8 @@ class RevenueServiceUnitTest {
         var userId = UUID.randomUUID();
         var shopId = UUID.randomUUID();
 
-        var order = Order.create(
-            "ORD-REV01",
-            shopId,
-            userId,
-            100000L,
-            0L,
-            "Buyer",
-            "0900",
-            "Address"
-        );
-        order.confirm();
-        order.ship();
-        order.deliver();
-
-        when(orders.findByShopIdOrderByCreatedAtDesc(shopId)).thenReturn(List.of(order));
+        when(orders.sumDeliveredRevenue(shopId))
+            .thenReturn(new OrderRepository.RevenueSummaryRow(100000L, 1L, 100000L));
         when(settlements.sumAvailableBalance(shopId)).thenReturn(95000L);
         when(settlements.sumHoldingBalance(shopId)).thenReturn(5000L);
 
