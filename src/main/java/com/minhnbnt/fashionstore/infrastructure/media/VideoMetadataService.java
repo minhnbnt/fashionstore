@@ -43,15 +43,15 @@ public class VideoMetadataService {
                 .key(videoKey)
                 .build());
         } catch (NoSuchKeyException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File video không tồn tại trên hệ thống: " + videoKey);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Video file not found: " + videoKey);
         } catch (software.amazon.awssdk.services.s3.model.S3Exception e) {
             if (e.statusCode() == 404) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File video không tồn tại trên hệ thống: " + videoKey);
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Video file not found: " + videoKey);
             }
-            log.warn("Không thể kiểm tra video key {}: {}", videoKey, e.getMessage());
+            log.warn("Cannot verify video key {}: {}", videoKey, e.getMessage());
             return;
         } catch (Exception e) {
-            log.warn("Không thể kiểm tra video key {}: {}", videoKey, e.getMessage());
+            log.warn("Cannot verify video key {}: {}", videoKey, e.getMessage());
             return;
         }
 
@@ -66,7 +66,7 @@ public class VideoMetadataService {
                 if (durationSeconds > maxSeconds + 0.5) {
                     throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
-                        String.format("Video sản phẩm dài %.1f giây, vượt quá giới hạn tối đa %.0f giây", durationSeconds, maxSeconds)
+                        String.format("Product video duration is %.1f seconds, exceeding maximum allowed of %.0f seconds", durationSeconds, maxSeconds)
                     );
                 }
             }

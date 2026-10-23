@@ -106,13 +106,6 @@ public class CatalogService {
     ) {
         access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
 
-        if (request.name() != null && request.name().trim().length() < 5) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Tên sản phẩm phải có từ 5 đến 300 ký tự"
-            );
-        }
-
         requireSingleDefault(request.variants());
 
         for (var variant : request.variants()) {
@@ -121,50 +114,13 @@ public class CatalogService {
 
         requireCategoryExists(request.categoryId());
 
-        if (request.description() != null && request.description().isBlank()) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Mô tả chi tiết sản phẩm không được để trống"
-            );
-        }
-
         if (Boolean.TRUE.equals(request.tryOnEnabled())) {
             if (request.garmentKey() == null || request.garmentKey().isBlank()) {
                 throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Ảnh garment (nền trắng) là bắt buộc khi bật tính năng thử đồ ảo"
+                    "Garment image is required when virtual try-on is enabled"
                 );
             }
-        }
-
-        if (request.images() != null && !request.images().isEmpty()) {
-            if (request.images().size() < 3) {
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Sản phẩm cần tối thiểu 3 ảnh sản phẩm"
-                );
-            }
-            if (request.images().size() > 9) {
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Sản phẩm chỉ được tải lên tối đa 9 ảnh"
-                );
-            }
-        }
-
-        if (request.weightGrams() != null && request.weightGrams() <= 0) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Cân nặng đóng gói phải lớn hơn 0"
-            );
-        }
-        if ((request.lengthCm() != null && request.lengthCm() <= 0)
-            || (request.widthCm() != null && request.widthCm() <= 0)
-            || (request.heightCm() != null && request.heightCm() <= 0)) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Kích thước đóng gói phải lớn hơn 0"
-            );
         }
 
         videoMetadataService.validateVideoDuration(request.videoKey(), 60.0);
@@ -647,7 +603,7 @@ public class CatalogService {
             return;
         }
         if (!categories.existsById(categoryId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Danh mục sản phẩm không tồn tại");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category does not exist");
         }
     }
 

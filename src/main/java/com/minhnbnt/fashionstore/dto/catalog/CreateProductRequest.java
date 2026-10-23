@@ -15,34 +15,34 @@ import java.util.UUID;
 @SuppressWarnings("MultipleNullnessAnnotations")
 public record CreateProductRequest(
     @Schema(example = "Áo thun đen", description = "Tên sản phẩm (5-300 ký tự)")
-    @NotBlank(message = "Tên sản phẩm không được để trống")
-    @Size(min = 5, max = 300, message = "Tên sản phẩm phải có từ 5 đến 300 ký tự")
+    @NotBlank(message = "Product name is required")
+    @Size(min = 5, max = 300, message = "Product name must be between 5 and 300 characters")
     String name,
 
     @Schema(description = "Slug duy nhất trong shop", example = "ao-thun-den")
-    @NotBlank(message = "Đường dẫn slug sản phẩm không được để trống")
-    @Pattern(regexp = "^[a-z0-9-]+$", message = "Slug chỉ được chứa chữ thường không dấu, số và dấu gạch ngang")
+    @NotBlank(message = "Product slug is required")
+    @Pattern(regexp = "^[a-z0-9-]+$", message = "Slug must contain only lowercase letters, digits and hyphens")
     String slug,
 
     @Schema(description = "Mô tả chi tiết rich text")
-    @NotBlank(message = "Mô tả chi tiết sản phẩm không được để trống")
-    @Size(max = 20000, message = "Mô tả chi tiết không được vượt quá 20000 ký tự")
+    @NotBlank(message = "Product description is required")
+    @Size(max = 20000, message = "Product description cannot exceed 20000 characters")
     @Nullable
     String description,
 
     @Schema(description = "Danh mục ngành hàng")
-    @NotNull(message = "Vui lòng chọn danh mục ngành hàng")
+    @NotNull(message = "Category is required")
     @Nullable
     UUID categoryId,
 
     @Schema(description = "Ít nhất 1 variant, đúng 1 default")
-    @NotEmpty(message = "Sản phẩm phải có ít nhất 1 biến thể")
+    @NotEmpty(message = "Product must have at least one variant")
     @Valid
     List<CreateVariantRequest> variants,
 
     @Schema(description = "Danh sách ảnh sản phẩm (tối thiểu 3, tối đa 9 ảnh)")
-    @NotNull(message = "Vui lòng tải lên tối thiểu 3 ảnh sản phẩm")
-    @Size(min = 3, max = 9, message = "Sản phẩm cần tối thiểu 3 ảnh và tối đa 9 ảnh")
+    @NotNull(message = "Product images are required")
+    @Size(min = 3, max = 9, message = "Product requires between 3 and 9 images")
     @Valid
     @Nullable
     List<ImageItemRequest> images,
@@ -77,18 +77,22 @@ public record CreateProductRequest(
 
     @Schema(description = "Cân nặng đóng gói tính bằng grams", nullable = true, example = "250")
     @Nullable
+    @jakarta.validation.constraints.Positive(message = "Package weight must be positive")
     Integer weightGrams,
 
     @Schema(description = "Chiều dài đóng gói (cm)", nullable = true, example = "25")
     @Nullable
+    @jakarta.validation.constraints.Positive(message = "Package length must be positive")
     Integer lengthCm,
 
     @Schema(description = "Chiều rộng đóng gói (cm)", nullable = true, example = "18")
     @Nullable
+    @jakarta.validation.constraints.Positive(message = "Package width must be positive")
     Integer widthCm,
 
     @Schema(description = "Chiều cao đóng gói (cm)", nullable = true, example = "5")
     @Nullable
+    @jakarta.validation.constraints.Positive(message = "Package height must be positive")
     Integer heightCm,
 
     @Schema(description = "Trạng thái mong muốn khi đăng bán: ACTIVE (Đang bán) hoặc HIDDEN (Tạm ẩn)", nullable = true, example = "ACTIVE")
@@ -103,9 +107,9 @@ public record CreateProductRequest(
         List<CreateVariantRequest> variants
     ) {
         this(
-            name != null && name.trim().length() < 5 ? (name + " - Thời Trang") : name,
+            resolveName(name),
             slug,
-            description != null && !description.isBlank() ? description : "Mô tả chi tiết sản phẩm " + name,
+            resolveDescription(description, name),
             categoryId,
             variants,
             List.of(
@@ -118,5 +122,19 @@ public record CreateProductRequest(
             null, null, null, null,
             null
         );
+    }
+
+    private static String resolveName(String name) {
+        if (name != null && name.trim().length() < 5) {
+            return name + " - Thời Trang";
+        }
+        return name;
+    }
+
+    private static String resolveDescription(@Nullable String description, String name) {
+        if (description != null && !description.isBlank()) {
+            return description;
+        }
+        return "Mô tả chi tiết sản phẩm " + name;
     }
 }
