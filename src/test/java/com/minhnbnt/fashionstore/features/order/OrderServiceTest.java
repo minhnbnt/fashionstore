@@ -159,6 +159,14 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orders.confirm(ownerId, created.id()))
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+
+        var detail = catalog.getDetail(Objects.requireNonNull(created.items().get(0).productId()));
+        var untouched = detail.variants().stream()
+            .filter(v -> v.id().equals(variantId))
+            .findFirst()
+            .orElseThrow()
+            .stockQuantity();
+        assertThat(untouched).isEqualTo(1);
     }
 
     @Test

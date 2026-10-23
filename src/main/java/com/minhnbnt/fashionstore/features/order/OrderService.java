@@ -13,13 +13,11 @@ import com.minhnbnt.fashionstore.dto.order.OrderItemResponse;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepository;
-import com.minhnbnt.fashionstore.features.catalog.repository.StockMovementRepository;
-import com.minhnbnt.fashionstore.features.order.repository.OrderAdminQueryRepository;
+import com.minhnbnt.fashionstore.features.catalog.repository.StockMovementRepository;import com.minhnbnt.fashionstore.features.order.repository.OrderAdminQueryRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderMonitoringQueryRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderStatusHistoryRepository;
-import com.minhnbnt.fashionstore.features.order.repository.OrderStockRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.AdminCancelReason;
@@ -62,8 +60,6 @@ public class OrderService {
     private final ProductRepository products;
 
     private final ProductVariantRepository variants;
-
-    private final OrderStockRepository stocks;
 
     private final StockMovementRepository movements;
 
@@ -393,8 +389,7 @@ public class OrderService {
             if (item.getVariantId() == null) {
                 continue;
             }
-            var ok = stocks.decrement(item.getVariantId(), item.getQuantity());
-            if (!ok) {
+            if (!variants.decrementStock(item.getVariantId(), item.getQuantity())) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Insufficient stock");
             }
         }
@@ -490,7 +485,7 @@ public class OrderService {
             if (item.getVariantId() == null) {
                 continue;
             }
-            stocks.increment(item.getVariantId(), item.getQuantity());
+            variants.incrementStock(item.getVariantId(), item.getQuantity());
             movements.save(StockMovement.record(
                 item.getVariantId(),
                 order.getShopId(),
