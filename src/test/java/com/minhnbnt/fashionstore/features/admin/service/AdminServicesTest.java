@@ -13,6 +13,7 @@ import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.infrastructure.GoTrueAdminClient;
 import com.minhnbnt.fashionstore.model.UserRole;
+import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -66,7 +67,7 @@ class AdminServicesTest {
     }
 
     private UUID registerShop(UUID ownerId, String slug) {
-        return shops.register(ownerId, com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop " + slug, slug)).id();
+        return shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug)).id();
     }
 
     @Test

@@ -28,6 +28,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -322,7 +323,7 @@ public class ShopService {
         return normalized.replaceAll("\\p{M}", "")
             .replaceAll("[đĐ]", "d")
             .replaceAll("\\s+", " ")
-            .toUpperCase(java.util.Locale.ROOT);
+            .toUpperCase(Locale.ROOT);
     }
 
     private static @Nullable String trimOrNull(@Nullable String value) {
