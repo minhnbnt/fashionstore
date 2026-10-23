@@ -1,4 +1,4 @@
-package com.minhnbnt.fashionstore.infrastructure;
+package com.minhnbnt.fashionstore.infrastructure.seed;
 
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.dto.order.CancelOrderRequest;

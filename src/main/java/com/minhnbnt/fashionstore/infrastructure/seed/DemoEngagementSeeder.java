@@ -1,4 +1,4 @@
-package com.minhnbnt.fashionstore.infrastructure;
+package com.minhnbnt.fashionstore.infrastructure.seed;
 
 import com.minhnbnt.fashionstore.dto.order.ApproveReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.CreateReturnRequest;

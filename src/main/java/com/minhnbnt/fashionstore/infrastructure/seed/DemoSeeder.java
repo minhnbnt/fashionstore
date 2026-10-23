@@ -1,4 +1,4 @@
-package com.minhnbnt.fashionstore.infrastructure;
+package com.minhnbnt.fashionstore.infrastructure.seed;
 
 import com.minhnbnt.fashionstore.dto.catalog.AttachImagesRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;

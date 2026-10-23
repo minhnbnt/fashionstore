@@ -1,4 +1,4 @@
-package com.minhnbnt.fashionstore.infrastructure;
+package com.minhnbnt.fashionstore.infrastructure.seed;
 
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.features.catalog.CatalogService;
