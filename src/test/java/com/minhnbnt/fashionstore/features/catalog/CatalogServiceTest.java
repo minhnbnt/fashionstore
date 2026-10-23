@@ -7,12 +7,16 @@ import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ImageItemRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSearchRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSort;
+import com.minhnbnt.fashionstore.dto.catalog.SellerProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateVariantRequest;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
+import com.minhnbnt.fashionstore.dto.order.CheckoutItemRequest;
+import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
 import com.minhnbnt.fashionstore.features.catalog.repository.CategoryRepository;
 import com.minhnbnt.fashionstore.features.identity.UserService;
+import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.Category;
@@ -45,6 +49,9 @@ class CatalogServiceTest {
 
     @Autowired
     private UserService users;
+
+    @Autowired
+    private OrderService orders;
 
     @Autowired
     private CategoryRepository categories;
@@ -668,5 +675,71 @@ class CatalogServiceTest {
         var logsAfterToggle = catalog.getAuditLogs(ownerId, shopId, created.id());
         assertThat(logsAfterToggle).hasSizeGreaterThanOrEqualTo(3);
         assertThat(logsAfterToggle.getFirst().action()).isEqualTo("TOGGLE_STATUS");
+    }
+
+    @Test
+    void deleteProductSoftDeletesSuccessfullyWhenNoActiveOrders() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-del-ok");
+        var created = catalog.createProduct(ownerId, shopId, productRequest("ao-soft-delete-ok"));
+
+        catalog.deleteProduct(ownerId, shopId, created.id());
+
+        // Verify product status is DELETED in seller view
+        var sellerList = catalog.listSellerProducts(ownerId, shopId, "DELETED", null, 0, 10);
+        assertThat(sellerList).extracting(SellerProductResponse::id).contains(created.id());
+
+        // Verify buyer cannot see deleted product
+        assertThatThrownBy(() -> catalog.getDetail(created.id()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    void deleteProductThrowsConflictWhenActiveOrdersExist() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-del-active");
+        var created = catalog.createProduct(ownerId, shopId, productRequest("ao-soft-delete-conflict"));
+        var variantId = created.variants().getFirst().id();
+
+        // Create an order in PENDING status for this product
+        var buyerId = mirroredUser();
+        orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901234567", "Hanoi", 0L)
+        );
+
+        // Attempting to delete product with active order must fail with 409
+        assertThatThrownBy(() -> catalog.deleteProduct(ownerId, shopId, created.id()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> {
+                var ex = (ResponseStatusException) e;
+                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+                assertThat(ex.getReason()).contains("Cannot delete product with active orders");
+            });
+    }
+
+    @Test
+    void toggleProductStatusHideAndActivate() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-hide-act");
+        var created = catalog.createProduct(ownerId, shopId, productRequest("ao-toggle-hide"));
+
+        // Hide product
+        var hidden = catalog.updateProduct(ownerId, shopId, created.id(), new UpdateProductRequest(null, null, null, "HIDDEN", null));
+        assertThat(hidden.status()).isEqualTo("HIDDEN");
+
+        // Buyer cannot see hidden product
+        assertThatThrownBy(() -> catalog.getDetail(created.id()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+
+        // Reactivate product
+        var reactivated = catalog.updateProduct(ownerId, shopId, created.id(), new UpdateProductRequest(null, null, null, "ACTIVE", null));
+        assertThat(reactivated.status()).isEqualTo("ACTIVE");
+
+        // Buyer can see active product again
+        var detail = catalog.getDetail(created.id());
+        assertThat(detail.status()).isEqualTo("ACTIVE");
     }
 }

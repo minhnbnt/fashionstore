@@ -662,20 +662,24 @@ public class CatalogService {
     }
 
     private void applyStatus(Product product, String status) {
-        if ("HIDDEN".equals(status)) {
-            if (product.getStatus() == ProductStatus.HIDDEN) {
-                return;
-            }
+        if (status == null || status.isBlank()) {
+            return;
+        }
+        if (status.equalsIgnoreCase(product.getStatus().name())) {
+            return;
+        }
+        if ("HIDDEN".equalsIgnoreCase(status)) {
             product.hide();
             return;
         }
-
-        if ("ACTIVE".equals(status)) {
-            if (product.getStatus() == ProductStatus.ACTIVE) {
-                return;
-            }
+        if ("ACTIVE".equalsIgnoreCase(status)) {
             product.activate();
+            return;
         }
+    }
+
+    private void applyVariantUpdates(Product product, List<UpdateVariantRequest> updates) {
+        applyVariantUpdates(product, updates, new ArrayList<>(), new LinkedHashMap<>(), new LinkedHashMap<>());
     }
 
     private void applyVariantUpdates(
