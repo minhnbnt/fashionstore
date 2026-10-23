@@ -151,11 +151,11 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
     }
 
     private boolean importOne(ImportContext context, Map<String, UUID> categoryIds, JsonNode item) {
-        var source = item.path("source").asText("").trim().toUpperCase(Locale.ROOT);
-        var sourceId = item.path("sourceId").asText("").trim();
-        var name = item.path("name").asText("").trim();
-        var imageFile = item.path("imageFile").asText("").trim();
-        var categorySlug = item.path("categorySlug").asText("ao").trim();
+        var source = item.path("source").asString("").trim().toUpperCase(Locale.ROOT);
+        var sourceId = item.path("sourceId").asString("").trim();
+        var name = item.path("name").asString("").trim();
+        var imageFile = item.path("imageFile").asString("").trim();
+        var categorySlug = item.path("categorySlug").asString("ao").trim();
         var price = item.path("price").asLong(-1);
         if (source.isBlank() || sourceId.isBlank() || name.isBlank() || imageFile.isBlank() || price < 0) {
             return false;
@@ -178,7 +178,11 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
             }
             var key = "imports/" + source.toLowerCase(Locale.ROOT) + "/" + safeKey(sourceId) + extension(imagePath);
             s3.putObject(
-                PutObjectRequest.builder().bucket(bucket).key(key).contentType(contentType(imagePath)).build(),
+                PutObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(key)
+                    .contentType(contentType(imagePath))
+                    .build(),
                 RequestBody.fromBytes(bytes)
             );
 
@@ -188,9 +192,17 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
                 compareAtPrice = originalPrice;
             }
             var variant = new CreateVariantRequest(
-                source + "-" + safeKey(sourceId), "Freesize", "Theo phân loại", price, compareAtPrice, 20, true
+                source + "-" + safeKey(sourceId),
+                "Freesize",
+                "Theo phân loại",
+                price,
+                compareAtPrice,
+                20,
+                true
             );
-            var sourceUrl = item.path("sourceUrl").asText("").trim();
+            var sourceUrl = item.path("sourceUrl")
+                .asString("")
+                .trim();
             var product = catalogService.createProduct(
                 context.ownerId(),
                 context.shopId(),
