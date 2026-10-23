@@ -13,12 +13,13 @@ import java.util.UUID;
 public record UpdateProductRequest(
     @Schema(description = "Tên mới, null = giữ nguyên", nullable = true)
     @Nullable
-    @Size(max = 300)
+    @Pattern(regexp = "^(?!\\s*$).+", message = "Product name cannot be blank if provided")
+    @Size(min = 5, max = 300, message = "Product name must be between 5 and 300 characters")
     String name,
 
     @Schema(description = "Mô tả mới, null = giữ nguyên", nullable = true)
     @Nullable
-    @Size(max = 20000)
+    @Size(max = 20000, message = "Product description cannot exceed 20000 characters")
     String description,
 
     @Schema(description = "Danh mục mới, null = giữ nguyên", nullable = true)
@@ -27,16 +28,18 @@ public record UpdateProductRequest(
 
     @Schema(description = "ACTIVE hoặc HIDDEN, null = giữ nguyên", example = "HIDDEN", nullable = true)
     @Nullable
-    @Pattern(regexp = "^(ACTIVE|HIDDEN)$")
+    @Pattern(regexp = "^(ACTIVE|HIDDEN)$", message = "Status must be either ACTIVE or HIDDEN")
     String status,
 
     @Schema(description = "Sửa variant theo id hoặc thêm mới nếu id null, null = không đụng variants", nullable = true)
     @Nullable
+    @Size(min = 1, message = "Product must have at least one variant if variants list is provided")
     @Valid
     List<UpdateVariantRequest> variants,
 
     @Schema(description = "Danh sách ảnh mới, null = giữ nguyên danh sách ảnh cũ", nullable = true)
     @Nullable
+    @Size(max = 9, message = "Product cannot exceed 9 images")
     @Valid
     List<ImageItemRequest> images,
 
