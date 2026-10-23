@@ -149,8 +149,10 @@ public class Shop implements Persistable<UUID> {
         this.approvedAt = approvedAt;
         if (submittedAt != null) {
             this.submittedAt = submittedAt;
+        } else if (createdAt != null) {
+            this.submittedAt = createdAt;
         } else {
-            this.submittedAt = createdAt != null ? createdAt : Instant.now();
+            this.submittedAt = Instant.now();
         }
         this.phone = phone;
         this.address = address;
