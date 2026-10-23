@@ -297,5 +297,51 @@ class ShopServiceTest {
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
     }
+
+    @Test
+    void registerRejectsDuplicateSlug() {
+        var ownerId = mirroredUser();
+        shops.register(ownerId, ShopTestFixtures.createRequest("Shop Truoc", "slug-trung"));
+
+        assertThatThrownBy(() -> shops.register(mirroredUser(), ShopTestFixtures.createRequest("Shop Sau", "slug-trung")))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void registerTrimsPaddedInputsAndNormalizesHolderName() {
+        var ownerId = mirroredUser();
+        var req = new CreateShopRequest(
+            "  Shop Pad  ", "shop-pad", "  Mo ta pad  ", " logo.webp ", " banner.webp ",
+            " 0901234567 ", " 123 Pho Hue ", "INDIVIDUAL",
+            "  Nguyễn  Văn  Pad ", " 001202001234 ", " 01/01/2021 ", " Cục QLHC ",
+            null, " front.webp ", " back.webp ", " selfie.webp ", null,
+            " Vietcombank ", " 0123456789 ", " nguyen van pad "
+        );
+
+        var created = shops.register(ownerId, req);
+
+        assertThat(created.name()).isEqualTo("Shop Pad");
+        var page = shops.searchForAdmin(null, "shop-pad", 0, 20);
+        assertThat(page.items().get(0).legalName()).isEqualTo("Nguyễn  Văn  Pad");
+    }
+
+    @Test
+    void registerStoresBlankOptionalAsNull() {
+        var ownerId = mirroredUser();
+        var req = new CreateShopRequest(
+            "Shop Blank", "shop-blank-opt", "Mo ta", "logo.webp", "banner.webp",
+            "0901234567", "123 Pho Hue", "INDIVIDUAL",
+            "NGUYEN VAN A", "001202001234", "01/01/2021", "Cuc QLHC",
+            "   ", "front.webp", "back.webp", "selfie.webp", "   ",
+            "Vietcombank", "0123456789", "NGUYEN VAN A"
+        );
+
+        shops.register(ownerId, req);
+
+        var page = shops.searchForAdmin(null, "shop-blank-opt", 0, 20);
+        assertThat(page.items().get(0).taxCode()).isNull();
+        assertThat(page.items().get(0).businessCertKey()).isNull();
+    }
 }
 
