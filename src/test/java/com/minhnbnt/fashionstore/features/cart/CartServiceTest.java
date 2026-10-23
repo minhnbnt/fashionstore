@@ -252,6 +252,50 @@ class CartServiceTest {
     }
 
     @Test
+    void checkoutSelectedAcrossShopsSplitsAndKeepsRest() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopA = approvedShop(ownerId, "shop-cart-i1");
+        var shopB = approvedShop(ownerId, "shop-cart-i2");
+        var variantA = variantInShop(ownerId, shopA, "ao-cart-i1", "SKU-CART-I1", 10);
+        var variantB = variantInShop(ownerId, shopB, "ao-cart-i2", "SKU-CART-I2", 10);
+        var leftOut = variantInShop(ownerId, shopA, "ao-cart-i3", "SKU-CART-I3", 10);
+        carts.addItem(buyerId, new CartItemRequest(variantA, 1));
+        carts.addItem(buyerId, new CartItemRequest(variantB, 2));
+        carts.addItem(buyerId, new CartItemRequest(leftOut, 1));
+
+        var placed = carts.checkout(buyerId, shipping(List.of(variantA, variantB)));
+
+        assertThat(placed).hasSize(2);
+        assertThat(placed).extracting(order -> order.shopId()).containsExactlyInAnyOrder(shopA, shopB);
+        assertThat(carts.getCart(buyerId).items())
+            .extracting(CartItemResponse::variantId)
+            .containsExactly(leftOut);
+    }
+
+    @Test
+    void checkoutSelectedBlockedOnSoldOutPlacesNothing() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-cart-j");
+        var soldOut = variantInShop(ownerId, shopId, "ao-cart-j1", "SKU-CART-J1", 0);
+        var fine = variantInShop(ownerId, shopId, "ao-cart-j2", "SKU-CART-J2", 10);
+        var leftOut = variantInShop(ownerId, shopId, "ao-cart-j3", "SKU-CART-J3", 10);
+        carts.addItem(buyerId, new CartItemRequest(soldOut, 1));
+        carts.addItem(buyerId, new CartItemRequest(fine, 1));
+        carts.addItem(buyerId, new CartItemRequest(leftOut, 1));
+
+        assertThatThrownBy(() -> carts.checkout(buyerId, shipping(List.of(soldOut, fine))))
+            .isInstanceOf(CartCheckoutBlockedException.class)
+            .satisfies(e -> assertThat(((CartCheckoutBlockedException) e).getItems())
+                .extracting(CheckoutBlockedItem::variantId)
+                .containsExactly(soldOut));
+
+        assertThat(orders.getMine(buyerId)).isEmpty();
+        assertThat(carts.getCart(buyerId).items()).hasSize(3);
+    }
+
+    @Test
     void checkoutEmptyCartFails() {
         var buyerId = mirroredUser();
 
