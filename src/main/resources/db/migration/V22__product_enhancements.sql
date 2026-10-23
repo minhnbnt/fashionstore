@@ -1,4 +1,4 @@
--- V24__product_enhancements.sql
+-- V22__product_enhancements.sql
 -- Đặc tả 2.2.1: Thêm sản phẩm mới kèm video, ảnh phẳng Virtual Try-On, thông tin bổ sung,
 -- thông số vận chuyển và trạng thái kiểm duyệt PENDING.
 
