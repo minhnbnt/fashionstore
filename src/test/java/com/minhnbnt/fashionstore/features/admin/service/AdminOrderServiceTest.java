@@ -11,7 +11,6 @@ import com.minhnbnt.fashionstore.dto.order.CheckoutItemRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.order.CreateReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
-import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
 import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
@@ -21,6 +20,7 @@ import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.AdminCancelReason;
 import com.minhnbnt.fashionstore.model.OrderAlert;
 import com.minhnbnt.fashionstore.model.OrderStatus;
+import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -81,7 +81,7 @@ class AdminOrderServiceTest {
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = mirroredUser();
-        var shop = shops.register(ownerId, new CreateShopRequest("Shop " + slug, slug, null, null, null));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }
