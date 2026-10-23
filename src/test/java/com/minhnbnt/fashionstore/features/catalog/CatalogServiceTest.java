@@ -437,7 +437,7 @@ class CatalogServiceTest {
             .satisfies(e -> {
                 var ex = (ResponseStatusException) e;
                 assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-                assertThat(ex.getReason()).contains("Ảnh garment");
+                assertThat(ex.getReason()).contains("Garment image is required");
             });
     }
 
@@ -461,7 +461,7 @@ class CatalogServiceTest {
             .satisfies(e -> {
                 var ex = (ResponseStatusException) e;
                 assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-                assertThat(ex.getReason()).contains("tối thiểu 3 ảnh");
+                assertThat(ex.getReason()).contains("at least 3 images");
             });
 
         // More than 9 images
@@ -479,7 +479,7 @@ class CatalogServiceTest {
             .satisfies(e -> {
                 var ex = (ResponseStatusException) e;
                 assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-                assertThat(ex.getReason()).contains("tối đa 9 ảnh");
+                assertThat(ex.getReason()).contains("cannot exceed 9 images");
             });
     }
 
@@ -504,7 +504,7 @@ class CatalogServiceTest {
             .satisfies(e -> {
                 var ex = (ResponseStatusException) e;
                 assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-                assertThat(ex.getReason()).contains("Tên sản phẩm phải có từ 5 đến 300 ký tự");
+                assertThat(ex.getReason()).contains("Product name must be between 5 and 300 characters");
             });
     }
 
@@ -529,7 +529,7 @@ class CatalogServiceTest {
             .satisfies(e -> {
                 var ex = (ResponseStatusException) e;
                 assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-                assertThat(ex.getReason()).contains("Danh mục sản phẩm không tồn tại");
+                assertThat(ex.getReason()).contains("Category does not exist");
             });
     }
 
@@ -555,7 +555,7 @@ class CatalogServiceTest {
             .satisfies(e -> {
                 var ex = (ResponseStatusException) e;
                 assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-                assertThat(ex.getReason()).contains("Cân nặng đóng gói phải lớn hơn 0");
+                assertThat(ex.getReason()).contains("Package weight must be greater than 0");
             });
     }
 

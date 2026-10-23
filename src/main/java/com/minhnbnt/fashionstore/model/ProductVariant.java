@@ -145,6 +145,11 @@ public class ProductVariant implements Persistable<UUID> {
         updatedAt = Instant.now();
     }
 
+    public void archiveSku(String suffix) {
+        this.sku = this.sku + suffix;
+        this.updatedAt = Instant.now();
+    }
+
     public void unsetDefault() {
         this.defaultVariant = false;
         updatedAt = Instant.now();

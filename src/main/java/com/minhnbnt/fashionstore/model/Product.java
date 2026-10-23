@@ -234,6 +234,7 @@ public class Product implements Persistable<UUID> {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Product is already deleted");
         }
         status = ProductStatus.DELETED;
+        slug = slug + "-del-" + UUID.randomUUID().toString().substring(0, 8);
         updatedAt = Instant.now();
     }
 

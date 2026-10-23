@@ -55,6 +55,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.regex.Pattern;
 import java.util.List;
@@ -106,6 +107,13 @@ public class CatalogService {
     ) {
         access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
 
+        if (request.name() != null && request.name().trim().length() < 5) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Product name must be between 5 and 300 characters"
+            );
+        }
+
         requireSingleDefault(request.variants());
 
         for (var variant : request.variants()) {
@@ -121,6 +129,36 @@ public class CatalogService {
                     "Garment image is required when virtual try-on is enabled"
                 );
             }
+        }
+
+        if (request.images() != null && !request.images().isEmpty()) {
+            if (request.images().size() < 3) {
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Product requires at least 3 images"
+                );
+            }
+            if (request.images().size() > 9) {
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Product cannot exceed 9 images"
+                );
+            }
+        }
+
+        if (request.weightGrams() != null && request.weightGrams() <= 0) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Package weight must be greater than 0"
+            );
+        }
+        if ((request.lengthCm() != null && request.lengthCm() <= 0)
+            || (request.widthCm() != null && request.widthCm() <= 0)
+            || (request.heightCm() != null && request.heightCm() <= 0)) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Package dimensions must be greater than 0"
+            );
         }
 
         videoMetadataService.validateVideoDuration(request.videoKey(), 60.0);
@@ -139,11 +177,31 @@ public class CatalogService {
             initialStatus = ProductStatus.PENDING;
         }
 
+        var skuList = request.variants().stream()
+            .map(CreateVariantRequest::sku)
+            .map(String::trim)
+            .toList();
+        var uniqueSkuSet = new HashSet<>(skuList);
+        if (uniqueSkuSet.size() < skuList.size()) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Variant SKUs must be unique within the product"
+            );
+        }
+
+        var candidateSlug = request.slug();
+        if (candidateSlug == null || candidateSlug.isBlank()) {
+            candidateSlug = request.name().trim().toLowerCase()
+                .replaceAll("\\s+", "-")
+                .replaceAll("[^a-z0-9-]", "");
+        }
+        var finalSlug = resolveUniqueSlug(shopId, candidateSlug);
+
         var product = Product.create(
             shopId,
             request.categoryId(),
             request.name(),
-            request.slug(),
+            finalSlug,
             Objects.requireNonNullElse(request.description(), ""),
             initialStatus,
             request.videoKey(),
@@ -663,6 +721,13 @@ public class CatalogService {
         }
         product.delete();
         products.save(product);
+
+        var variantList = variants.findByProductIdOrderByCreatedAtAsc(productId);
+        var delSuffix = "-del-" + UUID.randomUUID().toString().substring(0, 8);
+        for (var v : variantList) {
+            v.archiveSku(delSuffix);
+        }
+        variants.saveAll(variantList);
     }
 
     @Transactional
@@ -927,6 +992,20 @@ public class CatalogService {
             product.getCreatedAt(),
             product.getUpdatedAt()
         );
+    }
+
+    private String resolveUniqueSlug(UUID shopId, String baseSlug) {
+        var cleanBase = baseSlug.trim().toLowerCase();
+        if (cleanBase.isBlank()) {
+            cleanBase = "product";
+        }
+        var candidate = cleanBase;
+        var counter = 1;
+        while (products.findByShopIdAndSlug(shopId, candidate).isPresent()) {
+            candidate = cleanBase + "-" + counter;
+            counter++;
+        }
+        return candidate;
     }
 
     private static @Nullable String violationNameOf(Product product) {

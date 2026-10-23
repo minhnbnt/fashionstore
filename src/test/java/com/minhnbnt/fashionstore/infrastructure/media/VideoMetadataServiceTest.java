@@ -99,7 +99,7 @@ class VideoMetadataServiceTest {
             .satisfies(e -> {
                 var ex = (ResponseStatusException) e;
                 assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-                assertThat(ex.getReason()).contains("File video không tồn tại");
+                assertThat(ex.getReason()).contains("Video file not found");
             });
     }
 
@@ -113,7 +113,7 @@ class VideoMetadataServiceTest {
             .satisfies(e -> {
                 var ex = (ResponseStatusException) e;
                 assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-                assertThat(ex.getReason()).contains("File video không tồn tại");
+                assertThat(ex.getReason()).contains("Video file not found");
             });
     }
 
@@ -135,7 +135,7 @@ class VideoMetadataServiceTest {
             .satisfies(e -> {
                 var ex = (ResponseStatusException) e;
                 assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-                assertThat(ex.getReason()).contains("vượt quá giới hạn tối đa 60 giây");
+                assertThat(ex.getReason()).contains("exceeding maximum allowed");
             });
     }
 
