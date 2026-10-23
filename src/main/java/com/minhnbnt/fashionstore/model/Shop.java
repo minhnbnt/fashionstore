@@ -150,8 +150,10 @@ public class Shop implements Persistable<UUID> {
         this.approvedAt = approvedAt;
         if (submittedAt != null) {
             this.submittedAt = submittedAt;
+        } else if (createdAt != null) {
+            this.submittedAt = createdAt;
         } else {
-            this.submittedAt = createdAt != null ? createdAt : Instant.now();
+            this.submittedAt = Instant.now();
         }
         this.phone = phone;
         this.address = address;
@@ -233,7 +235,10 @@ public class Shop implements Persistable<UUID> {
         @Nullable String bankHolder
     ) {
         var now = Instant.now();
-        var effectiveSellerType = (sellerType != null) ? sellerType : "INDIVIDUAL";
+        var effectiveSellerType = "INDIVIDUAL";
+        if (sellerType != null) {
+            effectiveSellerType = sellerType;
+        }
         var shop = new Shop(
             UUID.randomUUID(), name, slug, description, logoKey, bannerKey,
             ShopStatus.PENDING, null, null, null, now,
