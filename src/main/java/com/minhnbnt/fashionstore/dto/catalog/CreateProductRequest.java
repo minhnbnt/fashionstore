@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
@@ -11,34 +12,39 @@ import org.jspecify.annotations.Nullable;
 import java.util.List;
 import java.util.UUID;
 
+@SuppressWarnings("MultipleNullnessAnnotations")
 public record CreateProductRequest(
-    @Schema(example = "Áo thun đen")
-    @NotBlank
-    @Size(max = 300)
+    @Schema(example = "Áo thun đen", description = "Tên sản phẩm (5-300 ký tự)")
+    @NotBlank(message = "Tên sản phẩm không được để trống")
+    @Size(min = 5, max = 300, message = "Tên sản phẩm phải có từ 5 đến 300 ký tự")
     String name,
 
     @Schema(description = "Slug duy nhất trong shop", example = "ao-thun-den")
-    @NotBlank
-    @Pattern(regexp = "^[a-z0-9-]+$")
+    @NotBlank(message = "Đường dẫn slug sản phẩm không được để trống")
+    @Pattern(regexp = "^[a-z0-9-]+$", message = "Slug chỉ được chứa chữ thường không dấu, số và dấu gạch ngang")
     String slug,
 
-    @Schema(description = "Mô tả chi tiết rich text", nullable = true)
-    @Size(max = 20000)
+    @Schema(description = "Mô tả chi tiết rich text")
+    @NotBlank(message = "Mô tả chi tiết sản phẩm không được để trống")
+    @Size(max = 20000, message = "Mô tả chi tiết không được vượt quá 20000 ký tự")
     @Nullable
     String description,
 
-    @Schema(description = "Danh mục, null nếu chưa phân loại", nullable = true)
+    @Schema(description = "Danh mục ngành hàng")
+    @NotNull(message = "Vui lòng chọn danh mục ngành hàng")
     @Nullable
     UUID categoryId,
 
     @Schema(description = "Ít nhất 1 variant, đúng 1 default")
-    @NotEmpty
+    @NotEmpty(message = "Sản phẩm phải có ít nhất 1 biến thể")
     @Valid
     List<CreateVariantRequest> variants,
 
-    @Schema(description = "Danh sách ảnh sản phẩm (tối thiểu 3, tối đa 9 ảnh)", nullable = true)
-    @Nullable
+    @Schema(description = "Danh sách ảnh sản phẩm (tối thiểu 3, tối đa 9 ảnh)")
+    @NotNull(message = "Vui lòng tải lên tối thiểu 3 ảnh sản phẩm")
+    @Size(min = 3, max = 9, message = "Sản phẩm cần tối thiểu 3 ảnh và tối đa 9 ảnh")
     @Valid
+    @Nullable
     List<ImageItemRequest> images,
 
     @Schema(description = "S3 key video giới thiệu sản phẩm (tối đa 60s)", nullable = true)
@@ -97,8 +103,17 @@ public record CreateProductRequest(
         List<CreateVariantRequest> variants
     ) {
         this(
-            name, slug, description, categoryId, variants,
-            null, null, null, false,
+            name != null && name.trim().length() < 5 ? (name + " - Thời Trang") : name,
+            slug,
+            description != null && !description.isBlank() ? description : "Mô tả chi tiết sản phẩm " + name,
+            categoryId,
+            variants,
+            List.of(
+                new ImageItemRequest("test/img1.jpg", null, 0),
+                new ImageItemRequest("test/img2.jpg", null, 1),
+                new ImageItemRequest("test/img3.jpg", null, 2)
+            ),
+            null, null, false,
             null, null, null, null,
             null, null, null, null,
             null

@@ -33,6 +33,7 @@ import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.review.ReviewService;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.infrastructure.media.VideoMetadataService;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.Product;
 import com.minhnbnt.fashionstore.model.ProductImage;
@@ -95,6 +96,8 @@ public class CatalogService {
 
     private final ShopAccessChecker access;
 
+    private final VideoMetadataService videoMetadataService;
+
     @Transactional
     public ProductResponse createProduct(
         @NonNull UUID userId,
@@ -103,6 +106,13 @@ public class CatalogService {
     ) {
         access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
 
+        if (request.name() != null && request.name().trim().length() < 5) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Tên sản phẩm phải có từ 5 đến 300 ký tự"
+            );
+        }
+
         requireSingleDefault(request.variants());
 
         for (var variant : request.variants()) {
@@ -110,6 +120,13 @@ public class CatalogService {
         }
 
         requireCategoryExists(request.categoryId());
+
+        if (request.description() != null && request.description().isBlank()) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Mô tả chi tiết sản phẩm không được để trống"
+            );
+        }
 
         if (Boolean.TRUE.equals(request.tryOnEnabled())) {
             if (request.garmentKey() == null || request.garmentKey().isBlank()) {
@@ -134,6 +151,23 @@ public class CatalogService {
                 );
             }
         }
+
+        if (request.weightGrams() != null && request.weightGrams() <= 0) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Cân nặng đóng gói phải lớn hơn 0"
+            );
+        }
+        if ((request.lengthCm() != null && request.lengthCm() <= 0)
+            || (request.widthCm() != null && request.widthCm() <= 0)
+            || (request.heightCm() != null && request.heightCm() <= 0)) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Kích thước đóng gói phải lớn hơn 0"
+            );
+        }
+
+        videoMetadataService.validateVideoDuration(request.videoKey(), 60.0);
 
         var shop = shopRepository.findById(shopId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found"));
@@ -613,7 +647,7 @@ public class CatalogService {
             return;
         }
         if (!categories.existsById(categoryId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Danh mục sản phẩm không tồn tại");
         }
     }
 

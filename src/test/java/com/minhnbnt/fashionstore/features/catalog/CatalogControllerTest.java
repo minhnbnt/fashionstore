@@ -103,16 +103,24 @@ class CatalogControllerTest {
     void createProductReturns201() throws Exception {
         var userId = UUID.randomUUID();
         var shopId = UUID.randomUUID();
+        var categoryId = UUID.randomUUID();
         when(catalog.createProduct(any(), any(), any())).thenReturn(product(UUID.randomUUID(), shopId));
 
         mockMvc.perform(post("/api/shops/{shopId}/products", shopId)
                 .with(jwt().jwt(builder -> builder.subject(userId.toString())))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                    {"name":"Áo thun","slug":"ao-thun",
+                    {"name":"Áo thun cao cấp","slug":"ao-thun",
+                     "description":"Mô tả chi tiết áo thun",
+                     "categoryId":"%s",
+                     "images":[
+                       {"s3Key":"p/1.jpg","sortOrder":0},
+                       {"s3Key":"p/2.jpg","sortOrder":1},
+                       {"s3Key":"p/3.jpg","sortOrder":2}
+                     ],
                      "variants":[{"sku":"SKU-1","size":"M","color":"Đen",
                       "price":100000,"stockQuantity":10,"defaultVariant":true}]}
-                    """))
+                    """.formatted(categoryId)))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.slug").value("ao-thun"));
     }
@@ -125,7 +133,96 @@ class CatalogControllerTest {
         mockMvc.perform(post("/api/shops/{shopId}/products", shopId)
                 .with(jwt().jwt(builder -> builder.subject(userId.toString())))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Áo\",\"slug\":\"ao\",\"variants\":[]}"))
+                .content("{\"name\":\"Áo thun cao cấp\",\"slug\":\"ao-thun\",\"description\":\"Mô tả\",\"categoryId\":\"%s\",\"images\":[{\"s3Key\":\"1.jpg\",\"sortOrder\":0},{\"s3Key\":\"2.jpg\",\"sortOrder\":1},{\"s3Key\":\"3.jpg\",\"sortOrder\":2}],\"variants\":[]}".formatted(UUID.randomUUID())))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createProductRejectsMissingCategory() throws Exception {
+        var userId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/shops/{shopId}/products", shopId)
+                .with(jwt().jwt(builder -> builder.subject(userId.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"name":"Áo thun cao cấp","slug":"ao-thun",
+                     "description":"Mô tả chi tiết",
+                     "images":[
+                       {"s3Key":"p/1.jpg","sortOrder":0},
+                       {"s3Key":"p/2.jpg","sortOrder":1},
+                       {"s3Key":"p/3.jpg","sortOrder":2}
+                     ],
+                     "variants":[{"sku":"SKU-1","size":"M","color":"Đen",
+                      "price":100000,"stockQuantity":10,"defaultVariant":true}]}
+                    """))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createProductRejectsMissingDescription() throws Exception {
+        var userId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/shops/{shopId}/products", shopId)
+                .with(jwt().jwt(builder -> builder.subject(userId.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"name":"Áo thun cao cấp","slug":"ao-thun",
+                     "categoryId":"%s",
+                     "images":[
+                       {"s3Key":"p/1.jpg","sortOrder":0},
+                       {"s3Key":"p/2.jpg","sortOrder":1},
+                       {"s3Key":"p/3.jpg","sortOrder":2}
+                     ],
+                     "variants":[{"sku":"SKU-1","size":"M","color":"Đen",
+                      "price":100000,"stockQuantity":10,"defaultVariant":true}]}
+                    """.formatted(UUID.randomUUID())))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createProductRejectsLessThan3Images() throws Exception {
+        var userId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/shops/{shopId}/products", shopId)
+                .with(jwt().jwt(builder -> builder.subject(userId.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"name":"Áo thun cao cấp","slug":"ao-thun",
+                     "description":"Mô tả chi tiết",
+                     "categoryId":"%s",
+                     "images":[
+                       {"s3Key":"p/1.jpg","sortOrder":0},
+                       {"s3Key":"p/2.jpg","sortOrder":1}
+                     ],
+                     "variants":[{"sku":"SKU-1","size":"M","color":"Đen",
+                      "price":100000,"stockQuantity":10,"defaultVariant":true}]}
+                    """.formatted(UUID.randomUUID())))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createProductRejectsShortName() throws Exception {
+        var userId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/shops/{shopId}/products", shopId)
+                .with(jwt().jwt(builder -> builder.subject(userId.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"name":"Ao","slug":"ao-thun",
+                     "description":"Mô tả chi tiết",
+                     "categoryId":"%s",
+                     "images":[
+                       {"s3Key":"p/1.jpg","sortOrder":0},
+                       {"s3Key":"p/2.jpg","sortOrder":1},
+                       {"s3Key":"p/3.jpg","sortOrder":2}
+                     ],
+                     "variants":[{"sku":"SKU-1","size":"M","color":"Đen",
+                      "price":100000,"stockQuantity":10,"defaultVariant":true}]}
+                    """.formatted(UUID.randomUUID())))
             .andExpect(status().isBadRequest());
     }
 

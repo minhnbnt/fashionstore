@@ -43,9 +43,6 @@ class CatalogServiceTest {
     private ShopService shops;
 
     @Autowired
-    private ShopRepository shopRepository;
-
-    @Autowired
     private UserService users;
 
     @Autowired
@@ -67,13 +64,26 @@ class CatalogServiceTest {
         return shop.id();
     }
 
-    private static CreateProductRequest productRequest(String slug) {
+    private UUID testCategory() {
+        return categories.findAllByOrderBySortOrderAsc().stream()
+            .findFirst()
+            .map(Category::getId)
+            .orElseGet(() -> categories.save(Category.seed("Áo Nam", "ao-nam", 0)).getId());
+    }
+
+    private CreateProductRequest productRequest(String slug) {
         return new CreateProductRequest(
-            "Ao " + slug,
+            "Áo Thun " + slug,
             slug,
-            null,
-            null,
-            List.of(new CreateVariantRequest("SKU-" + slug, "M", "Den", 100000L, null, 10, true))
+            "Mô tả chi tiết " + slug,
+            testCategory(),
+            List.of(new CreateVariantRequest("SKU-" + slug, "M", "Den", 100000L, null, 10, true)),
+            List.of(
+                new ImageItemRequest("img1.jpg", null, 0),
+                new ImageItemRequest("img2.jpg", null, 1),
+                new ImageItemRequest("img3.jpg", null, 2)
+            ),
+            null, null, false, null, null, null, null, null, null, null, null, "ACTIVE"
         );
     }
 
@@ -155,7 +165,7 @@ class CatalogServiceTest {
         return new CreateVariantRequest(sku, size, color, price, null, 5, false);
     }
 
-    private static CreateProductRequest productIn(
+    private CreateProductRequest productIn(
         String slug,
         String name,
         @Nullable UUID categoryId,
@@ -174,7 +184,20 @@ class CatalogServiceTest {
                 i == 0
             ));
         }
-        return new CreateProductRequest(name, slug, null, categoryId, withDefault);
+        var catId = categoryId != null ? categoryId : testCategory();
+        return new CreateProductRequest(
+            name,
+            slug,
+            "Mô tả chi tiết " + name,
+            catId,
+            withDefault,
+            List.of(
+                new ImageItemRequest("img1.jpg", null, 0),
+                new ImageItemRequest("img2.jpg", null, 1),
+                new ImageItemRequest("img3.jpg", null, 2)
+            ),
+            null, null, false, null, null, null, null, null, null, null, null, "ACTIVE"
+        );
     }
 
     private static ProductSearchRequest keyword(String q) {
@@ -372,9 +395,14 @@ class CatalogServiceTest {
 
         // When trusted shop explicitly sets status = HIDDEN:
         var hiddenReq = new CreateProductRequest(
-            "Ao Hidden Shop", "ao-hidden-shop", "Desc", null,
+            "Ao Hidden Shop", "ao-hidden-shop", "Desc", testCategory(),
             List.of(new CreateVariantRequest("SKU-HIDDEN", "M", "Den", 100000L, null, 10, true)),
-            null, null, null, false, null, null, null, null, null, null, null, null, "HIDDEN"
+            List.of(
+                new ImageItemRequest("img1.jpg", null, 0),
+                new ImageItemRequest("img2.jpg", null, 1),
+                new ImageItemRequest("img3.jpg", null, 2)
+            ),
+            null, null, false, null, null, null, null, null, null, null, null, "HIDDEN"
         );
         var hiddenProd = catalog.createProduct(ownerId, shop.id(), hiddenReq);
         assertThat(hiddenProd.status()).isEqualTo("HIDDEN");
@@ -394,9 +422,14 @@ class CatalogServiceTest {
         var shopId = approvedShop(ownerId, "shop-try-on");
 
         var tryOnReqWithoutGarment = new CreateProductRequest(
-            "Ao Thuc Te Ao", "ao-thuc-te-ao", "Mo ta", null,
+            "Ao Thuc Te Ao", "ao-thuc-te-ao", "Mo ta", testCategory(),
             List.of(new CreateVariantRequest("SKU-TRY-ON", "M", "Trang", 120000L, null, 10, true)),
-            null, null, null, true, null, null, null, null, null, null, null, null, "ACTIVE"
+            List.of(
+                new ImageItemRequest("img1.jpg", null, 0),
+                new ImageItemRequest("img2.jpg", null, 1),
+                new ImageItemRequest("img3.jpg", null, 2)
+            ),
+            null, null, true, null, null, null, null, null, null, null, null, "ACTIVE"
         );
 
         assertThatThrownBy(() -> catalog.createProduct(ownerId, shopId, tryOnReqWithoutGarment))
@@ -419,7 +452,7 @@ class CatalogServiceTest {
             new ImageItemRequest("img2.jpg", null, 1)
         );
         var reqTwoImages = new CreateProductRequest(
-            "Ao Hai Anh", "ao-hai-anh", "Mo ta", null,
+            "Ao Hai Anh", "ao-hai-anh", "Mo ta", testCategory(),
             List.of(new CreateVariantRequest("SKU-TWO-IMG", "M", "Do", 150000L, null, 5, true)),
             twoImages, null, null, false, null, null, null, null, null, null, null, null, "ACTIVE"
         );
@@ -437,7 +470,7 @@ class CatalogServiceTest {
             tenImages.add(new ImageItemRequest("img" + i + ".jpg", null, i));
         }
         var reqTenImages = new CreateProductRequest(
-            "Ao Muoi Anh", "ao-muoi-anh", "Mo ta", null,
+            "Ao Muoi Anh", "ao-muoi-anh", "Mo ta", testCategory(),
             List.of(new CreateVariantRequest("SKU-TEN-IMG", "M", "Do", 150000L, null, 5, true)),
             tenImages, null, null, false, null, null, null, null, null, null, null, null, "ACTIVE"
         );
@@ -447,6 +480,82 @@ class CatalogServiceTest {
                 var ex = (ResponseStatusException) e;
                 assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
                 assertThat(ex.getReason()).contains("tối đa 9 ảnh");
+            });
+    }
+
+    @Test
+    void createProductRejectsNameTooShort() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-val-name");
+
+        var req = new CreateProductRequest(
+            "Ao", "ao-ngan", "Mo ta", testCategory(),
+            List.of(new CreateVariantRequest("SKU-NAME", "M", "Den", 100000L, null, 10, true)),
+            List.of(
+                new ImageItemRequest("img1.jpg", null, 0),
+                new ImageItemRequest("img2.jpg", null, 1),
+                new ImageItemRequest("img3.jpg", null, 2)
+            ),
+            null, null, false, null, null, null, null, null, null, null, null, "ACTIVE"
+        );
+
+        assertThatThrownBy(() -> catalog.createProduct(ownerId, shopId, req))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> {
+                var ex = (ResponseStatusException) e;
+                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                assertThat(ex.getReason()).contains("Tên sản phẩm phải có từ 5 đến 300 ký tự");
+            });
+    }
+
+    @Test
+    void createProductRejectsNonExistentCategory() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-val-cat");
+
+        var req = new CreateProductRequest(
+            "Áo Thun Nam", "ao-thun-nam-cat", "Mo ta", UUID.randomUUID(),
+            List.of(new CreateVariantRequest("SKU-CAT", "M", "Den", 100000L, null, 10, true)),
+            List.of(
+                new ImageItemRequest("img1.jpg", null, 0),
+                new ImageItemRequest("img2.jpg", null, 1),
+                new ImageItemRequest("img3.jpg", null, 2)
+            ),
+            null, null, false, null, null, null, null, null, null, null, null, "ACTIVE"
+        );
+
+        assertThatThrownBy(() -> catalog.createProduct(ownerId, shopId, req))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> {
+                var ex = (ResponseStatusException) e;
+                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                assertThat(ex.getReason()).contains("Danh mục sản phẩm không tồn tại");
+            });
+    }
+
+    @Test
+    void createProductRejectsInvalidPackaging() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-val-pkg");
+
+        var req = new CreateProductRequest(
+            "Áo Thun Nam", "ao-thun-nam-pkg", "Mo ta", testCategory(),
+            List.of(new CreateVariantRequest("SKU-PKG", "M", "Den", 100000L, null, 10, true)),
+            List.of(
+                new ImageItemRequest("img1.jpg", null, 0),
+                new ImageItemRequest("img2.jpg", null, 1),
+                new ImageItemRequest("img3.jpg", null, 2)
+            ),
+            null, null, false, null, null, null, null,
+            -10, 20, 10, 5, "ACTIVE"
+        );
+
+        assertThatThrownBy(() -> catalog.createProduct(ownerId, shopId, req))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> {
+                var ex = (ResponseStatusException) e;
+                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                assertThat(ex.getReason()).contains("Cân nặng đóng gói phải lớn hơn 0");
             });
     }
 
