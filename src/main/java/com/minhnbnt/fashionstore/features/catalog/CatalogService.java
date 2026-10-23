@@ -208,7 +208,7 @@ public class CatalogService {
 
         var candidateSlug = request.slug();
         if (candidateSlug == null || candidateSlug.isBlank()) {
-            candidateSlug = request.name().trim().toLowerCase()
+            candidateSlug = request.name().trim().toLowerCase(Locale.ROOT)
                 .replaceAll("\\s+", "-")
                 .replaceAll("[^a-z0-9-]", "");
         }
@@ -1054,27 +1054,35 @@ public class CatalogService {
         int page,
         int limit
     ) {
-        return listSellerProducts(userId, shopId, statusFilter, null, null, null, null, q, "createdAt", "desc", page, limit);
+        var status = "ALL";
+        if (statusFilter != null) {
+            status = statusFilter;
+        }
+        var search = "";
+        if (q != null) {
+            search = q;
+        }
+        return listSellerProducts(userId, shopId, status, null, "ALL", 0L, 0L, search, "createdAt", "desc", page, limit);
     }
 
     @Transactional(readOnly = true)
     public List<SellerProductResponse> listSellerProducts(
         @NonNull UUID userId,
         @NonNull UUID shopId,
-        @Nullable String statusFilter,
+        @NonNull String statusFilter,
         @Nullable UUID categoryId,
-        @Nullable String stockLevel,
-        @Nullable Long minPrice,
-        @Nullable Long maxPrice,
-        @Nullable String q,
-        @Nullable String sortBy,
-        @Nullable String sortDir,
+        @NonNull String stockLevel,
+        long minPrice,
+        long maxPrice,
+        @NonNull String q,
+        @NonNull String sortBy,
+        @NonNull String sortDir,
         int page,
         int limit
     ) {
         access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
         List<Product> all;
-        if (statusFilter != null && !statusFilter.isBlank() && !"ALL".equalsIgnoreCase(statusFilter) && !"OUT_OF_STOCK".equalsIgnoreCase(statusFilter)) {
+        if (!statusFilter.isBlank() && !"ALL".equalsIgnoreCase(statusFilter) && !"OUT_OF_STOCK".equalsIgnoreCase(statusFilter)) {
             try {
                 var targetStatus = ProductStatus.valueOf(statusFilter.toUpperCase(Locale.ROOT));
                 all = products.findByShopIdAndStatusOrderByCreatedAtDesc(shopId, targetStatus);
@@ -1085,7 +1093,7 @@ public class CatalogService {
             all = products.findByShopIdOrderByCreatedAtDesc(shopId);
         }
 
-        if (statusFilter == null || (!statusFilter.equalsIgnoreCase("DELETED"))) {
+        if (!statusFilter.equalsIgnoreCase("DELETED")) {
             all = all.stream()
                 .filter(p -> p.getStatus() != ProductStatus.DELETED)
                 .toList();
@@ -1101,7 +1109,7 @@ public class CatalogService {
             .map(this::toSellerResponse)
             .toList();
 
-        if (q != null && !q.isBlank()) {
+        if (!q.isBlank()) {
             var lower = q.toLowerCase(Locale.ROOT).strip();
             responses = responses.stream()
                 .filter(p -> {
@@ -1129,25 +1137,23 @@ public class CatalogService {
                 .toList();
         }
 
-        if (stockLevel != null && !stockLevel.isBlank()) {
-            if ("OUT_OF_STOCK".equalsIgnoreCase(stockLevel)) {
-                responses = responses.stream()
-                    .filter(p -> p.totalStock() == 0)
-                    .toList();
-            } else if ("LOW_STOCK".equalsIgnoreCase(stockLevel)) {
-                responses = responses.stream()
-                    .filter(p -> p.totalStock() <= 15)
-                    .toList();
-            }
+        if ("OUT_OF_STOCK".equalsIgnoreCase(stockLevel)) {
+            responses = responses.stream()
+                .filter(p -> p.totalStock() == 0)
+                .toList();
+        } else if ("LOW_STOCK".equalsIgnoreCase(stockLevel)) {
+            responses = responses.stream()
+                .filter(p -> p.totalStock() <= 15)
+                .toList();
         }
 
-        if (minPrice != null) {
+        if (minPrice > 0) {
             responses = responses.stream()
                 .filter(p -> p.maxPrice() >= minPrice)
                 .toList();
         }
 
-        if (maxPrice != null) {
+        if (maxPrice > 0) {
             responses = responses.stream()
                 .filter(p -> p.minPrice() <= maxPrice)
                 .toList();
@@ -1339,23 +1345,21 @@ public class CatalogService {
 
             for (var v : variantList) {
                 long newPrice;
-                if (request.fixedPrice() != null) {
-                    newPrice = request.fixedPrice();
-                } else if (request.percentChange() != null) {
-                    var factor = 1.0 + (request.percentChange() / 100.0);
-                    newPrice = Math.max(1000L, Math.round(v.getPrice() * factor));
+                if ("FIXED".equalsIgnoreCase(request.mode())) {
+                    newPrice = Math.max(1000L, Math.round(request.value()));
                 } else {
-                    continue;
+                    var factor = 1.0 + (request.value() / 100.0);
+                    newPrice = Math.max(1000L, Math.round(v.getPrice() * factor));
                 }
                 v.setPrice(newPrice);
             }
             variants.saveAll(variantList);
 
             var summary = "Cập nhật giá hàng loạt: ";
-            if (request.fixedPrice() != null) {
-                summary = summary + "giá cố định " + request.fixedPrice() + " VND";
-            } else if (request.percentChange() != null) {
-                summary = summary + "thay đổi " + request.percentChange() + "%";
+            if ("FIXED".equalsIgnoreCase(request.mode())) {
+                summary = summary + "giá cố định " + Math.round(request.value()) + " VND";
+            } else {
+                summary = summary + "thay đổi " + request.value() + "%";
             }
             auditLogs.save(ProductAuditLog.record(
                 productId,
@@ -1405,12 +1409,10 @@ public class CatalogService {
 
             for (var v : variantList) {
                 int newStock;
-                if (request.fixedStock() != null) {
-                    newStock = request.fixedStock();
-                } else if (request.deltaStock() != null) {
-                    newStock = Math.max(0, v.getStockQuantity() + request.deltaStock());
+                if ("FIXED".equalsIgnoreCase(request.mode())) {
+                    newStock = Math.max(0, request.quantity());
                 } else {
-                    continue;
+                    newStock = Math.max(0, v.getStockQuantity() + request.quantity());
                 }
                 var delta = newStock - v.getStockQuantity();
                 v.setStockQuantity(newStock);
@@ -1419,10 +1421,10 @@ public class CatalogService {
             variants.saveAll(variantList);
 
             var summary = "Cập nhật tồn kho hàng loạt: ";
-            if (request.fixedStock() != null) {
-                summary = summary + "tồn cố định " + request.fixedStock();
-            } else if (request.deltaStock() != null) {
-                summary = summary + "thay đổi " + request.deltaStock();
+            if ("FIXED".equalsIgnoreCase(request.mode())) {
+                summary = summary + "tồn cố định " + request.quantity();
+            } else {
+                summary = summary + "thay đổi " + request.quantity();
             }
             auditLogs.save(ProductAuditLog.record(
                 productId,
@@ -1651,7 +1653,7 @@ public class CatalogService {
     }
 
     private String resolveUniqueSlug(UUID shopId, String baseSlug) {
-        var cleanBase = baseSlug.trim().toLowerCase();
+        var cleanBase = baseSlug.trim().toLowerCase(Locale.ROOT);
         if (cleanBase.isBlank()) {
             cleanBase = "product";
         }

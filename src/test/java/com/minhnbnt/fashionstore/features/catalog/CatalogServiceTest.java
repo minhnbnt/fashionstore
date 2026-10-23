@@ -813,7 +813,7 @@ class CatalogServiceTest {
         var fixedResult = catalog.bulkUpdatePrices(
             ownerId,
             shopId,
-            new BulkUpdatePriceRequest(List.of(p1.id(), p2.id()), 250000L, null)
+            new BulkUpdatePriceRequest(List.of(p1.id(), p2.id()), "FIXED", 250000.0)
         );
         assertThat(fixedResult.successCount()).isEqualTo(2);
         assertThat(fixedResult.failedCount()).isEqualTo(0);
@@ -826,7 +826,7 @@ class CatalogServiceTest {
         var percentResult = catalog.bulkUpdatePrices(
             ownerId,
             shopId,
-            new BulkUpdatePriceRequest(List.of(p1.id(), p2.id()), null, -20.0)
+            new BulkUpdatePriceRequest(List.of(p1.id(), p2.id()), "PERCENT", -20.0)
         );
         assertThat(percentResult.successCount()).isEqualTo(2);
         assertThat(percentResult.failedCount()).isEqualTo(0);
@@ -847,7 +847,7 @@ class CatalogServiceTest {
         var fixedResult = catalog.bulkUpdateStocks(
             ownerId,
             shopId,
-            new BulkUpdateStockRequest(List.of(p1.id(), p2.id()), 80, null)
+            new BulkUpdateStockRequest(List.of(p1.id(), p2.id()), "FIXED", 80)
         );
         assertThat(fixedResult.successCount()).isEqualTo(2);
 
@@ -859,7 +859,7 @@ class CatalogServiceTest {
         var deltaResult = catalog.bulkUpdateStocks(
             ownerId,
             shopId,
-            new BulkUpdateStockRequest(List.of(p1.id(), p2.id()), null, -10)
+            new BulkUpdateStockRequest(List.of(p1.id(), p2.id()), "DELTA", -10)
         );
         assertThat(deltaResult.successCount()).isEqualTo(2);
 
@@ -876,17 +876,17 @@ class CatalogServiceTest {
         var p1 = catalog.createProduct(ownerId, shopId, productRequest("filter-alpha"));
         var p2 = catalog.createProduct(ownerId, shopId, productRequest("filter-beta"));
 
-        catalog.bulkUpdateStocks(ownerId, shopId, new BulkUpdateStockRequest(List.of(p1.id()), 5, null));
-        catalog.bulkUpdateStocks(ownerId, shopId, new BulkUpdateStockRequest(List.of(p2.id()), 100, null));
+        catalog.bulkUpdateStocks(ownerId, shopId, new BulkUpdateStockRequest(List.of(p1.id()), "FIXED", 5));
+        catalog.bulkUpdateStocks(ownerId, shopId, new BulkUpdateStockRequest(List.of(p2.id()), "FIXED", 100));
 
         var lowStockList = catalog.listSellerProducts(
-            ownerId, shopId, "ALL", null, "LOW_STOCK", null, null, null, "stock", "asc", 0, 20
+            ownerId, shopId, "ALL", null, "LOW_STOCK", 0L, 0L, "", "stock", "asc", 0, 20
         );
         assertThat(lowStockList).extracting(SellerProductResponse::id).contains(p1.id());
         assertThat(lowStockList).extracting(SellerProductResponse::id).doesNotContain(p2.id());
 
         var searchBySku = catalog.listSellerProducts(
-            ownerId, shopId, "ALL", null, null, null, null, "filter-beta", "createdAt", "desc", 0, 20
+            ownerId, shopId, "ALL", null, "ALL", 0L, 0L, "filter-beta", "createdAt", "desc", 0, 20
         );
         assertThat(searchBySku).extracting(SellerProductResponse::id).contains(p2.id());
         assertThat(searchBySku).extracting(SellerProductResponse::id).doesNotContain(p1.id());
