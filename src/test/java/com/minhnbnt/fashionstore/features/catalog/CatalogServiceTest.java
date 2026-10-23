@@ -8,6 +8,7 @@ import com.minhnbnt.fashionstore.dto.catalog.ImageItemRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSearchRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSort;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
+import com.minhnbnt.fashionstore.dto.catalog.UpdateVariantRequest;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
 import com.minhnbnt.fashionstore.features.catalog.repository.CategoryRepository;
@@ -583,5 +584,89 @@ class CatalogServiceTest {
         var rejected = catalog.rejectProduct(adminId, prodToReject.id(), "Ảnh sản phẩm không đạt chuẩn");
         assertThat(rejected.status()).isEqualTo("BANNED");
         assertThat(rejected.statusReason()).isEqualTo("Ảnh sản phẩm không đạt chuẩn");
+    }
+
+    @Test
+    void sellerCanUpdateProductAndTrackAuditLogs() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-edit-audit");
+
+        var created = catalog.createProduct(ownerId, shopId, productRequest("ao-edit-test"));
+        var initialVariant = created.variants().getFirst();
+
+        // 1. Update product info, stock, price and add a new variant
+        var updateReq = new UpdateProductRequest(
+            "Áo Thun Cập Nhật",
+            "Mô tả mới đã cập nhật",
+            created.categoryId(),
+            "ACTIVE",
+            List.of(
+                new UpdateVariantRequest(
+                    initialVariant.id(),
+                    initialVariant.sku(),
+                    "M",
+                    "Trắng",
+                    150000L,
+                    180000L,
+                    25,
+                    true
+                ),
+                new UpdateVariantRequest(
+                    null,
+                    "SKU-NEW-VAR-" + UUID.randomUUID().toString().substring(0, 6),
+                    "L",
+                    "Đen",
+                    160000L,
+                    190000L,
+                    40,
+                    false
+                )
+            ),
+            List.of(
+                new ImageItemRequest("img-new-1.jpg", null, 0),
+                new ImageItemRequest("img-new-2.jpg", null, 1)
+            ),
+            null,
+            "garment-new.png",
+            true,
+            "100% Linen",
+            "Việt Nam",
+            "Giặt tay nhẹ nhàng",
+            "Size M: 50-60kg",
+            300, 30, 20, 5
+        );
+
+        var updated = catalog.updateProduct(ownerId, shopId, created.id(), updateReq);
+        assertThat(updated.name()).isEqualTo("Áo Thun Cập Nhật");
+        assertThat(updated.description()).isEqualTo("Mô tả mới đã cập nhật");
+        assertThat(updated.videoKey()).isNull();
+        assertThat(updated.garmentKey()).isEqualTo("garment-new.png");
+        assertThat(updated.tryOnEnabled()).isTrue();
+        assertThat(updated.material()).isEqualTo("100% Linen");
+        assertThat(updated.weightGrams()).isEqualTo(300);
+        assertThat(updated.images()).hasSize(2);
+        assertThat(updated.variants()).hasSize(2);
+
+        // 2. Check seller product detail
+        var detail = catalog.getSellerProductDetail(ownerId, shopId, created.id());
+        assertThat(detail.name()).isEqualTo("Áo Thun Cập Nhật");
+
+        // 3. Check audit logs
+        var auditLogs = catalog.getAuditLogs(ownerId, shopId, created.id());
+        assertThat(auditLogs).isNotEmpty();
+        var firstLog = auditLogs.getFirst();
+        assertThat(firstLog.action()).isEqualTo("UPDATE_PRODUCT");
+        assertThat(firstLog.changesSummary()).contains("Tồn kho");
+
+        // 4. Toggle status
+        var toggled = catalog.toggleProductStatus(ownerId, shopId, created.id());
+        assertThat(toggled.status()).isEqualTo("HIDDEN");
+
+        var toggledAgain = catalog.toggleProductStatus(ownerId, shopId, created.id());
+        assertThat(toggledAgain.status()).isEqualTo("ACTIVE");
+
+        var logsAfterToggle = catalog.getAuditLogs(ownerId, shopId, created.id());
+        assertThat(logsAfterToggle).hasSizeGreaterThanOrEqualTo(3);
+        assertThat(logsAfterToggle.getFirst().action()).isEqualTo("TOGGLE_STATUS");
     }
 }

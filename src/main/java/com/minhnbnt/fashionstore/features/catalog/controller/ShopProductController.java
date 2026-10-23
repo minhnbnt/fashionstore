@@ -4,6 +4,7 @@ import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.dto.catalog.AttachImagesRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ImageResponse;
+import com.minhnbnt.fashionstore.dto.catalog.ProductAuditLogResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -58,6 +61,70 @@ public class ShopProductController {
         var userId = UUID.fromString(subject);
 
         return catalog.createProduct(userId, shopId, request);
+    }
+
+    @GetMapping("/{id}")
+    @Operation(
+        summary = "Chi tiết product cho seller",
+        description = "Lấy chi tiết product thuộc shop để edit hoặc xem."
+    )
+    @ApiResponse(responseCode = "200", description = "Product detail")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc shop chưa duyệt")
+    @ApiResponse(responseCode = "404", description = "Product không thuộc shop này")
+    @SecurityRequirement(name = "bearerAuth")
+    public ProductResponse getDetail(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Parameter(description = "Id product") @PathVariable UUID id
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return catalog.getSellerProductDetail(userId, shopId, id);
+    }
+
+    @GetMapping("/{id}/audit-logs")
+    @Operation(
+        summary = "Lịch sử chỉnh sửa sản phẩm",
+        description = "Lấy danh sách audit log theo thời gian giảm dần."
+    )
+    @ApiResponse(responseCode = "200", description = "Danh sách audit log")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc shop chưa duyệt")
+    @ApiResponse(responseCode = "404", description = "Product không thuộc shop này")
+    @SecurityRequirement(name = "bearerAuth")
+    public List<ProductAuditLogResponse> getAuditLogs(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Parameter(description = "Id product") @PathVariable UUID id
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return catalog.getAuditLogs(userId, shopId, id);
+    }
+
+    @PatchMapping("/{id}/status")
+    @Operation(
+        summary = "Ẩn/hiện sản phẩm (toggle status)",
+        description = "Chuyển trạng thái giữa ACTIVE và HIDDEN."
+    )
+    @ApiResponse(responseCode = "200", description = "Product sau khi đổi status")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc shop chưa duyệt")
+    @ApiResponse(responseCode = "404", description = "Product không thuộc shop này")
+    @ApiResponse(responseCode = "409", description = "Trạng thái không thể toggle")
+    @SecurityRequirement(name = "bearerAuth")
+    public ProductResponse toggleStatus(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Parameter(description = "Id product") @PathVariable UUID id
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return catalog.toggleProductStatus(userId, shopId, id);
     }
 
     @PutMapping("/{id}")

@@ -14,4 +14,6 @@ public interface ProductVariantRepository extends CrudRepository<ProductVariant,
     List<ProductVariant> findByShopId(UUID shopId);
 
     Optional<ProductVariant> findByShopIdAndId(UUID shopId, UUID id);
+
+    Optional<ProductVariant> findByShopIdAndSku(UUID shopId, String sku);
 }
