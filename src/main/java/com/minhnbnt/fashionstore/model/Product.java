@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -15,6 +16,7 @@ import java.util.UUID;
 
 @Table("product")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class Product implements Persistable<UUID> {
 
     @Id
@@ -45,36 +47,6 @@ public class Product implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public Product(
-        UUID id,
-        UUID shopId,
-        @Nullable UUID categoryId,
-        String name,
-        String slug,
-        String description,
-        ProductStatus status,
-        @Nullable ProductViolationType violationType,
-        @Nullable String statusReason,
-        @Nullable UUID createdBy,
-        Instant createdAt,
-        Instant updatedAt
-    ) {
-        this.id = id;
-        this.shopId = shopId;
-        this.categoryId = categoryId;
-        this.name = name;
-        this.slug = slug;
-        this.description = description;
-        this.status = status;
-        this.violationType = violationType;
-        this.statusReason = statusReason;
-        this.createdBy = createdBy;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-        this.newRecord = false;
-    }
-
     public static Product create(
         UUID shopId,
         @Nullable UUID categoryId,
@@ -84,7 +56,7 @@ public class Product implements Persistable<UUID> {
         @Nullable UUID createdBy
     ) {
         var now = Instant.now();
-        var product = new Product(
+        return new Product(
             UUID.randomUUID(),
             shopId,
             categoryId,
@@ -95,11 +67,9 @@ public class Product implements Persistable<UUID> {
             null,
             null,
             createdBy,
-            now,
-            now
+            now, now,
+            true
         );
-        product.newRecord = true;
-        return product;
     }
 
     public void hide() {
@@ -117,9 +87,11 @@ public class Product implements Persistable<UUID> {
                 "Product was banned for a policy violation and cannot be activated"
             );
         }
+
         if (status != ProductStatus.HIDDEN) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only hidden products can be activated");
         }
+
         status = ProductStatus.ACTIVE;
         updatedAt = Instant.now();
     }
@@ -161,11 +133,7 @@ public class Product implements Persistable<UUID> {
         updatedAt = Instant.now();
     }
 
-    public void updateDetails(
-        @Nullable String name,
-        @Nullable String description,
-        @Nullable UUID categoryId
-    ) {
+    public void updateDetails(@Nullable String name, @Nullable String description, @Nullable UUID categoryId) {
         if (name != null) {
             this.name = name;
         }

@@ -133,7 +133,8 @@ class DemoShopOpsSeeder {
             SettlementStatus.RELEASED,
             releasedAt.minus(2, ChronoUnit.DAYS),
             releasedAt,
-            holding.getCreatedAt()
+            holding.getCreatedAt(),
+            false
         );
         settlements.save(released);
 

@@ -1,8 +1,10 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.PersistenceCreator;
 import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.Instant;
@@ -14,6 +16,7 @@ import java.util.UUID;
  */
 @Table("admin_config_audit")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class AdminConfigAudit {
 
     @Id
@@ -32,24 +35,4 @@ public class AdminConfigAudit {
     private final @Nullable UUID changedBy;
 
     private final Instant changedAt;
-
-    public AdminConfigAudit(
-        UUID id,
-        ConfigAuditEntity entity,
-        String entityKey,
-        String action,
-        @Nullable String oldValue,
-        @Nullable String newValue,
-        @Nullable UUID changedBy,
-        Instant changedAt
-    ) {
-        this.id = id;
-        this.entity = entity;
-        this.entityKey = entityKey;
-        this.action = action;
-        this.oldValue = oldValue;
-        this.newValue = newValue;
-        this.changedBy = changedBy;
-        this.changedAt = changedAt;
-    }
 }

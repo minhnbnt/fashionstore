@@ -1,6 +1,7 @@
 package com.minhnbnt.fashionstore.model;
 
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.PersistenceCreator;
@@ -14,6 +15,7 @@ import java.util.UUID;
 
 @Table("address")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class Address implements Persistable<UUID> {
 
     @Id
@@ -40,30 +42,6 @@ public class Address implements Persistable<UUID> {
     @Getter(AccessLevel.NONE)
     private boolean newRecord;
 
-    @PersistenceCreator
-    public Address(
-        UUID id,
-        UUID userId,
-        String recipientName,
-        String phoneNumber,
-        String fullAddress,
-        AddressLabel label,
-        boolean defaultAddress,
-        Instant createdAt,
-        Instant updatedAt
-    ) {
-        this.id = id;
-        this.userId = userId;
-        this.recipientName = recipientName;
-        this.phoneNumber = phoneNumber;
-        this.fullAddress = fullAddress;
-        this.label = label;
-        this.defaultAddress = defaultAddress;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-        this.newRecord = false;
-    }
-
     public static Address create(
         UUID userId,
         String recipientName,
@@ -73,7 +51,8 @@ public class Address implements Persistable<UUID> {
         boolean defaultAddress
     ) {
         var now = Instant.now();
-        var address = new Address(
+
+        return new Address(
             UUID.randomUUID(),
             userId,
             recipientName,
@@ -81,19 +60,12 @@ public class Address implements Persistable<UUID> {
             fullAddress,
             label,
             defaultAddress,
-            now,
-            now
+            now, now,
+            true
         );
-        address.newRecord = true;
-        return address;
     }
 
-    public void updateDetails(
-        String recipientName,
-        String phoneNumber,
-        String fullAddress,
-        AddressLabel label
-    ) {
+    public void updateDetails(String recipientName, String phoneNumber, String fullAddress, AddressLabel label) {
         this.recipientName = recipientName;
         this.phoneNumber = phoneNumber;
         this.fullAddress = fullAddress;

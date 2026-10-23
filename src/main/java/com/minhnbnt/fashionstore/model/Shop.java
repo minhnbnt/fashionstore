@@ -136,8 +136,7 @@ public class Shop implements Persistable<UUID> {
         @Nullable String kycStatus,
         @Nullable String kycRejectionReason,
         Instant createdAt,
-        Instant updatedAt
-    ) {
+        Instant updatedAt) {
         this.id = id;
         this.name = name;
         this.slug = slug;
@@ -196,18 +195,27 @@ public class Shop implements Persistable<UUID> {
     }
 
     public static Shop create(
-        String name,
-        String slug,
-        String description,
-        @Nullable String logoKey,
-        @Nullable String bannerKey
-    ) {
-        return create(
-            name, slug, description, logoKey, bannerKey,
-            null, null, "INDIVIDUAL", null, null,
-            null, null, null, null, null,
-            null, null, null, null, null
-        );
+        String name, String slug, String description, @Nullable String logoKey, @Nullable String bannerKey) {
+        return create(name,
+            slug,
+            description,
+            logoKey,
+            bannerKey,
+            null,
+            null,
+            "INDIVIDUAL",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
     }
 
     public static Shop create(
@@ -230,22 +238,51 @@ public class Shop implements Persistable<UUID> {
         @Nullable String businessCertKey,
         @Nullable String bankName,
         @Nullable String bankAccount,
-        @Nullable String bankHolder
-    ) {
+        @Nullable String bankHolder) {
         var now = Instant.now();
-        var effectiveSellerType = (sellerType != null) ? sellerType : "INDIVIDUAL";
+        var effectiveSellerType = "INDIVIDUAL";
+        if (sellerType != null) {
+            effectiveSellerType = sellerType;
+        }
         var shop = new Shop(
-            UUID.randomUUID(), name, slug, description, logoKey, bannerKey,
-            ShopStatus.PENDING, null, null, null, now,
-            phone, address, null, 2, effectiveSellerType,
-            taxCode, idNumber, idFrontKey, businessCertKey,
-            null, 0, 0,
-            bankName, bankAccount, bankHolder,
-            null, null,
-            legalName, idFrontKey, idBackKey, idSelfieKey, idIssuedDate, idIssuedPlace,
-            "PENDING_REVIEW", null,
-            now, now
-        );
+            UUID.randomUUID(),
+            name,
+            slug,
+            description,
+            logoKey,
+            bannerKey,
+            ShopStatus.PENDING,
+            null,
+            null,
+            null,
+            now,
+            phone,
+            address,
+            null,
+            2,
+            effectiveSellerType,
+            taxCode,
+            idNumber,
+            idFrontKey,
+            businessCertKey,
+            null,
+            0,
+            0,
+            bankName,
+            bankAccount,
+            bankHolder,
+            null,
+            null,
+            legalName,
+            idFrontKey,
+            idBackKey,
+            idSelfieKey,
+            idIssuedDate,
+            idIssuedPlace,
+            "PENDING_REVIEW",
+            null,
+            now,
+            now);
         shop.newRecord = true;
         return shop;
     }
@@ -317,11 +354,7 @@ public class Shop implements Persistable<UUID> {
     }
 
     public void updateDetails(
-        @Nullable String name,
-        @Nullable String description,
-        @Nullable String logoKey,
-        @Nullable String bannerKey
-    ) {
+        @Nullable String name, @Nullable String description, @Nullable String logoKey, @Nullable String bannerKey) {
         if (name != null) {
             this.name = name;
         }
@@ -346,8 +379,7 @@ public class Shop implements Persistable<UUID> {
         @Nullable String bankAccount,
         @Nullable String bankHolder,
         @Nullable String autoReplyText,
-        @Nullable String workingHours
-    ) {
+        @Nullable String workingHours) {
         if (phone != null) {
             this.phone = phone;
         }

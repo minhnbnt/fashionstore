@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -19,6 +20,7 @@ import java.util.UUID;
  */
 @Table("site_popup")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class SitePopup implements Persistable<UUID> {
 
     @Id
@@ -59,46 +61,6 @@ public class SitePopup implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public SitePopup(
-        UUID id,
-        String name,
-        @Nullable String title,
-        @Nullable String body,
-        @Nullable String imageKey,
-        @Nullable String ctaLabel,
-        @Nullable String linkUrl,
-        PopupAudience audience,
-        PopupFrequency frequency,
-        int delaySeconds,
-        int priority,
-        boolean active,
-        @Nullable Instant startsAt,
-        @Nullable Instant endsAt,
-        @Nullable UUID updatedBy,
-        Instant createdAt,
-        Instant updatedAt
-    ) {
-        this.id = id;
-        this.name = name;
-        this.title = title;
-        this.body = body;
-        this.imageKey = imageKey;
-        this.ctaLabel = ctaLabel;
-        this.linkUrl = linkUrl;
-        this.audience = audience;
-        this.frequency = frequency;
-        this.delaySeconds = delaySeconds;
-        this.priority = priority;
-        this.active = active;
-        this.startsAt = startsAt;
-        this.endsAt = endsAt;
-        this.updatedBy = updatedBy;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-        this.newRecord = false;
-    }
-
     public static SitePopup create(
         String name,
         @Nullable String title,
@@ -113,18 +75,41 @@ public class SitePopup implements Persistable<UUID> {
         boolean active,
         @Nullable Instant startsAt,
         @Nullable Instant endsAt,
-        UUID adminId
-    ) {
+        UUID adminId) {
         var now = Instant.now();
         var popup = new SitePopup(
-            UUID.randomUUID(), name, null, null, null, null, null, audience, frequency,
-            0, 0, false, null, null, adminId, now, now
-        );
-        popup.update(
-            name, title, body, imageKey, ctaLabel, linkUrl, audience, frequency,
-            delaySeconds, priority, active, startsAt, endsAt, adminId
-        );
-        popup.newRecord = true;
+            UUID.randomUUID(),
+            name,
+            null,
+            null,
+            null,
+            null,
+            null,
+            audience,
+            frequency,
+            0,
+            0,
+            false,
+            null,
+            null,
+            adminId,
+            now,
+            now,
+            true);
+        popup.update(name,
+            title,
+            body,
+            imageKey,
+            ctaLabel,
+            linkUrl,
+            audience,
+            frequency,
+            delaySeconds,
+            priority,
+            active,
+            startsAt,
+            endsAt,
+            adminId);
         return popup;
     }
 
@@ -142,8 +127,7 @@ public class SitePopup implements Persistable<UUID> {
         boolean active,
         @Nullable Instant startsAt,
         @Nullable Instant endsAt,
-        UUID adminId
-    ) {
+        UUID adminId) {
         ContentFields.requireValidWindow(startsAt, endsAt);
 
         var cleanTitle = ContentFields.optional(title);

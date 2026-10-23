@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -13,6 +14,7 @@ import java.util.UUID;
 
 @Table("chat_conversation")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class ChatConversation implements Persistable<UUID> {
 
     @Id
@@ -35,42 +37,17 @@ public class ChatConversation implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public ChatConversation(
-        UUID id,
-        UUID shopId,
-        UUID buyerId,
-        @Nullable String lastMessageText,
-        Instant lastMessageAt,
-        int sellerUnreadCount,
-        int buyerUnreadCount,
-        Instant createdAt
-    ) {
-        this.id = id;
-        this.shopId = shopId;
-        this.buyerId = buyerId;
-        this.lastMessageText = lastMessageText;
-        this.lastMessageAt = lastMessageAt;
-        this.sellerUnreadCount = sellerUnreadCount;
-        this.buyerUnreadCount = buyerUnreadCount;
-        this.createdAt = createdAt;
-        this.newRecord = false;
-    }
-
     public static ChatConversation create(UUID shopId, UUID buyerId) {
+
         var now = Instant.now();
-        var conv = new ChatConversation(
+
+        return new ChatConversation(
             UUID.randomUUID(),
-            shopId,
-            buyerId,
-            null,
-            now,
-            0,
-            0,
-            now
+            shopId, buyerId,
+            null, now,
+            0, 0,
+            now, true
         );
-        conv.newRecord = true;
-        return conv;
     }
 
     public void recordNewMessage(String text, boolean sentByBuyer) {

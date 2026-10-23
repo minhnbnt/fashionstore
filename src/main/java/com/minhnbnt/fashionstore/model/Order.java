@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -15,6 +16,7 @@ import java.util.UUID;
 
 @Table("orders")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class Order implements Persistable<UUID> {
 
     @Id
@@ -69,72 +71,17 @@ public class Order implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public Order(
-        UUID id,
-        String code,
-        UUID shopId,
-        UUID buyerId,
-        OrderStatus status,
-        String paymentMethod,
-        PaymentStatus paymentStatus,
-        long subtotal,
-        long shippingFee,
-        long total,
-        String shippingName,
-        String shippingPhone,
-        String shippingAddress,
-        String note,
-        @Nullable String cancelReason,
-        @Nullable String cancelNote,
-        @Nullable OrderCanceller cancelledBy,
-        @Nullable Instant confirmedAt,
-        @Nullable Instant shippedAt,
-        @Nullable Instant deliveredAt,
-        @Nullable Instant receivedAt,
-        @Nullable Instant cancelledAt,
-        Instant createdAt,
-        Instant updatedAt
-    ) {
-        this.id = id;
-        this.code = code;
-        this.shopId = shopId;
-        this.buyerId = buyerId;
-        this.status = status;
-        this.paymentMethod = paymentMethod;
-        this.paymentStatus = paymentStatus;
-        this.subtotal = subtotal;
-        this.shippingFee = shippingFee;
-        this.total = total;
-        this.shippingName = shippingName;
-        this.shippingPhone = shippingPhone;
-        this.shippingAddress = shippingAddress;
-        this.note = note;
-        this.cancelReason = cancelReason;
-        this.cancelNote = cancelNote;
-        this.cancelledBy = cancelledBy;
-        this.confirmedAt = confirmedAt;
-        this.shippedAt = shippedAt;
-        this.deliveredAt = deliveredAt;
-        this.receivedAt = receivedAt;
-        this.cancelledAt = cancelledAt;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-        this.newRecord = false;
-    }
-
     public static Order create(
         String code,
-        UUID shopId,
-        UUID buyerId,
-        long subtotal,
-        long shippingFee,
-        String shippingName,
-        String shippingPhone,
-        String shippingAddress
-    ) {
+                               UUID shopId,
+                               UUID buyerId,
+                               long subtotal,
+                               long shippingFee,
+                               String shippingName,
+                               String shippingPhone,
+                               String shippingAddress) {
         var now = Instant.now();
-        var order = new Order(
+        return new Order(
             UUID.randomUUID(),
             code,
             shopId,
@@ -158,10 +105,8 @@ public class Order implements Persistable<UUID> {
             null,
             null,
             now,
-            now
-        );
-        order.newRecord = true;
-        return order;
+            now,
+            true);
     }
 
     public void confirm() {
@@ -205,9 +150,7 @@ public class Order implements Persistable<UUID> {
     public void cancelBySeller(String reason, @Nullable String note) {
         if (status != OrderStatus.PENDING && status != OrderStatus.CONFIRMED) {
             throw new ResponseStatusException(
-                HttpStatus.CONFLICT,
-                "Only pending or confirmed orders can be cancelled by seller"
-            );
+                HttpStatus.CONFLICT, "Only pending or confirmed orders can be cancelled by seller");
         }
         status = OrderStatus.CANCELLED;
         cancelReason = reason;
@@ -223,9 +166,7 @@ public class Order implements Persistable<UUID> {
     public void cancelByAdmin(AdminCancelReason reason, String note) {
         if (status != OrderStatus.PENDING && status != OrderStatus.CONFIRMED) {
             throw new ResponseStatusException(
-                HttpStatus.CONFLICT,
-                "Only pending or confirmed orders can be cancelled by admin"
-            );
+                HttpStatus.CONFLICT, "Only pending or confirmed orders can be cancelled by admin");
         }
         status = OrderStatus.CANCELLED;
         cancelReason = reason.name();
