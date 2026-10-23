@@ -666,15 +666,16 @@ public class CatalogService {
     }
 
     private static void requireValidPrice(long price, @Nullable Long compareAtPrice) {
-
-        if (compareAtPrice == null) {
-            return;
-        }
-
-        if (compareAtPrice <= price) {
+        if (price < 0) {
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
-                "compare_at_price must be greater than price"
+                "Price must not be negative"
+            );
+        }
+        if (compareAtPrice != null && compareAtPrice < 0) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Compare-at price must not be negative"
             );
         }
     }
