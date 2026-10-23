@@ -8,8 +8,8 @@ import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.model.ChatConversation;
 import com.minhnbnt.fashionstore.model.ChatMessage;
 import com.minhnbnt.fashionstore.model.MemberRole;
-import com.minhnbnt.fashionstore.model.Shop;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
+import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -52,7 +52,7 @@ class ChatServiceUnitTest {
     void startConversationCreatesNewWhenNotFound() {
         var buyerId = UUID.randomUUID();
         var shopId = UUID.randomUUID();
-        var shop = Shop.create("Fashion Hub", "fashion-hub", "Mo ta", null, null);
+        var shop = ShopTestFixtures.shop("Fashion Hub", "fashion-hub", "Mo ta");
 
         when(shops.findById(shopId)).thenReturn(Optional.of(shop));
         when(conversations.findByShopIdAndBuyerId(shopId, buyerId)).thenReturn(Optional.empty());
@@ -73,7 +73,7 @@ class ChatServiceUnitTest {
         var conv = ChatConversation.create(shopId, buyerId);
         var ownerId = UUID.randomUUID();
 
-        var shop = Shop.create("Fashion Hub", "fashion-hub", "Mo ta", null, null);
+        var shop = ShopTestFixtures.shop("Fashion Hub", "fashion-hub", "Mo ta");
         shop.updateProfile(
             null, null, null, null, null, null, null,
             "Xin chao, shop se phan hoi ban som nhat!",

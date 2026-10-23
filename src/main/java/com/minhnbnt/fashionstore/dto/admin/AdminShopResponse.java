@@ -120,31 +120,4 @@ public record AdminShopResponse(
     @Nullable
     String kycRejectionReason
 ) {
-    public AdminShopResponse(
-        UUID id,
-        String name,
-        String slug,
-        String description,
-        @Nullable String logoKey,
-        @Nullable String bannerKey,
-        String status,
-        @Nullable String statusReason,
-        @Nullable UUID ownerId,
-        @Nullable String ownerEmail,
-        @Nullable String ownerName,
-        @Nullable String ownerStatus,
-        Instant submittedAt,
-        @Nullable Instant approvedAt,
-        Instant createdAt,
-        Instant updatedAt
-    ) {
-        this(
-            id, name, slug, description, logoKey, bannerKey, status, statusReason,
-            ownerId, ownerEmail, ownerName, ownerStatus, submittedAt, approvedAt,
-            createdAt, updatedAt,
-            null, null, null, null, null, null, null,
-            null, null, null, null, null, null, null,
-            "PENDING_REVIEW", null
-        );
-    }
 }

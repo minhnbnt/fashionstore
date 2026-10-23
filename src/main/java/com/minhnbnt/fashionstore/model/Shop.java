@@ -195,30 +195,6 @@ public class Shop implements Persistable<UUID> {
     }
 
     public static Shop create(
-        String name, String slug, String description, @Nullable String logoKey, @Nullable String bannerKey) {
-        return create(name,
-            slug,
-            description,
-            logoKey,
-            bannerKey,
-            null,
-            null,
-            "INDIVIDUAL",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null);
-    }
-
-    public static Shop create(
         String name,
         String slug,
         String description,

@@ -7,8 +7,8 @@ import com.minhnbnt.fashionstore.features.order.repository.SellerWithdrawalRepos
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.SellerWithdrawal;
-import com.minhnbnt.fashionstore.model.Shop;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
+import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -69,7 +69,7 @@ class RevenueServiceUnitTest {
         var userId = UUID.randomUUID();
         var shopId = UUID.randomUUID();
 
-        var shop = Shop.create("My Shop", "my-shop", "Mo ta shop", null, null);
+        var shop = ShopTestFixtures.shop("My Shop", "my-shop", "Mo ta shop");
         shop.updateProfile(
             "0901234567",
             "123 Street",
