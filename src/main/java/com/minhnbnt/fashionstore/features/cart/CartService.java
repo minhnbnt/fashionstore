@@ -30,6 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -138,10 +139,25 @@ public class CartService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart is empty");
         }
 
+        var checked = lines;
+        var selectedIds = request.variantIds();
+        if (selectedIds != null && !selectedIds.isEmpty()) {
+            var wanted = new HashSet<>(selectedIds);
+            checked = new ArrayList<>();
+            for (var item : lines) {
+                if (wanted.remove(item.getVariantId())) {
+                    checked.add(item);
+                }
+            }
+            if (!wanted.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Some selected items are not in the cart");
+            }
+        }
+
         var linesByShop = new LinkedHashMap<UUID, List<CheckoutItemRequest>>();
         var problems = new ArrayList<CheckoutBlockedItem>();
 
-        for (var item : lines) {
+        for (var item : checked) {
             var variant = variants.findById(item.getVariantId()).orElse(null);
             if (variant == null) {
                 problems.add(new CheckoutBlockedItem(item.getVariantId(), "Variant not found"));
@@ -197,7 +213,9 @@ public class CartService {
             ));
         }
 
-        items.deleteByCartId(cart.getId());
+        for (var item : checked) {
+            items.delete(item);
+        }
 
         return placed;
     }
