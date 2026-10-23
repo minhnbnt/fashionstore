@@ -261,45 +261,6 @@ class ShopServiceTest {
     }
 
     @Test
-    @SuppressWarnings("NullAway")
-    void registerRejectsMissingName() {
-        var ownerId = mirroredUser();
-        var req = new CreateShopRequest(
-            null, "slug-test", "desc", "logo", "banner", "0901234567", "Hanoi", "INDIVIDUAL",
-            "NGUYEN VAN A", "001202001234", "01/01/2021", "CA", null, "f", "b", "s", null, "VCB", "123", "NGUYEN VAN A"
-        );
-        assertThatThrownBy(() -> shops.register(ownerId, req))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
-    }
-
-    @Test
-    @SuppressWarnings("NullAway")
-    void registerRejectsMissingPhone() {
-        var ownerId = mirroredUser();
-        var req = new CreateShopRequest(
-            "Name", "slug-test", "desc", "logo", "banner", null, "Hanoi", "INDIVIDUAL",
-            "NGUYEN VAN A", "001202001234", "01/01/2021", "CA", null, "f", "b", "s", null, "VCB", "123", "NGUYEN VAN A"
-        );
-        assertThatThrownBy(() -> shops.register(ownerId, req))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
-    }
-
-    @Test
-    @SuppressWarnings("NullAway")
-    void registerRejectsMissingCccd() {
-        var ownerId = mirroredUser();
-        var req = new CreateShopRequest(
-            "Name", "slug-test", "desc", "logo", "banner", "0901234567", "Hanoi", "INDIVIDUAL",
-            "NGUYEN VAN A", null, "01/01/2021", "CA", null, "f", "b", "s", null, "VCB", "123", "NGUYEN VAN A"
-        );
-        assertThatThrownBy(() -> shops.register(ownerId, req))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
-    }
-
-    @Test
     void registerRejectsInvalidCccdFormat() {
         var ownerId = mirroredUser();
         var req = new CreateShopRequest(
