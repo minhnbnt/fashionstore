@@ -55,7 +55,7 @@ public class ShopMemberRepository {
         return jdbc.sql("""
             SELECT m.role, m.role_id, m.status, r.permissions
             FROM shop_member m
-            LEFT JOIN shop_role r ON r.id = m.role_id
+            LEFT JOIN shop_role r ON r.id = m.role_id AND r.shop_id = m.shop_id
             WHERE m.shop_id = :shop AND m.user_id = :user
             """)
             .param("shop", shopId)

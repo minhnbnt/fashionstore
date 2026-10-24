@@ -69,6 +69,24 @@ class ShopMemberRepositoryIntegrationTest {
     }
 
     @Test
+    void findAccessReturnsEmptyPermissionsWhenRoleBelongsToAnotherShop() {
+        var ownerId = user();
+        var shopId = shop(ownerId);
+        var otherShopId = shop(user());
+        var staffId = user();
+
+        var foreignRole = ShopRole.create(otherShopId, "Foreign Desk", new String[]{"ORDER_READ", "ORDER_PROCESS"}, false);
+        roles.save(foreignRole);
+        members.add(ShopMember.staff(shopId, staffId, foreignRole.getId(), ownerId));
+
+        var access = members.findAccess(shopId, staffId).orElseThrow();
+
+        assertThat(access.role().name()).isEqualTo("STAFF");
+        assertThat(access.roleId()).isEqualTo(foreignRole.getId());
+        assertThat(access.permissions()).isNotNull().isEmpty();
+    }
+
+    @Test
     void findAccessIsEmptyForNonMember() {
         var ownerId = user();
         var shopId = shop(ownerId);
