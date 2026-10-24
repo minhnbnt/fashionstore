@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -13,6 +14,7 @@ import java.util.UUID;
 
 @Table("seller_withdrawal")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class SellerWithdrawal implements Persistable<UUID> {
 
     @Id
@@ -37,38 +39,9 @@ public class SellerWithdrawal implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public SellerWithdrawal(
-        UUID id,
-        UUID shopId,
-        long amount,
-        String bankName,
-        String bankAccount,
-        String bankHolder,
-        WithdrawalStatus status,
-        Instant createdAt,
-        @Nullable Instant processedAt
-    ) {
-        this.id = id;
-        this.shopId = shopId;
-        this.amount = amount;
-        this.bankName = bankName;
-        this.bankAccount = bankAccount;
-        this.bankHolder = bankHolder;
-        this.status = status;
-        this.createdAt = createdAt;
-        this.processedAt = processedAt;
-        this.newRecord = false;
-    }
-
     public static SellerWithdrawal request(
-        UUID shopId,
-        long amount,
-        String bankName,
-        String bankAccount,
-        String bankHolder
-    ) {
-        var withdrawal = new SellerWithdrawal(
+        UUID shopId, long amount, String bankName, String bankAccount, String bankHolder) {
+        return new SellerWithdrawal(
             UUID.randomUUID(),
             shopId,
             amount,
@@ -77,10 +50,8 @@ public class SellerWithdrawal implements Persistable<UUID> {
             bankHolder,
             WithdrawalStatus.REQUESTED,
             Instant.now(),
-            null
-        );
-        withdrawal.newRecord = true;
-        return withdrawal;
+            null,
+            true);
     }
 
     public void complete() {

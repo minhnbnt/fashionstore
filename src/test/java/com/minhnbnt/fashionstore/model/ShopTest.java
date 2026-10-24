@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -11,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ShopTest {
 
     private static Shop pending() {
-        return Shop.create("Shop", "shop", "", null, null);
+        return ShopTestFixtures.shop("Shop", "shop", "");
     }
 
     private static Shop approved() {

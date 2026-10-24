@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -13,6 +14,7 @@ import java.util.UUID;
 
 @Table("product_moderation_history")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class ProductModerationHistory implements Persistable<UUID> {
 
     @Id
@@ -35,28 +37,6 @@ public class ProductModerationHistory implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public ProductModerationHistory(
-        UUID id,
-        UUID productId,
-        String fromStatus,
-        String toStatus,
-        @Nullable String violationType,
-        @Nullable UUID changedBy,
-        String reason,
-        Instant createdAt
-    ) {
-        this.id = id;
-        this.productId = productId;
-        this.fromStatus = fromStatus;
-        this.toStatus = toStatus;
-        this.violationType = violationType;
-        this.changedBy = changedBy;
-        this.reason = reason;
-        this.createdAt = createdAt;
-        this.newRecord = false;
-    }
-
     public static ProductModerationHistory record(
         UUID productId,
         ProductStatus from,
@@ -69,11 +49,17 @@ public class ProductModerationHistory implements Persistable<UUID> {
         if (violationType != null) {
             violationName = violationType.name();
         }
-        var history = new ProductModerationHistory(
-            UUID.randomUUID(), productId, from.name(), to.name(), violationName, changedBy, reason, Instant.now()
+        return new ProductModerationHistory(
+            UUID.randomUUID(),
+            productId,
+            from.name(),
+            to.name(),
+            violationName,
+            changedBy,
+            reason,
+            Instant.now(),
+            true
         );
-        history.newRecord = true;
-        return history;
     }
 
     @Override

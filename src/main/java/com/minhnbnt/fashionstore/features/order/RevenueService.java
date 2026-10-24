@@ -12,7 +12,6 @@ import com.minhnbnt.fashionstore.features.order.repository.SellerSettlementRepos
 import com.minhnbnt.fashionstore.features.order.repository.SellerWithdrawalRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.model.MemberRole;
-import com.minhnbnt.fashionstore.model.OrderStatus;
 import com.minhnbnt.fashionstore.model.SellerSettlement;
 import com.minhnbnt.fashionstore.model.SellerWithdrawal;
 import com.minhnbnt.fashionstore.model.SettlementStatus;
@@ -25,13 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDate;
-import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -64,25 +58,14 @@ public class RevenueService {
     public RevenueSummaryResponse getSummary(@NonNull UUID userId, @NonNull UUID shopId) {
         access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
 
-        var allOrders = orders.findByShopIdOrderByCreatedAtDesc(shopId);
-        var deliveredOrders = allOrders.stream()
-            .filter(o -> o.getStatus() == OrderStatus.DELIVERED)
-            .toList();
-
-        var totalRevenue = deliveredOrders.stream().mapToLong(o -> o.getSubtotal()).sum();
-        var totalCount = (long) deliveredOrders.size();
-        var avgValue = 0L;
-        if (totalCount > 0) {
-            avgValue = totalRevenue / totalCount;
-        }
-
+        var row = orders.sumDeliveredRevenue(shopId);
         var walletBalance = settlements.sumAvailableBalance(shopId);
         var holdingBalance = settlements.sumHoldingBalance(shopId);
 
         return new RevenueSummaryResponse(
-            totalRevenue,
-            totalCount,
-            avgValue,
+            row.totalRevenue(),
+            row.totalOrders(),
+            row.avgOrderValue(),
             walletBalance,
             holdingBalance
         );
@@ -92,28 +75,13 @@ public class RevenueService {
     public List<DailyRevenueResponse> getDailyRevenue(@NonNull UUID userId, @NonNull UUID shopId) {
         access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
 
-        var deliveredOrders = orders.findByShopIdOrderByCreatedAtDesc(shopId).stream()
-            .filter(o -> o.getStatus() == OrderStatus.DELIVERED)
+        return orders.sumDailyRevenue(shopId).stream()
+            .map(row -> new DailyRevenueResponse(
+                row.day().toString(),
+                row.revenue(),
+                (int) row.orders()
+            ))
             .toList();
-
-        var map = new HashMap<LocalDate, long[]>();
-        for (var o : deliveredOrders) {
-            var date = LocalDate.ofInstant(o.getCreatedAt(), ZoneOffset.UTC);
-            var arr = map.computeIfAbsent(date, k -> new long[]{0L, 0L});
-            arr[0] += o.getSubtotal();
-            arr[1]++;
-        }
-
-        var result = new ArrayList<DailyRevenueResponse>();
-        for (var entry : map.entrySet()) {
-            result.add(new DailyRevenueResponse(
-                entry.getKey().toString(),
-                entry.getValue()[0],
-                (int) entry.getValue()[1]
-            ));
-        }
-        result.sort((a, b) -> b.date().compareTo(a.date()));
-        return result;
     }
 
     @Transactional(readOnly = true)
@@ -124,38 +92,15 @@ public class RevenueService {
     ) {
         access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
 
-        var deliveredOrders = orders.findByShopIdOrderByCreatedAtDesc(shopId).stream()
-            .filter(o -> o.getStatus() == OrderStatus.DELIVERED)
-            .toList();
-
-        var productStats = new HashMap<UUID, long[]>();
-        var productNames = new HashMap<UUID, String>();
-
-        for (var o : deliveredOrders) {
-            for (var item : items.findByOrderId(o.getId())) {
-                if (item.getProductId() != null) {
-                    var stats = productStats.computeIfAbsent(item.getProductId(), k -> new long[]{0L, 0L});
-                    stats[0] += item.getQuantity();
-                    stats[1] += item.getLineTotal();
-                    productNames.putIfAbsent(item.getProductId(), item.getProductName());
-                }
-            }
-        }
-
-        var result = new ArrayList<TopProductRevenueResponse>();
-        for (var entry : productStats.entrySet()) {
-            result.add(new TopProductRevenueResponse(
-                entry.getKey(),
-                productNames.getOrDefault(entry.getKey(), "Unknown"),
-                (int) entry.getValue()[0],
-                entry.getValue()[1]
-            ));
-        }
-
-        result.sort((a, b) -> Long.compare(b.totalRevenue(), a.totalRevenue()));
-
         var max = Math.clamp(limit, 1, 50);
-        return result.stream().limit(max).toList();
+        return items.findTopProducts(shopId, max).stream()
+            .map(row -> new TopProductRevenueResponse(
+                row.productId(),
+                row.productName(),
+                (int) row.totalQuantity(),
+                row.totalRevenue()
+            ))
+            .toList();
     }
 
     @Transactional(readOnly = true)

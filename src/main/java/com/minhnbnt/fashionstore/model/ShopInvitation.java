@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -14,6 +15,7 @@ import java.util.UUID;
 
 @Table("shop_invitation")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class ShopInvitation implements Persistable<UUID> {
 
     @Id
@@ -38,33 +40,9 @@ public class ShopInvitation implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public ShopInvitation(
-        UUID id,
-        UUID shopId,
-        String email,
-        UUID roleId,
-        String token,
-        Instant expiresAt,
-        @Nullable Instant acceptedAt,
-        UUID createdBy,
-        Instant createdAt
-    ) {
-        this.id = id;
-        this.shopId = shopId;
-        this.email = email;
-        this.roleId = roleId;
-        this.token = token;
-        this.expiresAt = expiresAt;
-        this.acceptedAt = acceptedAt;
-        this.createdBy = createdBy;
-        this.createdAt = createdAt;
-        this.newRecord = false;
-    }
-
     public static ShopInvitation create(UUID shopId, String email, UUID roleId, UUID createdBy) {
         var now = Instant.now();
-        var inv = new ShopInvitation(
+        return new ShopInvitation(
             UUID.randomUUID(),
             shopId,
             email,
@@ -73,10 +51,8 @@ public class ShopInvitation implements Persistable<UUID> {
             now.plus(48, ChronoUnit.HOURS),
             null,
             createdBy,
-            now
-        );
-        inv.newRecord = true;
-        return inv;
+            now,
+            true);
     }
 
     public void accept() {

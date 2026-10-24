@@ -173,6 +173,16 @@ public class ReturnRequestService {
             .toList();
     }
 
+    /**
+     * Mọi yêu cầu trả hàng của 1 đơn, mới nhất trước. Không kiểm quyền: chỉ màn giám sát admin gọi.
+     */
+    @Transactional(readOnly = true)
+    public List<ReturnRequestResponse> listForOrder(@NonNull UUID orderId) {
+        return returns.findByOrderIdOrderByCreatedAtDesc(orderId).stream()
+            .map(ReturnRequestService::toResponse)
+            .toList();
+    }
+
     private static ReturnRequestResponse toResponse(ReturnRequest req) {
         List<String> evidence = List.of();
         if (req.getEvidenceKeys() != null) {

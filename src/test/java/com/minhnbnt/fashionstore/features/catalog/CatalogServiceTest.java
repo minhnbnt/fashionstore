@@ -16,6 +16,7 @@ import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.Category;
 import com.minhnbnt.fashionstore.model.ProductStatus;
+import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,7 +60,7 @@ class CatalogServiceTest {
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = mirroredUser();
-        var shop = shops.register(ownerId, com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop " + slug, slug));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }
@@ -94,7 +95,7 @@ class CatalogServiceTest {
     @Test
     void createOnPendingShopIsForbidden() {
         var ownerId = mirroredUser();
-        var shop = shops.register(ownerId, com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop Pend", "shop-pend-cat"));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop Pend", "shop-pend-cat"));
 
         assertThatThrownBy(() -> catalog.createProduct(ownerId, shop.id(), productRequest("ao-pend")))
             .isInstanceOf(ResponseStatusException.class)

@@ -8,10 +8,11 @@ import com.minhnbnt.fashionstore.dto.catalog.ProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
-import com.minhnbnt.fashionstore.features.admin.AdminProductService;
+import com.minhnbnt.fashionstore.features.admin.service.AdminProductService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.ProductViolationType;
+import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,7 +51,7 @@ class BannedKeywordServiceTest {
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = mirroredUser();
-        var shop = shops.register(ownerId, com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop " + slug, slug));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }

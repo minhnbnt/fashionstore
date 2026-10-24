@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -13,6 +14,7 @@ import java.util.UUID;
 
 @Table("product_image")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class ProductImage implements Persistable<UUID> {
 
     @Id
@@ -31,40 +33,8 @@ public class ProductImage implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public ProductImage(
-        UUID id,
-        UUID productId,
-        @Nullable UUID variantId,
-        String s3Key,
-        int sortOrder,
-        Instant createdAt
-    ) {
-        this.id = id;
-        this.productId = productId;
-        this.variantId = variantId;
-        this.s3Key = s3Key;
-        this.sortOrder = sortOrder;
-        this.createdAt = createdAt;
-        this.newRecord = false;
-    }
-
-    public static ProductImage create(
-        UUID productId,
-        @Nullable UUID variantId,
-        String s3Key,
-        int sortOrder
-    ) {
-        var image = new ProductImage(
-            UUID.randomUUID(),
-            productId,
-            variantId,
-            s3Key,
-            sortOrder,
-            Instant.now()
-        );
-        image.newRecord = true;
-        return image;
+    public static ProductImage create(UUID productId, @Nullable UUID variantId, String s3Key, int sortOrder) {
+        return new ProductImage(UUID.randomUUID(), productId, variantId, s3Key, sortOrder, Instant.now(), true);
     }
 
     @Override

@@ -189,6 +189,10 @@ public class ShopAdminQueryRepository {
     }
 
     private static AdminShopResponse toAdminShop(ResultSet rs, int rowNum) throws SQLException {
+        var kycStatus = rs.getString("kyc_status");
+        if (kycStatus == null) {
+            kycStatus = "PENDING_REVIEW";
+        }
         return new AdminShopResponse(
             rs.getObject("id", UUID.class),
             rs.getString("name"),
@@ -220,7 +224,7 @@ public class ShopAdminQueryRepository {
             rs.getString("bank_name"),
             rs.getString("bank_account"),
             rs.getString("bank_holder"),
-            rs.getString("kyc_status") != null ? rs.getString("kyc_status") : "PENDING_REVIEW",
+            kycStatus,
             rs.getString("kyc_rejection_reason")
         );
     }

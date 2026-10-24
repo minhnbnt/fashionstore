@@ -18,4 +18,23 @@ public interface OrderItemRepository extends CrudRepository<OrderItem, UUID> {
           AND o.status IN ('PENDING', 'CONFIRMED', 'SHIPPING')
     """)
     boolean hasActiveOrdersForProduct(UUID productId);
+
+    public record TopProductRow(UUID productId, String productName, long totalQuantity, long totalRevenue) {
+    }
+
+    @Query("""
+        SELECT oi.product_id AS product_id,
+               MIN(oi.product_name) AS product_name,
+               SUM(oi.quantity)::bigint AS total_quantity,
+               SUM(oi.line_total)::bigint AS total_revenue
+        FROM order_item oi
+        JOIN orders o ON o.id = oi.order_id
+        WHERE o.shop_id = :shopId
+          AND o.status = 'DELIVERED'
+          AND oi.product_id IS NOT NULL
+        GROUP BY oi.product_id
+        ORDER BY total_revenue DESC
+        LIMIT :limit
+    """)
+    List<TopProductRow> findTopProducts(UUID shopId, int limit);
 }

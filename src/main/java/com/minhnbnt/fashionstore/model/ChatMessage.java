@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -13,6 +14,7 @@ import java.util.UUID;
 
 @Table("chat_message")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class ChatMessage implements Persistable<UUID> {
 
     @Id
@@ -35,28 +37,6 @@ public class ChatMessage implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public ChatMessage(
-        UUID id,
-        UUID conversationId,
-        UUID senderId,
-        String senderType,
-        String content,
-        @Nullable String imageKey,
-        Instant sentAt,
-        boolean isRead
-    ) {
-        this.id = id;
-        this.conversationId = conversationId;
-        this.senderId = senderId;
-        this.senderType = senderType;
-        this.content = content;
-        this.imageKey = imageKey;
-        this.sentAt = sentAt;
-        this.isRead = isRead;
-        this.newRecord = false;
-    }
-
     public static ChatMessage of(
         UUID conversationId,
         UUID senderId,
@@ -64,7 +44,7 @@ public class ChatMessage implements Persistable<UUID> {
         String content,
         @Nullable String imageKey
     ) {
-        var msg = new ChatMessage(
+        return new ChatMessage(
             UUID.randomUUID(),
             conversationId,
             senderId,
@@ -72,10 +52,9 @@ public class ChatMessage implements Persistable<UUID> {
             content,
             imageKey,
             Instant.now(),
-            false
+            false,
+            true
         );
-        msg.newRecord = true;
-        return msg;
     }
 
     public void markRead() {

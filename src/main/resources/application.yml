@@ -9,3 +9,12 @@ spring:
     import: 
       - optional:file:config/springboot.yml
       - optional:file:.env[.properties]
+
+# Lịch nghỉ lễ cho SLA đơn hàng đồng bộ từ Calendarific (bảng public_holiday, admin sửa tay được).
+# Key lấy ở https://calendarific.com, truyền qua biến môi trường CALENDARIFIC_API_KEY, không commit.
+# Trống thì không đồng bộ, SLA vẫn dùng ngày seed + bản admin sửa tay.
+calendarific:
+  url: https://calendarific.com/api/v2
+  api-key: ${CALENDARIFIC_API_KEY:}
+  # 03:00 ngày 1 hằng tháng (giờ VN), đồng bộ năm nay + năm sau.
+  sync-cron: "0 0 3 1 * *"

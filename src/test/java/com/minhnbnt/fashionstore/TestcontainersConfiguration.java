@@ -2,6 +2,7 @@ package com.minhnbnt.fashionstore;
 
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.UUID;
 
 import org.jspecify.annotations.NonNull;
@@ -36,7 +37,9 @@ public class TestcontainersConfiguration {
             .parse("ghcr.io/minhnbnt/postgresql:latest")
             .asCompatibleSubstituteFor("postgres");
 
-        var container = new PostgreSQLContainer(image);
+        // Image init extension mất ~40s trên Docker Desktop Windows, mặc định 60s không đủ khi Gradle chạy song song.
+        var container = new PostgreSQLContainer(image)
+            .withStartupTimeout(Duration.ofMinutes(3));
         container.start();
 
         return container;

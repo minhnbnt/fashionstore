@@ -87,7 +87,7 @@ Public (`/api/public/**`, không cần đăng nhập):
 
 ## Code
 
-- Migration `V12__site_content.sql` (V11 đã thuộc nhánh giám sát đơn): `site_banner`, `site_popup`, `site_page`, `faq_item` + seed.
+- Migration `V12__site_content.sql`: `site_banner`, `site_popup`, `site_page`, `faq_item` + seed. Module giám sát đơn được merge sau ở `V15`.
 - `model/`: `SiteBanner`, `SitePopup`, `SitePage`, `FaqItem` + enum; luật lịch chạy dùng chung ở `ContentSchedule`.
 - `features/content/`: service + repository + `PublicContentController`. Admin controller ở `features/admin/` gọi thẳng service content (không có điều phối liên domain nên không thêm lớp `Admin*Service` chuyển tiếp).
 
