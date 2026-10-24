@@ -14,7 +14,7 @@ public record UpdateProductRequest(
     @Schema(description = "Tên mới, null = giữ nguyên", nullable = true)
     @Nullable
     @Pattern(regexp = "^(?!\\s*$).+", message = "Product name cannot be blank if provided")
-    @Size(min = 5, max = 300, message = "Product name must be between 5 and 300 characters")
+    @Size(max = 300, message = "Product name cannot exceed 300 characters")
     String name,
 
     @Schema(description = "Mô tả mới, null = giữ nguyên", nullable = true)
@@ -28,7 +28,7 @@ public record UpdateProductRequest(
 
     @Schema(description = "ACTIVE, HIDDEN hoặc PENDING (giữ nguyên), null = giữ nguyên", example = "HIDDEN", nullable = true)
     @Nullable
-    @Pattern(regexp = "^(ACTIVE|HIDDEN|PENDING|BANNED)$", message = "Status must be either ACTIVE, HIDDEN, or PENDING")
+    @Pattern(regexp = "^(ACTIVE|HIDDEN|PENDING)$", message = "Status must be either ACTIVE, HIDDEN, or PENDING")
     String status,
 
     @Schema(description = "Sửa variant theo id hoặc thêm mới nếu id null, null = không đụng variants", nullable = true)

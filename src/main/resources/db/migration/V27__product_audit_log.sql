@@ -1,4 +1,4 @@
--- V24__product_audit_log.sql
+-- V27__product_audit_log.sql
 -- Đặc tả 2.2.2: Lịch sử chỉnh sửa sản phẩm (Audit Log)
 
 CREATE TABLE product_audit_log (
