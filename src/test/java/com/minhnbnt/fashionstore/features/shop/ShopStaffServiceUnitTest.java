@@ -8,14 +8,12 @@ import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.ShopInvitation;
 import com.minhnbnt.fashionstore.model.ShopMember;
-import com.minhnbnt.fashionstore.model.ShopMemberAudit;
 import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.model.ShopRole;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -51,7 +49,7 @@ class ShopStaffServiceUnitTest {
     private ShopInvitationRepository invitations;
 
     @Mock
-    private ShopMemberAuditRepository audits;
+    private ShopAuditService audit;
 
     @Mock
     private ShopAccessChecker access;
@@ -94,7 +92,7 @@ class ShopStaffServiceUnitTest {
         assertThat(response.name()).isEqualTo("Warehouse Lead");
         assertThat(response.isSystem()).isFalse();
         verify(roles).save(any());
-        verify(audits).save(any());
+        verify(audit).record(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -191,7 +189,7 @@ class ShopStaffServiceUnitTest {
             eq("Owner"),
             eq(invitation.token())
         );
-        verify(audits).save(any());
+        verify(audit).record(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -336,7 +334,7 @@ class ShopStaffServiceUnitTest {
 
         verify(invitations).claimPending(inv.getId());
         verify(members).add(any(ShopMember.class));
-        verify(audits).save(any());
+        verify(audit).record(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -436,7 +434,7 @@ class ShopStaffServiceUnitTest {
                 "Invitation has already been accepted"
             ));
         verify(members, never()).add(any());
-        verify(audits, never()).save(any());
+        verify(audit, never()).record(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -524,7 +522,7 @@ class ShopStaffServiceUnitTest {
                 HttpStatus.CONFLICT,
                 "Invitation has already been accepted"
             ));
-        verify(audits, never()).save(any());
+        verify(audit, never()).record(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -554,7 +552,7 @@ class ShopStaffServiceUnitTest {
         staffService.revokeInvitation(ownerId, shopId, inv.getId());
 
         verify(invitations, never()).save(any());
-        verify(audits, never()).save(any());
+        verify(audit, never()).record(any(), any(), any(), any(), any(), any());
         verify(notifications, never()).deleteByRefId(any());
     }
 
@@ -570,9 +568,7 @@ class ShopStaffServiceUnitTest {
         staffService.removeMember(ownerId, shopId, memberId);
 
         verify(members).updateStatus(shopId, memberId, "DEACTIVATED");
-        var captor = ArgumentCaptor.forClass(ShopMemberAudit.class);
-        verify(audits).save(captor.capture());
-        assertThat(captor.getValue().getAction()).isEqualTo("DEACTIVATE_MEMBER");
+        verify(audit).record(any(), any(), eq("DEACTIVATE_MEMBER"), any(), any(), any());
     }
 
     @Test
@@ -588,9 +584,7 @@ class ShopStaffServiceUnitTest {
 
         verify(access).requireShopRole(ownerId, shopId, MemberRole.OWNER);
         verify(members).updateStatus(shopId, memberId, "ACTIVE");
-        var captor = ArgumentCaptor.forClass(ShopMemberAudit.class);
-        verify(audits).save(captor.capture());
-        assertThat(captor.getValue().getAction()).isEqualTo("ACTIVATE_MEMBER");
+        verify(audit).record(any(), any(), eq("ACTIVATE_MEMBER"), any(), any(), any());
     }
 
     @Test
@@ -610,7 +604,7 @@ class ShopStaffServiceUnitTest {
                 "Cannot change status of OWNER"
             ));
         verify(members, never()).updateStatus(any(), any(), any());
-        verify(audits, never()).save(any());
+        verify(audit, never()).record(any(), any(), any(), any(), any(), any());
     }
 
     @Test

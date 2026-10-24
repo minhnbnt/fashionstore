@@ -16,7 +16,6 @@ import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.ShopInvitation;
 import com.minhnbnt.fashionstore.model.ShopMember;
-import com.minhnbnt.fashionstore.model.ShopMemberAudit;
 import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.model.ShopRole;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
@@ -46,7 +45,7 @@ public class ShopStaffService {
 
     private final ShopInvitationRepository invitations;
 
-    private final ShopMemberAuditRepository audits;
+    private final ShopAuditService audit;
 
     private final ShopActivityQueryRepository activity;
 
@@ -90,7 +89,7 @@ public class ShopStaffService {
         var role = ShopRole.create(shopId, request.name(), perms, false);
         roles.save(role);
 
-        audits.save(ShopMemberAudit.record(shopId, userId, "CREATE_ROLE", "ROLE", role.getId(), role.getName()));
+        audit.record(shopId, userId, "CREATE_ROLE", "ROLE", role.getId(), role.getName());
 
         return toRoleResponse(role);
     }
@@ -116,7 +115,7 @@ public class ShopStaffService {
         role.update(request.name(), perms);
         roles.save(role);
 
-        audits.save(ShopMemberAudit.record(shopId, userId, "UPDATE_ROLE", "ROLE", role.getId(), role.getName()));
+        audit.record(shopId, userId, "UPDATE_ROLE", "ROLE", role.getId(), role.getName());
 
         return toRoleResponse(role);
     }
@@ -141,7 +140,7 @@ public class ShopStaffService {
         }
 
         roles.delete(role);
-        audits.save(ShopMemberAudit.record(shopId, userId, "DELETE_ROLE", "ROLE", role.getId(), role.getName()));
+        audit.record(shopId, userId, "DELETE_ROLE", "ROLE", role.getId(), role.getName());
     }
 
     @Transactional(readOnly = true)
@@ -235,14 +234,14 @@ public class ShopStaffService {
             inv.getToken()
         );
 
-        audits.save(ShopMemberAudit.record(
+        audit.record(
             shopId,
             userId,
             "INVITE_STAFF",
             "INVITATION",
             inv.getId(),
             "Email: " + email
-        ));
+        );
 
         return toInvitationResponse(inv);
     }
@@ -276,14 +275,14 @@ public class ShopStaffService {
         invitations.save(inv);
         notifications.deleteByRefId(inv.getId());
 
-        audits.save(ShopMemberAudit.record(
+        audit.record(
             shopId,
             userId,
             "REVOKE_INVITATION",
             "INVITATION",
             inv.getId(),
             "Email: " + inv.getEmail()
-        ));
+        );
     }
 
     @Transactional(readOnly = true)
@@ -356,14 +355,14 @@ public class ShopStaffService {
 
         notifications.deleteByRefId(inv.getId());
 
-        audits.save(ShopMemberAudit.record(
+        audit.record(
             inv.getShopId(),
             userId,
             "ACCEPT_INVITATION",
             "MEMBER",
             userId,
             "Joined as staff"
-        ));
+        );
     }
 
     @Transactional
@@ -389,14 +388,14 @@ public class ShopStaffService {
         }
 
         members.updateRole(shopId, targetMemberId, MemberRole.STAFF, request.roleId());
-        audits.save(ShopMemberAudit.record(
+        audit.record(
             shopId,
             userId,
             "CHANGE_MEMBER_ROLE",
             "MEMBER",
             targetMemberId,
             "New role: " + role.getName()
-        ));
+        );
     }
 
     @Transactional
@@ -426,14 +425,14 @@ public class ShopStaffService {
         if ("ACTIVE".equals(status)) {
             action = "ACTIVATE_MEMBER";
         }
-        audits.save(ShopMemberAudit.record(
+        audit.record(
             shopId,
             userId,
             action,
             "MEMBER",
             targetMemberId,
             "Status: " + status
-        ));
+        );
     }
 
     @Transactional

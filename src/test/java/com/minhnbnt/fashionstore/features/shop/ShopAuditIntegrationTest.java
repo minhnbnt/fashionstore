@@ -23,11 +23,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Ghim nhật ký hoạt động dùng chung: thao tác nghiệp vụ của shop được ghi kèm actor,
@@ -69,6 +73,49 @@ class ShopAuditIntegrationTest {
 
     @Autowired
     private CategoryRepository categories;
+
+    @Autowired
+    private ShopAuditService audit;
+
+    @Autowired
+    private TransactionTemplate transactions;
+
+    @Test
+    void auditFailureDoesNotAbortBusinessTransaction() {
+        var ownerId = user("owner", "Audit Owner");
+        var shopId = approvedShop(ownerId, "audit-savepoint");
+        var unknownActor = UUID.randomUUID();
+        var category = Category.seed("Audit Savepoint", "audit-savepoint-" + UUID.randomUUID(), 0);
+
+        transactions.executeWithoutResult(status -> {
+            audit.record(shopId, unknownActor, "PRODUCT_CREATE", "PRODUCT", null, null);
+            categories.save(category);
+        });
+
+        assertThat(categories.findById(category.getId())).isPresent();
+    }
+
+    @Test
+    void staffCannotListAuditLogs() {
+        var ownerId = user("owner", "Audit Owner");
+        var shopId = approvedShop(ownerId, "audit-forbidden");
+        var staffId = staffWith(ownerId, shopId, "ORDER_READ");
+
+        assertThatThrownBy(() -> staff.listAuditLogs(staffId, shopId, null, 0, 50))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN));
+    }
+
+    @Test
+    void auditPageSizeIsClamped() {
+        var ownerId = user("owner", "Audit Owner");
+        var shopId = approvedShop(ownerId, "audit-clamp");
+        catalog.createProduct(ownerId, shopId, productRequest("audit-clamp"));
+
+        assertThat(staff.listAuditLogs(ownerId, shopId, null, 0, 0).size()).isEqualTo(1);
+        assertThat(staff.listAuditLogs(ownerId, shopId, null, 0, 500).size()).isEqualTo(100);
+    }
 
     @Test
     void productCreateIsRecorded() {
