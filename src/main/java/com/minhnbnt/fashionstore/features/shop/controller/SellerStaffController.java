@@ -3,6 +3,7 @@ package com.minhnbnt.fashionstore.features.shop.controller;
 import com.minhnbnt.fashionstore.dto.shop.ChangeMemberRoleRequest;
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRoleRequest;
 import com.minhnbnt.fashionstore.dto.shop.InviteStaffRequest;
+import com.minhnbnt.fashionstore.dto.shop.MyPermissionsResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopMemberAuditResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopMemberDetailResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopRoleResponse;
@@ -194,6 +195,27 @@ public class SellerStaffController {
         var userId = UUID.fromString(subject);
 
         staffService.removeMember(userId, shopId, memberId);
+    }
+
+    @GetMapping("/my-permissions")
+    @Operation(
+        operationId = "getMyPermissions",
+        summary = "Quyền của tôi trong shop",
+        description = "Trả về cờ chủ shop và danh sách quyền hiện có của người dùng trong shop, "
+            + "dùng để ẩn/hiện menu và nút thao tác trên giao diện người bán."
+    )
+    @ApiResponse(responseCode = "200", description = "Quyền của người dùng hiện tại")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên đang hoạt động của shop")
+    @SecurityRequirement(name = "bearerAuth")
+    public MyPermissionsResponse getMyPermissions(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return staffService.myPermissions(userId, shopId);
     }
 
     @GetMapping("/audit")

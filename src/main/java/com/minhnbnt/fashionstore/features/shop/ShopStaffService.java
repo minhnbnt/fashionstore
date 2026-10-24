@@ -3,6 +3,7 @@ package com.minhnbnt.fashionstore.features.shop;
 import com.minhnbnt.fashionstore.dto.shop.ChangeMemberRoleRequest;
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRoleRequest;
 import com.minhnbnt.fashionstore.dto.shop.InviteStaffRequest;
+import com.minhnbnt.fashionstore.dto.shop.MyPermissionsResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopMemberAuditResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopMemberDetailResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopRoleResponse;
@@ -11,6 +12,7 @@ import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.ShopInvitation;
 import com.minhnbnt.fashionstore.model.ShopMember;
 import com.minhnbnt.fashionstore.model.ShopMemberAudit;
+import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.model.ShopRole;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
@@ -273,6 +275,18 @@ public class ShopStaffService {
         return audits.findByShopIdOrderByCreatedAtDesc(shopId).stream()
             .map(ShopStaffService::toAuditResponse)
             .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public MyPermissionsResponse myPermissions(@NonNull UUID userId, @NonNull UUID shopId) {
+        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+
+        var permissionNames = access.permissionsOf(userId, shopId).stream()
+            .map(ShopPermission::name)
+            .sorted()
+            .toList();
+
+        return new MyPermissionsResponse(access.isOwner(userId, shopId), permissionNames);
     }
 
     private void initDefaultRoles(UUID shopId) {
