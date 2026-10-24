@@ -5,6 +5,7 @@ import com.minhnbnt.fashionstore.dto.chat.ChatMessageResponse;
 import com.minhnbnt.fashionstore.dto.chat.SendMessageRequest;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatConversationRepository;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatMessageRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.model.ChatConversation;
@@ -35,6 +36,8 @@ public class ChatService {
     private final ShopMemberRepository members;
 
     private final ShopAccessChecker access;
+
+    private final ShopAuditService audit;
 
     @Transactional
     public ChatConversationResponse startConversation(@NonNull UUID buyerId, @NonNull UUID shopId) {
@@ -124,6 +127,10 @@ public class ChatService {
 
         conv.recordNewMessage(request.content(), !isSeller);
         conversations.save(conv);
+
+        if (isSeller) {
+            audit.record(conv.getShopId(), userId, "CHAT_REPLY", "CONVERSATION", conv.getId(), null);
+        }
 
         // Auto reply if buyer sent message and shop has auto reply text
         if (!isSeller) {

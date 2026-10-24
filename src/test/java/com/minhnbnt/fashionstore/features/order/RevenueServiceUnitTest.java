@@ -4,6 +4,7 @@ import com.minhnbnt.fashionstore.dto.order.CreateWithdrawalRequest;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.SellerSettlementRepository;
 import com.minhnbnt.fashionstore.features.order.repository.SellerWithdrawalRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.model.SellerWithdrawal;
 import com.minhnbnt.fashionstore.model.ShopPermission;
@@ -42,6 +43,9 @@ class RevenueServiceUnitTest {
 
     @Mock
     private ShopAccessChecker access;
+
+    @Mock
+    private ShopAuditService audit;
 
     @InjectMocks
     private RevenueService revenueService;

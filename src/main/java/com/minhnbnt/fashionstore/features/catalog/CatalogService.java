@@ -38,6 +38,7 @@ import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepos
 import com.minhnbnt.fashionstore.features.catalog.repository.StockMovementRepository;
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.review.ReviewService;
+import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.infrastructure.media.VideoMetadataService;
@@ -109,6 +110,8 @@ public class CatalogService {
     private final ReviewService reviews;
 
     private final ShopAccessChecker access;
+
+    private final ShopAuditService audit;
 
     private final VideoMetadataService videoMetadataService;
 
@@ -269,6 +272,8 @@ public class CatalogService {
 
         keywordScanner.scan(product.getId(), product.getName(), product.getDescription());
 
+        audit.record(product.getShopId(), userId, "PRODUCT_CREATE", "PRODUCT", product.getId(), product.getName());
+
         return toResponse(product);
     }
 
@@ -398,6 +403,8 @@ public class CatalogService {
             toJson(oldValues),
             toJson(newValues)
         ));
+
+        audit.record(saved.getShopId(), userId, "PRODUCT_UPDATE", "PRODUCT", saved.getId(), saved.getName());
 
         return toResponse(saved);
     }
@@ -831,6 +838,8 @@ public class CatalogService {
             toJson(Map.of("status", newStatus))
         ));
 
+        audit.record(product.getShopId(), userId, "PRODUCT_STATUS", "PRODUCT", productId, product.getName());
+
         return toResponse(saved);
     }
 
@@ -980,6 +989,8 @@ public class CatalogService {
             v.archiveSku(delSuffix);
         }
         variants.saveAll(variantList);
+
+        audit.record(product.getShopId(), userId, "PRODUCT_DELETE", "PRODUCT", productId, product.getName());
     }
 
     @Transactional
@@ -999,6 +1010,8 @@ public class CatalogService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Image not found");
         }
         images.delete(image);
+
+        audit.record(product.getShopId(), userId, "PRODUCT_IMAGE_DELETE", "PRODUCT", productId, product.getName());
     }
 
     @Transactional(readOnly = true)
@@ -1211,6 +1224,14 @@ public class CatalogService {
                 "{\"status\":\"" + oldStatus + "\"}",
                 "{\"status\":\"" + targetStatus.name() + "\"}"
             ));
+            audit.record(
+                product.getShopId(),
+                userId,
+                "PRODUCT_STATUS_BULK",
+                "PRODUCT",
+                product.getId(),
+                product.getName()
+            );
             successCount++;
         }
 
@@ -1264,6 +1285,14 @@ public class CatalogService {
                 null,
                 null
             ));
+            audit.record(
+                product.getShopId(),
+                userId,
+                "PRODUCT_DELETE_BULK",
+                "PRODUCT",
+                productId,
+                product.getName()
+            );
             successCount++;
         }
 
@@ -1333,6 +1362,14 @@ public class CatalogService {
                 null,
                 null
             ));
+            audit.record(
+                product.getShopId(),
+                userId,
+                "PRODUCT_PRICE_BULK",
+                "PRODUCT",
+                productId,
+                product.getName()
+            );
             successCount++;
         }
 
@@ -1398,6 +1435,14 @@ public class CatalogService {
                 null,
                 null
             ));
+            audit.record(
+                product.getShopId(),
+                userId,
+                "INVENTORY_ADJUST_BULK",
+                "PRODUCT",
+                productId,
+                product.getName()
+            );
             successCount++;
         }
 
@@ -1472,6 +1517,15 @@ public class CatalogService {
             prodName = prod.getName();
         }
         var isLow = variant.getStockQuantity() <= variant.getLowStockThreshold();
+
+        audit.record(
+            variant.getShopId(),
+            userId,
+            "INVENTORY_ADJUST",
+            "PRODUCT",
+            variant.getProductId(),
+            prodName
+        );
 
         return new InventoryItemResponse(
             variant.getId(),
@@ -1561,6 +1615,18 @@ public class CatalogService {
                 errors.add("Row " + (i + 1) + ": " + ex.getMessage());
             }
         }
+
+        if (success > 0) {
+            audit.record(
+                shopId,
+                userId,
+                "PRODUCT_IMPORT",
+                "PRODUCT",
+                null,
+                "Imported " + success + " products"
+            );
+        }
+
         return new BulkImportResult(success, failed, errors);
     }
 

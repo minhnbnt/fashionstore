@@ -4,11 +4,12 @@ import com.minhnbnt.fashionstore.dto.shop.ChangeMemberRoleRequest;
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRoleRequest;
 import com.minhnbnt.fashionstore.dto.shop.InviteStaffRequest;
 import com.minhnbnt.fashionstore.dto.shop.MyPermissionsResponse;
-import com.minhnbnt.fashionstore.dto.shop.ShopMemberAuditResponse;
+import com.minhnbnt.fashionstore.dto.shop.ShopActivityResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopMemberDetailResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopRoleResponse;
 import com.minhnbnt.fashionstore.dto.shop.StaffInvitationResponse;
 import com.minhnbnt.fashionstore.dto.shop.UpdateMemberStatusRequest;
+import com.minhnbnt.fashionstore.dto.common.PageResponse;
 import com.minhnbnt.fashionstore.features.shop.ShopStaffService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -296,18 +298,27 @@ public class SellerStaffController {
     }
 
     @GetMapping("/audit")
-    @Operation(summary = "Nhật ký thao tác nhân sự (Audit log)", description = "Xem lại toàn bộ lịch sử mời nhân viên, đổi vai trò, xóa nhân sự trong shop.")
-    @ApiResponse(responseCode = "200", description = "Lịch sử thao tác")
+    @Operation(
+        operationId = "listAuditLogs",
+        summary = "Nhật ký hoạt động của shop",
+        description = "Chủ shop xem nhật ký mọi thao tác nghiệp vụ và nhân sự trong shop, mới nhất trước. "
+            + "Có thể lọc theo mã hành động."
+    )
+    @ApiResponse(responseCode = "200", description = "Trang nhật ký hoạt động")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Chỉ chủ shop mới được xem nhật ký")
     @SecurityRequirement(name = "bearerAuth")
-    public List<ShopMemberAuditResponse> listAuditLogs(
+    public PageResponse<ShopActivityResponse> listAuditLogs(
         @AuthenticationPrincipal Jwt jwt,
-        @Parameter(description = "Id shop") @PathVariable UUID shopId
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Parameter(description = "Lọc theo mã hành động, ví dụ PRODUCT_CREATE")
+        @RequestParam(required = false) String action,
+        @Parameter(description = "Trang hiện tại, đếm từ 0") @RequestParam(defaultValue = "0") int page,
+        @Parameter(description = "Số phần tử mỗi trang, tối đa 100") @RequestParam(defaultValue = "20") int size
     ) {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var userId = UUID.fromString(subject);
 
-        return staffService.listAuditLogs(userId, shopId);
+        return staffService.listAuditLogs(userId, shopId, action, page, size);
     }
 }

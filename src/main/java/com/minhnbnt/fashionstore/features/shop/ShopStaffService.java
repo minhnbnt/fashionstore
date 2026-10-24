@@ -6,10 +6,11 @@ import com.minhnbnt.fashionstore.dto.shop.CreateShopRoleRequest;
 import com.minhnbnt.fashionstore.dto.shop.InvitationDetailResponse;
 import com.minhnbnt.fashionstore.dto.shop.InviteStaffRequest;
 import com.minhnbnt.fashionstore.dto.shop.MyPermissionsResponse;
-import com.minhnbnt.fashionstore.dto.shop.ShopMemberAuditResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopMemberDetailResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopRoleResponse;
 import com.minhnbnt.fashionstore.dto.shop.StaffInvitationResponse;
+import com.minhnbnt.fashionstore.dto.common.PageResponse;
+import com.minhnbnt.fashionstore.dto.shop.ShopActivityResponse;
 import com.minhnbnt.fashionstore.features.identity.IdentityDirectoryService;
 import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.model.MemberRole;
@@ -21,6 +22,7 @@ import com.minhnbnt.fashionstore.model.ShopRole;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -45,6 +47,8 @@ public class ShopStaffService {
     private final ShopInvitationRepository invitations;
 
     private final ShopMemberAuditRepository audits;
+
+    private final ShopActivityQueryRepository activity;
 
     private final ShopAccessChecker access;
 
@@ -442,12 +446,16 @@ public class ShopStaffService {
     }
 
     @Transactional(readOnly = true)
-    public List<ShopMemberAuditResponse> listAuditLogs(@NonNull UUID userId, @NonNull UUID shopId) {
+    public PageResponse<ShopActivityResponse> listAuditLogs(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        @Nullable String action,
+        int page,
+        int size
+    ) {
         access.requireShopRole(userId, shopId, MemberRole.OWNER);
 
-        return audits.findByShopIdOrderByCreatedAtDesc(shopId).stream()
-            .map(ShopStaffService::toAuditResponse)
-            .toList();
+        return activity.page(shopId, action, page, size);
     }
 
     @Transactional(readOnly = true)
@@ -583,19 +591,6 @@ public class ShopStaffService {
             inv.getExpiresAt(),
             inv.getAcceptedAt(),
             inv.getCreatedAt()
-        );
-    }
-
-    private static ShopMemberAuditResponse toAuditResponse(ShopMemberAudit a) {
-        return new ShopMemberAuditResponse(
-            a.getId(),
-            a.getShopId(),
-            a.getMemberId(),
-            a.getAction(),
-            a.getTargetType(),
-            a.getTargetId(),
-            a.getDetail(),
-            a.getCreatedAt()
         );
     }
 }

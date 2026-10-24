@@ -10,6 +10,7 @@ import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.SellerSettlementRepository;
 import com.minhnbnt.fashionstore.features.order.repository.SellerWithdrawalRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.model.SellerSettlement;
 import com.minhnbnt.fashionstore.model.SellerWithdrawal;
@@ -43,6 +44,8 @@ public class RevenueService {
     private final ShopRepository shops;
 
     private final ShopAccessChecker access;
+
+    private final ShopAuditService audit;
 
     @Transactional
     public void createSettlementForOrder(UUID shopId, UUID orderId, long grossAmount) {
@@ -182,7 +185,17 @@ public class RevenueService {
             bankHolder
         );
 
-        return toWithdrawalResponse(withdrawals.save(withdrawal));
+        var saved = withdrawals.save(withdrawal);
+        audit.record(
+            saved.getShopId(),
+            userId,
+            "WITHDRAWAL_CREATE",
+            "WITHDRAWAL",
+            saved.getId(),
+            saved.getAmount() + " VND"
+        );
+
+        return toWithdrawalResponse(saved);
     }
 
     @Transactional(readOnly = true)

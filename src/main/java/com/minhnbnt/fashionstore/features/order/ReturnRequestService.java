@@ -6,6 +6,7 @@ import com.minhnbnt.fashionstore.dto.order.RejectReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.ReturnRequestResponse;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.ReturnRequestRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
 import com.minhnbnt.fashionstore.model.OrderStatus;
 import com.minhnbnt.fashionstore.model.ReturnRequest;
@@ -37,6 +38,8 @@ public class ReturnRequestService {
     private final ShopMemberRepository members;
 
     private final ShopAccessChecker access;
+
+    private final ShopAuditService audit;
 
     @Transactional
     public ReturnRequestResponse create(
@@ -131,7 +134,10 @@ public class ReturnRequestService {
         access.requireShopPermission(userId, req.getShopId(), ShopPermission.RETURN_PROCESS);
 
         req.approve(request.resolution(), request.refundAmount(), request.sellerNote());
-        return toResponse(returns.save(req));
+        var saved = returns.save(req);
+        audit.record(saved.getShopId(), userId, "RETURN_APPROVE", "RETURN", saved.getId(), null);
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -147,7 +153,10 @@ public class ReturnRequestService {
         access.requireShopPermission(userId, req.getShopId(), ShopPermission.RETURN_PROCESS);
 
         req.reject(request.sellerNote());
-        return toResponse(returns.save(req));
+        var saved = returns.save(req);
+        audit.record(saved.getShopId(), userId, "RETURN_REJECT", "RETURN", saved.getId(), null);
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -163,7 +172,10 @@ public class ReturnRequestService {
         access.requireShopPermission(userId, req.getShopId(), ShopPermission.RETURN_PROCESS);
 
         req.complete(note);
-        return toResponse(returns.save(req));
+        var saved = returns.save(req);
+        audit.record(saved.getShopId(), userId, "RETURN_COMPLETE", "RETURN", saved.getId(), null);
+
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)

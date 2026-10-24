@@ -20,6 +20,8 @@ public class ShopDecorationService {
 
     private final ShopAccessChecker access;
 
+    private final ShopAuditService audit;
+
     @Transactional(readOnly = true)
     public DecorationResponse getPublishedLayout(@NonNull UUID shopId) {
         var deco = decorations.findByShopId(shopId)
@@ -53,7 +55,10 @@ public class ShopDecorationService {
             .orElseGet(() -> ShopDecoration.createDefault(shopId));
 
         deco.saveDraft(draftJson);
-        return toResponse(decorations.save(deco));
+        var saved = decorations.save(deco);
+        audit.record(saved.getShopId(), userId, "DECORATION_SAVE", "DECORATION", saved.getId(), null);
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -64,7 +69,10 @@ public class ShopDecorationService {
             .orElseGet(() -> ShopDecoration.createDefault(shopId));
 
         deco.publish();
-        return toResponse(decorations.save(deco));
+        var saved = decorations.save(deco);
+        audit.record(saved.getShopId(), userId, "DECORATION_PUBLISH", "DECORATION", saved.getId(), null);
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -75,7 +83,10 @@ public class ShopDecorationService {
             .orElseGet(() -> ShopDecoration.createDefault(shopId));
 
         deco.discardDraft();
-        return toResponse(decorations.save(deco));
+        var saved = decorations.save(deco);
+        audit.record(saved.getShopId(), userId, "DECORATION_DISCARD", "DECORATION", saved.getId(), null);
+
+        return toResponse(saved);
     }
 
     private static DecorationResponse toResponse(ShopDecoration d) {

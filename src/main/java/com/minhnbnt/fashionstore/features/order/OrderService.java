@@ -18,6 +18,7 @@ import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderMonitoringQueryRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderStatusHistoryRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.AdminCancelReason;
@@ -70,6 +71,8 @@ public class OrderService {
     private final RevenueService revenue;
 
     private final ShopAccessChecker access;
+
+    private final ShopAuditService audit;
 
     private final OrderAdminQueryRepository adminQueries;
 
@@ -259,7 +262,10 @@ public class OrderService {
         restockIfConfirmed(order, from, orderItems);
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CANCELLED, userId));
 
-        return toResponse(orders.save(order), orderItems);
+        var saved = orders.save(order);
+        audit.record(saved.getShopId(), userId, "ORDER_CANCEL", "ORDER", saved.getId(), saved.getCode());
+
+        return toResponse(saved, orderItems);
     }
 
     @Transactional(readOnly = true)
@@ -397,7 +403,10 @@ public class OrderService {
         order.confirm();
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CONFIRMED, userId));
 
-        return toResponse(orders.save(order), orderItems);
+        var saved = orders.save(order);
+        audit.record(saved.getShopId(), userId, "ORDER_CONFIRM", "ORDER", saved.getId(), saved.getCode());
+
+        return toResponse(saved, orderItems);
     }
 
     @Transactional
@@ -410,7 +419,10 @@ public class OrderService {
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.SHIPPING, userId));
 
         var orderItems = items.findByOrderId(order.getId());
-        return toResponse(orders.save(order), orderItems);
+        var saved = orders.save(order);
+        audit.record(saved.getShopId(), userId, "ORDER_SHIP", "ORDER", saved.getId(), saved.getCode());
+
+        return toResponse(saved, orderItems);
     }
 
     @Transactional
@@ -424,7 +436,10 @@ public class OrderService {
         revenue.createSettlementForOrder(order.getShopId(), order.getId(), order.getSubtotal());
 
         var orderItems = items.findByOrderId(order.getId());
-        return toResponse(orders.save(order), orderItems);
+        var saved = orders.save(order);
+        audit.record(saved.getShopId(), userId, "ORDER_DELIVER", "ORDER", saved.getId(), saved.getCode());
+
+        return toResponse(saved, orderItems);
     }
 
     @Transactional(readOnly = true)

@@ -26,6 +26,9 @@ class ShopDecorationServiceUnitTest {
     @Mock
     private ShopAccessChecker access;
 
+    @Mock
+    private ShopAuditService audit;
+
     @InjectMocks
     private ShopDecorationService decorationService;
 

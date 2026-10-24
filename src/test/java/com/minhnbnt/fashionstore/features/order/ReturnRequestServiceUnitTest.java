@@ -5,6 +5,7 @@ import com.minhnbnt.fashionstore.dto.order.CreateReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.RejectReturnRequest;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.ReturnRequestRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
 import com.minhnbnt.fashionstore.model.Order;
 import com.minhnbnt.fashionstore.model.ReturnRequest;
@@ -38,6 +39,9 @@ class ReturnRequestServiceUnitTest {
 
     @Mock
     private ShopAccessChecker access;
+
+    @Mock
+    private ShopAuditService audit;
 
     @InjectMocks
     private ReturnRequestService returnService;

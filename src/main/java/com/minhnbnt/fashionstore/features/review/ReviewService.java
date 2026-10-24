@@ -12,6 +12,7 @@ import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.review.repository.ReviewRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.OrderStatus;
 import com.minhnbnt.fashionstore.model.ProductStatus;
@@ -46,6 +47,8 @@ public class ReviewService {
     private final ShopService shops;
 
     private final ShopAccessChecker access;
+
+    private final ShopAuditService audit;
 
     @Transactional(readOnly = true)
     public List<ReviewResponse> getReviews(@NonNull UUID productId) {
@@ -139,10 +142,13 @@ public class ReviewService {
         @NonNull UUID reviewId,
         @NonNull ReplyReviewRequest request
     ) {
-        var review = requireShopReview(userId, reviewId);
-        review.reply(request.reply());
+        var found = requireShopReview(userId, reviewId);
+        found.review().reply(request.reply());
 
-        return toSellerResponse(reviews.save(review));
+        var saved = reviews.save(found.review());
+        audit.record(found.shopId(), userId, "REVIEW_REPLY", "REVIEW", saved.getId(), null);
+
+        return toSellerResponse(saved);
     }
 
     @Transactional
@@ -151,10 +157,13 @@ public class ReviewService {
         @NonNull UUID reviewId,
         @NonNull ReportReviewRequest request
     ) {
-        var review = requireShopReview(userId, reviewId);
-        review.report(request.reason());
+        var found = requireShopReview(userId, reviewId);
+        found.review().report(request.reason());
 
-        return toSellerResponse(reviews.save(review));
+        var saved = reviews.save(found.review());
+        audit.record(found.shopId(), userId, "REVIEW_REPORT", "REVIEW", saved.getId(), null);
+
+        return toSellerResponse(saved);
     }
 
     private boolean hasDeliveredAndReceived(UUID buyerId, UUID productId) {
@@ -197,7 +206,7 @@ public class ReviewService {
         return review;
     }
 
-    private Review requireShopReview(UUID userId, UUID reviewId) {
+    private ShopReview requireShopReview(UUID userId, UUID reviewId) {
         var review = reviews.findById(reviewId).orElse(null);
         if (review == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Review not found");
@@ -210,7 +219,10 @@ public class ReviewService {
 
         access.requireShopPermission(userId, product.getShopId(), ShopPermission.REVIEW_REPLY);
 
-        return review;
+        return new ShopReview(review, product.getShopId());
+    }
+
+    private record ShopReview(Review review, UUID shopId) {
     }
 
     private static ReviewResponse toResponse(Review review) {
