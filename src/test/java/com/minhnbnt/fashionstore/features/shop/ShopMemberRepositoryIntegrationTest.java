@@ -94,6 +94,31 @@ class ShopMemberRepositoryIntegrationTest {
         assertThat(members.findAccess(shopId, user())).isEmpty();
     }
 
+    @Test
+    void findMembershipsByUserReturnsAllShopsAndRoles() {
+        var userId = user();
+        var ownedShopId = shop(userId);
+
+        var otherOwnerId = user();
+        var staffShopId = shop(otherOwnerId);
+        var warehouseRole = ShopRole.create(staffShopId, "Kho vận", new String[]{"INVENTORY_READ", "ORDER_READ"}, false);
+        roles.save(warehouseRole);
+        members.add(ShopMember.staff(staffShopId, userId, warehouseRole.getId(), otherOwnerId));
+
+        var rows = members.findMembershipsByUser(userId);
+
+        assertThat(rows).hasSize(2);
+        var staffRow = rows.stream().filter(r -> r.shopId().equals(staffShopId)).findFirst().orElseThrow();
+        assertThat(staffRow.role().name()).isEqualTo("STAFF");
+        assertThat(staffRow.roleName()).isEqualTo("Kho vận");
+        assertThat(staffRow.permissions()).containsExactlyInAnyOrder("INVENTORY_READ", "ORDER_READ");
+        assertThat(staffRow.memberStatus()).isEqualTo("ACTIVE");
+
+        var ownerRow = rows.stream().filter(r -> r.shopId().equals(ownedShopId)).findFirst().orElseThrow();
+        assertThat(ownerRow.role().name()).isEqualTo("OWNER");
+        assertThat(ownerRow.memberStatus()).isEqualTo("ACTIVE");
+    }
+
     private UUID user() {
         var id = UUID.randomUUID();
         users.upsert(id, new CreateUserRequest("member-access-" + id + "@t.local", "Member Access", null));

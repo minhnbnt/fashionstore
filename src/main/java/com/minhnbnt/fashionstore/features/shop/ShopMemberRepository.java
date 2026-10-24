@@ -2,6 +2,7 @@ package com.minhnbnt.fashionstore.features.shop;
 
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.ShopMember;
+import com.minhnbnt.fashionstore.model.ShopStatus;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -109,6 +110,73 @@ public class ShopMemberRepository {
         return jdbc.sql("SELECT shop_id FROM shop_member WHERE user_id = :user AND status = 'ACTIVE' ORDER BY joined_at")
             .param("user", userId)
             .query((rs, rowNum) -> (UUID) rs.getObject("shop_id"))
+            .list();
+    }
+
+    public record UserShopMembershipRow(
+        UUID shopId,
+        String shopName,
+        String shopSlug,
+        @Nullable String logoKey,
+        @Nullable String bannerKey,
+        ShopStatus shopStatus,
+        MemberRole role,
+        @Nullable UUID roleId,
+        @Nullable String roleName,
+        String memberStatus,
+        Instant joinedAt,
+        String[] permissions
+    ) {
+    }
+
+    public List<UserShopMembershipRow> findMembershipsByUser(UUID userId) {
+        return jdbc.sql("""
+            SELECT
+                sm.shop_id,
+                s.name as shop_name,
+                s.slug as shop_slug,
+                s.logo_key,
+                s.banner_key,
+                s.status as shop_status,
+                sm.role,
+                sm.role_id,
+                sr.name as role_name,
+                sm.status as member_status,
+                sm.joined_at,
+                sr.permissions
+            FROM shop_member sm
+            JOIN shop s ON s.id = sm.shop_id
+            LEFT JOIN shop_role sr ON sr.id = sm.role_id AND sr.shop_id = sm.shop_id
+            WHERE sm.user_id = :user
+            ORDER BY sm.joined_at DESC
+            """)
+            .param("user", userId)
+            .query((rs, rowNum) -> {
+                var permissionsArray = rs.getArray("permissions");
+                String[] permissions = new String[0];
+                if (permissionsArray != null) {
+                    permissions = (String[]) permissionsArray.getArray();
+                }
+                var roleName = rs.getString("role_name");
+                var role = MemberRole.valueOf(rs.getString("role"));
+                if (role == MemberRole.OWNER && roleName == null) {
+                    roleName = "Chủ gian hàng";
+                }
+                return new UserShopMembershipRow(
+                    (UUID) rs.getObject("shop_id"),
+                    rs.getString("shop_name"),
+                    rs.getString("shop_slug"),
+                    rs.getString("logo_key"),
+                    rs.getString("banner_key"),
+                    ShopStatus.valueOf(rs.getString("shop_status")),
+                    role,
+                    rs.getObject("role_id", UUID.class),
+                    roleName,
+                    rs.getString("member_status"),
+                    rs.getTimestamp("joined_at").toInstant(),
+                    permissions
+                );
+            })
             .list();
     }
 
