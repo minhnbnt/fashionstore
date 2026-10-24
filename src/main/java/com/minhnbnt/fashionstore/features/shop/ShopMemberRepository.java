@@ -48,6 +48,34 @@ public class ShopMemberRepository {
             .optional();
     }
 
+    public record MemberAccess(MemberRole role, @Nullable UUID roleId, String status, String[] permissions) {
+    }
+
+    public Optional<MemberAccess> findAccess(UUID shopId, UUID userId) {
+        return jdbc.sql("""
+            SELECT m.role, m.role_id, m.status, r.permissions
+            FROM shop_member m
+            LEFT JOIN shop_role r ON r.id = m.role_id
+            WHERE m.shop_id = :shop AND m.user_id = :user
+            """)
+            .param("shop", shopId)
+            .param("user", userId)
+            .query((rs, rowNum) -> {
+                var permissionsArray = rs.getArray("permissions");
+                String[] permissions = new String[0];
+                if (permissionsArray != null) {
+                    permissions = (String[]) permissionsArray.getArray();
+                }
+                return new MemberAccess(
+                    MemberRole.valueOf(rs.getString("role")),
+                    rs.getObject("role_id", UUID.class),
+                    rs.getString("status"),
+                    permissions
+                );
+            })
+            .optional();
+    }
+
     public Optional<ShopMember> findMember(UUID shopId, UUID userId) {
         return jdbc.sql("SELECT * FROM shop_member WHERE shop_id = :shop AND user_id = :user")
             .param("shop", shopId)

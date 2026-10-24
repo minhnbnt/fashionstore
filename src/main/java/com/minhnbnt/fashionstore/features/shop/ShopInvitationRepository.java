@@ -11,5 +11,9 @@ public interface ShopInvitationRepository extends CrudRepository<ShopInvitation,
 
     List<ShopInvitation> findByShopIdOrderByCreatedAtDesc(UUID shopId);
 
+    List<ShopInvitation> findByShopIdAndAcceptedAtIsNullAndRevokedAtIsNullOrderByCreatedAtDesc(UUID shopId);
+
+    Optional<ShopInvitation> findByShopIdAndId(UUID shopId, UUID id);
+
     Optional<ShopInvitation> findByToken(String token);
 }

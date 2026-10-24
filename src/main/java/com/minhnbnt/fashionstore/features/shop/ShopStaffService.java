@@ -162,7 +162,7 @@ public class ShopStaffService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Role not found");
         }
 
-        var inv = ShopInvitation.create(shopId, request.email(), request.roleId(), userId);
+        var inv = ShopInvitation.create(shopId, request.email(), request.roleId(), userId, null);
         invitations.save(inv);
 
         audits.save(ShopMemberAudit.record(
@@ -279,7 +279,12 @@ public class ShopStaffService {
         roles.save(ShopRole.create(
             shopId,
             "Quản lý (Manager)",
-            new String[]{"PRODUCT_READ", "PRODUCT_WRITE", "ORDER_READ", "ORDER_PROCESS", "INVENTORY_WRITE", "REVENUE_READ"},
+            new String[]{
+                "PRODUCT_READ", "PRODUCT_WRITE", "INVENTORY_READ", "INVENTORY_WRITE",
+                "ORDER_READ", "ORDER_PROCESS", "ORDER_CANCEL", "RETURN_PROCESS",
+                "REVENUE_READ", "REVENUE_WITHDRAW", "REVIEW_READ", "REVIEW_REPLY",
+                "CHAT_ACCESS", "DECORATION_WRITE"
+            },
             true
         ));
         roles.save(ShopRole.create(

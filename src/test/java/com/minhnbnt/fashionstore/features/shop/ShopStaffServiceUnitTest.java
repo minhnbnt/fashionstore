@@ -110,7 +110,7 @@ class ShopStaffServiceUnitTest {
         var userId = UUID.randomUUID();
         var shopId = UUID.randomUUID();
         var roleId = UUID.randomUUID();
-        var inv = ShopInvitation.create(shopId, "staff@store.com", roleId, UUID.randomUUID());
+        var inv = ShopInvitation.create(shopId, "staff@store.com", roleId, UUID.randomUUID(), null);
 
         when(invitations.findByToken(inv.getToken())).thenReturn(Optional.of(inv));
 
