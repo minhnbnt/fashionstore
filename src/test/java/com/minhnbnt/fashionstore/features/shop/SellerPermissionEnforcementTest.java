@@ -214,13 +214,11 @@ class SellerPermissionEnforcementTest {
     }
 
     @Test
-    void staffAggregateOrdersEmptyWhenOnlyOtherShopGranted() {
-        var ownerA = mirroredUser();
-        var shopA = approvedShop(ownerA, "perm-order-agg-empty-a-" + UUID.randomUUID());
-        var ownerB = mirroredUser();
-        var shopB = approvedShop(ownerB, "perm-order-agg-empty-b-" + UUID.randomUUID());
-        var staffId = staffWith(ownerB, shopB, ShopPermission.ORDER_READ);
-        pendingOrder(shopA, mirroredUser());
+    void staffAggregateOrdersEmptyWhenMemberLacksPermission() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "perm-order-agg-empty-" + UUID.randomUUID());
+        var staffId = staffWith(ownerId, shopId, ShopPermission.CHAT_ACCESS);
+        pendingOrder(shopId, mirroredUser());
 
         var listed = orders.listSellerOrdersFiltered(staffId, null, null, null, 0, 20);
 
@@ -269,13 +267,11 @@ class SellerPermissionEnforcementTest {
     }
 
     @Test
-    void staffAggregateReturnsEmptyWhenOnlyOtherShopGranted() {
-        var ownerA = mirroredUser();
-        var shopA = approvedShop(ownerA, "perm-return-agg-empty-a-" + UUID.randomUUID());
-        var ownerB = mirroredUser();
-        var shopB = approvedShop(ownerB, "perm-return-agg-empty-b-" + UUID.randomUUID());
-        var staffId = staffWith(ownerB, shopB, ShopPermission.RETURN_PROCESS);
-        pendingReturn(shopA, mirroredUser());
+    void staffAggregateReturnsEmptyWhenMemberLacksPermission() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "perm-return-agg-empty-" + UUID.randomUUID());
+        var staffId = staffWith(ownerId, shopId, ShopPermission.ORDER_READ);
+        pendingReturn(shopId, mirroredUser());
 
         var listed = returns.listSellerReturns(staffId, null, null);
 
@@ -291,6 +287,17 @@ class SellerPermissionEnforcementTest {
         var summary = revenue.getSummary(staffId, shopId);
 
         assertThat(summary.totalRevenue()).isZero();
+    }
+
+    @Test
+    void staffCannotReadRevenue() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "perm-revenue-deny-" + UUID.randomUUID());
+        var staffId = staffWith(ownerId, shopId, ShopPermission.ORDER_READ);
+
+        assertThatThrownBy(() -> revenue.getSummary(staffId, shopId))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertPermissionDenied((ResponseStatusException) e));
     }
 
     @Test
@@ -315,6 +322,18 @@ class SellerPermissionEnforcementTest {
         var listed = reviews.listForShop(staffId, shopId, false);
 
         assertThat(listed).hasSize(1);
+    }
+
+    @Test
+    void staffCannotListReviews() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "perm-review-deny-" + UUID.randomUUID());
+        var staffId = staffWith(ownerId, shopId, ShopPermission.ORDER_READ);
+        reviewFor(shopId, ownerId);
+
+        assertThatThrownBy(() -> reviews.listForShop(staffId, shopId, false))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertPermissionDenied((ResponseStatusException) e));
     }
 
     @Test
