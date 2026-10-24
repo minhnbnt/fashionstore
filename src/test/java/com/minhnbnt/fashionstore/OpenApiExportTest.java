@@ -30,14 +30,16 @@ class OpenApiExportTest {
             .getResponse()
             .getContentAsString();
 
-        // Write to fashionstore-ui-stats docs
-        var targetUi = Paths.get("..", "fashionstore-ui-stats", "docs", "openapi.json");
-        Files.writeString(targetUi, response);
-
-        // Also write to fashionstore-ui docs if exists
+        // Write to fashionstore-ui docs if exists
         var targetMainUi = Paths.get("..", "fashionstore-ui", "docs", "openapi.json");
         if (Files.exists(targetMainUi.getParent())) {
             Files.writeString(targetMainUi, response);
+        }
+
+        // Also write to fashionstore-ui-stats docs if exists
+        var targetUi = Paths.get("..", "fashionstore-ui-stats", "docs", "openapi.json");
+        if (Files.exists(targetUi.getParent())) {
+            Files.writeString(targetUi, response);
         }
     }
 }
