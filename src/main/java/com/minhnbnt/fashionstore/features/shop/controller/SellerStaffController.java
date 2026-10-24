@@ -137,12 +137,13 @@ public class SellerStaffController {
 
     @PostMapping("/invitations")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Mời nhân viên vào shop", description = "Gửi lời mời tham gia shop cho nhân viên theo email kèm theo vai trò.")
+    @Operation(summary = "Mời nhân viên vào shop", description = "Gửi lời mời tham gia shop cho tài khoản đã đăng ký theo email kèm theo vai trò. Lời mời được giao qua thông báo trong website, không gửi email.")
     @ApiResponse(responseCode = "201", description = "Tạo lời mời thành công")
     @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Chỉ chủ shop mới được mời nhân viên")
-    @ApiResponse(responseCode = "404", description = "Không tìm thấy vai trò được chỉ định")
+    @ApiResponse(responseCode = "404", description = "Không tìm thấy vai trò hoặc email chưa có tài khoản")
+    @ApiResponse(responseCode = "409", description = "Email đã là thành viên hoặc đang có lời mời chờ")
     @SecurityRequirement(name = "bearerAuth")
     public StaffInvitationResponse inviteStaff(
         @AuthenticationPrincipal Jwt jwt,
@@ -153,6 +154,50 @@ public class SellerStaffController {
         var userId = UUID.fromString(subject);
 
         return staffService.inviteStaff(userId, shopId, request);
+    }
+
+    @GetMapping("/invitations")
+    @Operation(
+        operationId = "listInvitations",
+        summary = "Danh sách lời mời đang chờ",
+        description = "Chủ shop xem các lời mời chưa chấp nhận và chưa hết hạn của shop."
+    )
+    @ApiResponse(responseCode = "200", description = "Danh sách lời mời đang chờ")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Chỉ chủ shop mới được xem lời mời")
+    @SecurityRequirement(name = "bearerAuth")
+    public List<StaffInvitationResponse> listInvitations(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return staffService.listInvitations(userId, shopId);
+    }
+
+    @DeleteMapping("/invitations/{invitationId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(
+        operationId = "revokeInvitation",
+        summary = "Thu hồi lời mời",
+        description = "Chủ shop thu hồi một lời mời đang chờ; thông báo trong website của người được mời cũng bị xóa."
+    )
+    @ApiResponse(responseCode = "204", description = "Đã thu hồi lời mời")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Chỉ chủ shop mới được thu hồi lời mời")
+    @ApiResponse(responseCode = "404", description = "Không tìm thấy lời mời")
+    @ApiResponse(responseCode = "409", description = "Lời mời đã được chấp nhận")
+    @SecurityRequirement(name = "bearerAuth")
+    public void revokeInvitation(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Parameter(description = "Id lời mời") @PathVariable UUID invitationId
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        staffService.revokeInvitation(userId, shopId, invitationId);
     }
 
     @PatchMapping("/members/{memberId}/role")

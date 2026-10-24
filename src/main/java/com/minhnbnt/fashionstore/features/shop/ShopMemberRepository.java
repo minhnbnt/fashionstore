@@ -154,6 +154,14 @@ public class ShopMemberRepository {
             .update();
     }
 
+    public void updateStatus(UUID shopId, UUID userId, String status) {
+        jdbc.sql("UPDATE shop_member SET status = :status WHERE shop_id = :shop AND user_id = :user")
+            .param("status", status)
+            .param("shop", shopId)
+            .param("user", userId)
+            .update();
+    }
+
     public void remove(UUID shopId, UUID userId) {
         jdbc.sql("DELETE FROM shop_member WHERE shop_id = :shop AND user_id = :user")
             .param("shop", shopId)

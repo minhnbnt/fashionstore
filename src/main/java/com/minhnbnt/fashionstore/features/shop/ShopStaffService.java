@@ -1,13 +1,17 @@
 package com.minhnbnt.fashionstore.features.shop;
 
+import com.minhnbnt.fashionstore.dto.identity.AccountInfo;
 import com.minhnbnt.fashionstore.dto.shop.ChangeMemberRoleRequest;
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRoleRequest;
+import com.minhnbnt.fashionstore.dto.shop.InvitationDetailResponse;
 import com.minhnbnt.fashionstore.dto.shop.InviteStaffRequest;
 import com.minhnbnt.fashionstore.dto.shop.MyPermissionsResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopMemberAuditResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopMemberDetailResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopRoleResponse;
 import com.minhnbnt.fashionstore.dto.shop.StaffInvitationResponse;
+import com.minhnbnt.fashionstore.features.identity.IdentityDirectoryService;
+import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.ShopInvitation;
 import com.minhnbnt.fashionstore.model.ShopMember;
@@ -17,6 +21,7 @@ import com.minhnbnt.fashionstore.model.ShopRole;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -40,6 +46,12 @@ public class ShopStaffService {
     private final ShopMemberAuditRepository audits;
 
     private final ShopAccessChecker access;
+
+    private final ShopRepository shops;
+
+    private final IdentityDirectoryService identity;
+
+    private final NotificationService notifications;
 
     @Transactional
     public List<ShopRoleResponse> listRoles(@NonNull UUID userId, @NonNull UUID shopId) {
@@ -164,8 +176,45 @@ public class ShopStaffService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Role not found");
         }
 
-        var inv = ShopInvitation.create(shopId, request.email(), request.roleId(), userId, null);
-        invitations.save(inv);
+        var email = request.email().trim().toLowerCase(Locale.ROOT);
+        releaseOrRejectPendingInvitation(shopId, email);
+
+        var account = identity.findByEmail(email).orElse(null);
+        if (account == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No registered account with this email");
+        }
+        if (account.id().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot invite yourself");
+        }
+
+        var existingMember = members.findMember(shopId, account.id()).orElse(null);
+        if (existingMember != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This account is already a member of the shop");
+        }
+
+        var shop = shops.findById(shopId).orElseThrow(
+            () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found")
+        );
+        var ownerName = identity.findById(userId).map(AccountInfo::displayName).orElse("Chủ shop");
+
+        var inv = ShopInvitation.create(shopId, email, role.getId(), userId, account.id());
+        try {
+            invitations.save(inv);
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "A pending invitation already exists for this email"
+            );
+        }
+
+        notifications.notifyInvitation(
+            account.id(),
+            inv.getId(),
+            shop.getName(),
+            role.getName(),
+            ownerName,
+            inv.getToken()
+        );
 
         audits.save(ShopMemberAudit.record(
             shopId,
@@ -173,10 +222,75 @@ public class ShopStaffService {
             "INVITE_STAFF",
             "INVITATION",
             inv.getId(),
-            "Email: " + request.email()
+            "Email: " + email
         ));
 
         return toInvitationResponse(inv);
+    }
+
+    @Transactional(readOnly = true)
+    public List<StaffInvitationResponse> listInvitations(@NonNull UUID userId, @NonNull UUID shopId) {
+        access.requireShopRole(userId, shopId, MemberRole.OWNER);
+
+        return invitations.findByShopIdAndAcceptedAtIsNullAndRevokedAtIsNullOrderByCreatedAtDesc(shopId).stream()
+            .filter(invitation -> !invitation.isExpired())
+            .map(ShopStaffService::toInvitationResponse)
+            .toList();
+    }
+
+    @Transactional
+    public void revokeInvitation(@NonNull UUID userId, @NonNull UUID shopId, @NonNull UUID invitationId) {
+        access.requireShopRole(userId, shopId, MemberRole.OWNER);
+
+        var inv = invitations.findByShopIdAndId(shopId, invitationId).orElse(null);
+        if (inv == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Invitation not found");
+        }
+        if (inv.getAcceptedAt() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Invitation has already been accepted");
+        }
+
+        inv.revoke();
+        invitations.save(inv);
+        notifications.deleteByRefId(inv.getId());
+
+        audits.save(ShopMemberAudit.record(
+            shopId,
+            userId,
+            "REVOKE_INVITATION",
+            "INVITATION",
+            inv.getId(),
+            "Email: " + inv.getEmail()
+        ));
+    }
+
+    @Transactional(readOnly = true)
+    public InvitationDetailResponse getInvitationDetail(@NonNull UUID userId, @NonNull String token) {
+        var inv = invitations.findByToken(token).orElse(null);
+        if (inv == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Invitation not found");
+        }
+
+        var shop = shops.findById(inv.getShopId()).orElse(null);
+        var shopName = "";
+        if (shop != null) {
+            shopName = shop.getName();
+        }
+
+        var role = roles.findById(inv.getRoleId()).orElse(null);
+        var roleName = "";
+        if (role != null) {
+            roleName = role.getName();
+        }
+
+        return new InvitationDetailResponse(
+            inv.getShopId(),
+            shopName,
+            roleName,
+            inv.getEmail(),
+            inv.getExpiresAt(),
+            invitationStatus(inv)
+        );
     }
 
     @Transactional
@@ -185,18 +299,30 @@ public class ShopStaffService {
         if (inv == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Invitation not found");
         }
-        if (inv.isExpired()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invitation has expired");
+        if (inv.isRevoked()) {
+            throw new ResponseStatusException(HttpStatus.GONE, "Invitation has been revoked");
         }
         if (inv.getAcceptedAt() != null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Invitation has already been accepted");
         }
+        if (inv.isExpired()) {
+            throw new ResponseStatusException(HttpStatus.GONE, "Invitation has expired");
+        }
+
+        requireInvitee(inv, userId);
+
+        var existing = members.findMember(inv.getShopId(), userId).orElse(null);
+        if (existing == null) {
+            var member = ShopMember.staff(inv.getShopId(), userId, inv.getRoleId(), inv.getCreatedBy());
+            members.add(member);
+        } else {
+            members.updateStatus(inv.getShopId(), userId, "ACTIVE");
+            members.updateRole(inv.getShopId(), userId, MemberRole.STAFF, inv.getRoleId());
+        }
 
         inv.accept();
         invitations.save(inv);
-
-        var member = ShopMember.staff(inv.getShopId(), userId, inv.getRoleId(), inv.getCreatedBy());
-        members.add(member);
+        notifications.deleteByRefId(inv.getId());
 
         audits.save(ShopMemberAudit.record(
             inv.getShopId(),
@@ -289,6 +415,57 @@ public class ShopStaffService {
         return new MyPermissionsResponse(access.isOwner(userId, shopId), permissionNames);
     }
 
+    private void releaseOrRejectPendingInvitation(UUID shopId, String email) {
+        var pending = invitations.findByShopIdAndAcceptedAtIsNullAndRevokedAtIsNullOrderByCreatedAtDesc(shopId);
+
+        for (var inv : pending) {
+            if (!inv.getEmail().equalsIgnoreCase(email)) {
+                continue;
+            }
+            if (!inv.isExpired()) {
+                throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "A pending invitation already exists for this email"
+                );
+            }
+
+            // Lời mời hết hạn vẫn chiếm slot trong unique index, phải thu hồi trước khi mời lại.
+            inv.revoke();
+            invitations.save(inv);
+            notifications.deleteByRefId(inv.getId());
+        }
+    }
+
+    private void requireInvitee(ShopInvitation inv, UUID userId) {
+        if (inv.getInviteeId() != null) {
+            if (inv.getInviteeId().equals(userId)) {
+                return;
+            }
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Invitation does not belong to this account");
+        }
+
+        var actor = identity.findById(userId).orElse(null);
+        if (actor == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Invitation does not belong to this account");
+        }
+        if (!inv.getEmail().equalsIgnoreCase(actor.email())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Invitation does not belong to this account");
+        }
+    }
+
+    private static String invitationStatus(ShopInvitation inv) {
+        if (inv.isRevoked()) {
+            return "REVOKED";
+        }
+        if (inv.getAcceptedAt() != null) {
+            return "ACCEPTED";
+        }
+        if (inv.isExpired()) {
+            return "EXPIRED";
+        }
+        return "PENDING";
+    }
+
     private void initDefaultRoles(UUID shopId) {
         roles.save(ShopRole.create(
             shopId,
@@ -338,6 +515,7 @@ public class ShopStaffService {
             inv.getShopId(),
             inv.getEmail(),
             inv.getRoleId(),
+            inv.getInviteeId(),
             inv.getToken(),
             inv.getExpiresAt(),
             inv.getAcceptedAt(),
