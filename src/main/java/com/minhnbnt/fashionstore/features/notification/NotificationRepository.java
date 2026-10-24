@@ -73,6 +73,22 @@ public class NotificationRepository {
             .single();
     }
 
+    public long countByUser(UUID userId) {
+        return jdbc.sql("SELECT count(*) FROM user_notification WHERE user_id = :user")
+            .param("user", userId)
+            .query(Long.class)
+            .single();
+    }
+
+    public boolean exists(UUID userId, UUID id) {
+        var count = jdbc.sql("SELECT count(*) FROM user_notification WHERE user_id = :user AND id = :id")
+            .param("user", userId)
+            .param("id", id)
+            .query(Long.class)
+            .single();
+        return count > 0;
+    }
+
     public void markRead(UUID userId, UUID id) {
         jdbc.sql("""
             UPDATE user_notification SET read_at = now()
