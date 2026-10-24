@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -15,6 +16,7 @@ import java.util.UUID;
 
 @Table("return_request")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class ReturnRequest implements Persistable<UUID> {
 
     @Id
@@ -47,48 +49,10 @@ public class ReturnRequest implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public ReturnRequest(
-        UUID id,
-        UUID orderId,
-        UUID shopId,
-        UUID buyerId,
-        String reason,
-        @Nullable String description,
-        String[] evidenceKeys,
-        ReturnStatus status,
-        @Nullable String resolution,
-        @Nullable Long refundAmount,
-        @Nullable String sellerNote,
-        Instant createdAt,
-        Instant updatedAt
-    ) {
-        this.id = id;
-        this.orderId = orderId;
-        this.shopId = shopId;
-        this.buyerId = buyerId;
-        this.reason = reason;
-        this.description = description;
-        this.evidenceKeys = evidenceKeys;
-        this.status = status;
-        this.resolution = resolution;
-        this.refundAmount = refundAmount;
-        this.sellerNote = sellerNote;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-        this.newRecord = false;
-    }
-
     public static ReturnRequest create(
-        UUID orderId,
-        UUID shopId,
-        UUID buyerId,
-        String reason,
-        @Nullable String description,
-        String[] evidenceKeys
-    ) {
+        UUID orderId, UUID shopId, UUID buyerId, String reason, @Nullable String description, String[] evidenceKeys) {
         var now = Instant.now();
-        var req = new ReturnRequest(
+        return new ReturnRequest(
             UUID.randomUUID(),
             orderId,
             shopId,
@@ -101,10 +65,8 @@ public class ReturnRequest implements Persistable<UUID> {
             null,
             null,
             now,
-            now
-        );
-        req.newRecord = true;
-        return req;
+            now,
+            true);
     }
 
     public void approve(String resolution, @Nullable Long refundAmount, @Nullable String sellerNote) {

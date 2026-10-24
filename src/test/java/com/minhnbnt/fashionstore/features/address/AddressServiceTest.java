@@ -4,6 +4,7 @@ import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.address.AddressRequest;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.features.identity.UserService;
+import com.minhnbnt.fashionstore.model.AddressLabel;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,8 +33,8 @@ class AddressServiceTest {
         return id;
     }
 
-    private static AddressRequest address(String city) {
-        return new AddressRequest(null, null, null, null, city);
+    private static AddressRequest address(String fullAddress) {
+        return new AddressRequest("Nguyen Van A", "0912345678", fullAddress, AddressLabel.HOME, false);
     }
 
     private static void assertStatus(ResponseStatusException e, HttpStatus status) {
@@ -44,10 +45,13 @@ class AddressServiceTest {
     void firstAddressBecomesDefault() {
         var userId = user();
 
-        var created = addresses.addAddress(userId, address("Ha Noi"));
+        var created = addresses.addAddress(userId, address("So 18 Duy Tan, Phuong Dich Vong, Ha Noi"));
 
         assertThat(created.defaultAddress()).isTrue();
-        assertThat(created.city()).isEqualTo("Ha Noi");
+        assertThat(created.fullAddress()).isEqualTo("So 18 Duy Tan, Phuong Dich Vong, Ha Noi");
+        assertThat(created.recipientName()).isEqualTo("Nguyen Van A");
+        assertThat(created.phoneNumber()).isEqualTo("0912345678");
+        assertThat(created.label()).isEqualTo(AddressLabel.HOME);
     }
 
     @Test
@@ -65,33 +69,35 @@ class AddressServiceTest {
     }
 
     @Test
-    void editsMergeKeepingEmpty() {
+    void updateReplacesAllFields() {
         var userId = user();
         var id = addresses.addAddress(
             userId,
-            new AddressRequest("12", "Nguyen Trai", "Ben Thanh", "Quan 1", "Sai Gon")
+            new AddressRequest(
+                "Nguyen Van A",
+                "0912345678",
+                "12 Nguyen Trai, Phuong Ben Thanh, Sai Gon",
+                AddressLabel.HOME,
+                false
+            )
         ).id();
 
-        var updated = addresses.updateAddress(userId, id, new AddressRequest(null, null, null, null, "Da Nang"));
-
-        assertThat(updated.city()).isEqualTo("Da Nang");
-        assertThat(updated.houseNumber()).isEqualTo("12");
-        assertThat(updated.street()).isEqualTo("Nguyen Trai");
-        assertThat(updated.ward()).isEqualTo("Ben Thanh");
-        assertThat(updated.district()).isEqualTo("Quan 1");
-    }
-
-    @Test
-    void blankKeepsPreviousValue() {
-        var userId = user();
-        var id = addresses.addAddress(
+        var updated = addresses.updateAddress(
             userId,
-            new AddressRequest("12", "Nguyen Trai", null, null, "Sai Gon")
-        ).id();
+            id,
+            new AddressRequest(
+                "Tran Thi B",
+                "0987654321",
+                "Toa nha Keangnam, Phuong Me Tri, Ha Noi",
+                AddressLabel.OFFICE,
+                false
+            )
+        );
 
-        var updated = addresses.updateAddress(userId, id, new AddressRequest(null, "", null, null, null));
-
-        assertThat(updated.street()).isEqualTo("Nguyen Trai");
+        assertThat(updated.recipientName()).isEqualTo("Tran Thi B");
+        assertThat(updated.phoneNumber()).isEqualTo("0987654321");
+        assertThat(updated.fullAddress()).isEqualTo("Toa nha Keangnam, Phuong Me Tri, Ha Noi");
+        assertThat(updated.label()).isEqualTo(AddressLabel.OFFICE);
     }
 
     @Test
@@ -101,8 +107,27 @@ class AddressServiceTest {
 
         var updated = addresses.updateAddress(userId, id, address("Hue"));
 
-        assertThat(updated.city()).isEqualTo("Hue");
+        assertThat(updated.fullAddress()).isEqualTo("Hue");
         assertThat(updated.defaultAddress()).isTrue();
+    }
+
+    @Test
+    void updateCanMarkDefault() {
+        var userId = user();
+        addresses.addAddress(userId, address("Ha Noi"));
+        var id = addresses.addAddress(userId, address("Hue")).id();
+
+        var updated = addresses.updateAddress(
+            userId,
+            id,
+            new AddressRequest("Nguyen Van A", "0912345678", "Hue", AddressLabel.HOME, true)
+        );
+
+        assertThat(updated.defaultAddress()).isTrue();
+
+        var list = addresses.getAddresses(userId);
+        assertThat(list.get(0).defaultAddress()).isFalse();
+        assertThat(list.get(1).defaultAddress()).isTrue();
     }
 
     @Test
@@ -143,6 +168,23 @@ class AddressServiceTest {
         addresses.deleteAddress(userId, id);
 
         assertThat(addresses.getAddresses(userId)).isEmpty();
+    }
+
+    @Test
+    void maxTenAddressesEnforced() {
+        var userId = user();
+        for (int i = 0; i < 10; i++) {
+            addresses.addAddress(userId, address("City " + i));
+        }
+
+        assertThat(addresses.getAddresses(userId)).hasSize(10);
+
+        assertThatThrownBy(() -> addresses.addAddress(userId, address("City 11")))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> {
+                assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST);
+                assertThat(((ResponseStatusException) e).getReason()).contains("Maximum of 10 addresses reached");
+            });
     }
 
     @Test

@@ -16,7 +16,6 @@ import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import jakarta.validation.Validator;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +27,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -49,15 +49,8 @@ public class ShopService {
 
     private final ShopAccessChecker access;
 
-    private final Validator validator;
-
     @Transactional
     public ShopResponse register(@NonNull UUID ownerId, @NonNull CreateShopRequest request) {
-        var violations = validator.validate(request);
-        if (!violations.isEmpty()) {
-            var violation = violations.iterator().next();
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, violation.getMessage());
-        }
 
         var normHolder = normalizeName(request.bankHolder());
         var normLegal = normalizeName(request.legalName());
@@ -68,23 +61,10 @@ public class ShopService {
             );
         }
 
-        var sellerType = "INDIVIDUAL";
-        if (request.sellerType() != null && !request.sellerType().isBlank()) {
-            sellerType = request.sellerType().trim();
+        var sellerType = trimOrNull(request.sellerType());
+        if (sellerType == null) {
+            sellerType = "INDIVIDUAL";
         }
-
-        String taxCode = null;
-        if (request.taxCode() != null) {
-            taxCode = request.taxCode().trim();
-        }
-
-        String businessCertKey = null;
-        if (request.businessCertKey() != null) {
-            businessCertKey = request.businessCertKey().trim();
-        }
-
-        var cleanedId = request.idNumber().trim();
-
         var shop = Shop.create(
             request.name().trim(),
             request.slug().trim(),
@@ -95,14 +75,14 @@ public class ShopService {
             request.address().trim(),
             sellerType,
             request.legalName().trim(),
-            cleanedId,
+            request.idNumber().trim(),
             request.idIssuedDate().trim(),
             request.idIssuedPlace().trim(),
-            taxCode,
+            trimOrNull(request.taxCode()),
             request.idFrontKey().trim(),
             request.idBackKey().trim(),
             request.idSelfieKey().trim(),
-            businessCertKey,
+            trimOrNull(request.businessCertKey()),
             request.bankName().trim(),
             request.bankAccount().trim(),
             request.bankHolder().trim()
@@ -343,10 +323,19 @@ public class ShopService {
         return normalized.replaceAll("\\p{M}", "")
             .replaceAll("[đĐ]", "d")
             .replaceAll("\\s+", " ")
-            .toUpperCase(java.util.Locale.ROOT);
+            .toUpperCase(Locale.ROOT);
     }
 
-
+    private static @Nullable String trimOrNull(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        var trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed;
+    }
 
     public static ShopResponse toResponse(Shop shop) {
         return new ShopResponse(

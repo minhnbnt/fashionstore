@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.PersistenceCreator;
@@ -10,6 +11,7 @@ import java.util.UUID;
 
 @Table("shop_member")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class ShopMember {
 
     private final UUID shopId;
@@ -28,33 +30,13 @@ public class ShopMember {
 
     private final Instant joinedAt;
 
-    @PersistenceCreator
-    public ShopMember(
-        UUID shopId,
-        UUID userId,
-        MemberRole role,
-        @Nullable UUID roleId,
-        @Nullable UUID invitedBy,
-        @Nullable Instant invitedAt,
-        String status,
-        Instant joinedAt
-    ) {
-        this.shopId = shopId;
-        this.userId = userId;
-        this.role = role;
-        this.roleId = roleId;
-        this.invitedBy = invitedBy;
-        this.invitedAt = invitedAt;
-        this.status = status;
-        this.joinedAt = joinedAt;
-    }
-
     public static ShopMember owner(UUID shopId, UUID userId) {
         return new ShopMember(shopId, userId, MemberRole.OWNER, null, null, null, "ACTIVE", Instant.now());
     }
 
     public static ShopMember staff(UUID shopId, UUID userId, @Nullable UUID roleId, @Nullable UUID invitedBy) {
-        return new ShopMember(shopId, userId, MemberRole.STAFF, roleId, invitedBy, Instant.now(), "ACTIVE", Instant.now());
+        return new ShopMember(
+            shopId, userId, MemberRole.STAFF, roleId, invitedBy, Instant.now(), "ACTIVE", Instant.now());
     }
 
     public void updateRole(MemberRole role, @Nullable UUID roleId) {

@@ -6,6 +6,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 
+import java.util.List;
+import java.util.UUID;
+
 public record CartCheckoutRequest(
     @Schema(example = "An")
     @NotBlank
@@ -25,6 +28,13 @@ public record CartCheckoutRequest(
     @Schema(description = "Phi ship VND ap cho moi don, null = 0", nullable = true)
     @Nullable
     @Min(0)
-    Long shippingFee
+    Long shippingFee,
+
+    @Schema(
+        description = "Chi thanh toan cac variant nay, null/rong = toan bo gio",
+        nullable = true
+    )
+    @Nullable
+    List<UUID> variantIds
 ) {
 }

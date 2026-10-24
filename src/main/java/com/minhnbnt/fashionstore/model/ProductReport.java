@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -17,6 +18,7 @@ import java.util.UUID;
  */
 @Table("product_report")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class ProductReport implements Persistable<UUID> {
 
     @Id
@@ -45,46 +47,21 @@ public class ProductReport implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public ProductReport(
-        UUID id,
-        UUID productId,
-        ReportSource source,
-        @Nullable UUID reporterId,
-        ProductViolationType reason,
-        String description,
-        ReportStatus status,
-        @Nullable UUID resolvedBy,
-        @Nullable Instant resolvedAt,
-        @Nullable String resolutionNote,
-        Instant createdAt
-    ) {
-        this.id = id;
-        this.productId = productId;
-        this.source = source;
-        this.reporterId = reporterId;
-        this.reason = reason;
-        this.description = description;
-        this.status = status;
-        this.resolvedBy = resolvedBy;
-        this.resolvedAt = resolvedAt;
-        this.resolutionNote = resolutionNote;
-        this.createdAt = createdAt;
-        this.newRecord = false;
-    }
-
     public static ProductReport byUser(
-        UUID productId,
-        UUID reporterId,
-        ProductViolationType reason,
-        String description
-    ) {
-        var report = new ProductReport(
-            UUID.randomUUID(), productId, ReportSource.USER, reporterId, reason, description,
-            ReportStatus.OPEN, null, null, null, Instant.now()
-        );
-        report.newRecord = true;
-        return report;
+        UUID productId, UUID reporterId, ProductViolationType reason, String description) {
+        return new ProductReport(
+            UUID.randomUUID(),
+            productId,
+            ReportSource.USER,
+            reporterId,
+            reason,
+            description,
+            ReportStatus.OPEN,
+            null,
+            null,
+            null,
+            Instant.now(),
+            true);
     }
 
     @Override

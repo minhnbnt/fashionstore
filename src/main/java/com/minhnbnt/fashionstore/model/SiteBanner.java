@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -16,6 +17,7 @@ import java.util.UUID;
  */
 @Table("site_banner")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class SiteBanner implements Persistable<UUID> {
 
     @Id
@@ -48,38 +50,6 @@ public class SiteBanner implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public SiteBanner(
-        UUID id,
-        BannerPlacement placement,
-        String title,
-        String imageKey,
-        @Nullable String mobileImageKey,
-        @Nullable String linkUrl,
-        int sortOrder,
-        boolean active,
-        @Nullable Instant startsAt,
-        @Nullable Instant endsAt,
-        @Nullable UUID updatedBy,
-        Instant createdAt,
-        Instant updatedAt
-    ) {
-        this.id = id;
-        this.placement = placement;
-        this.title = title;
-        this.imageKey = imageKey;
-        this.mobileImageKey = mobileImageKey;
-        this.linkUrl = linkUrl;
-        this.sortOrder = sortOrder;
-        this.active = active;
-        this.startsAt = startsAt;
-        this.endsAt = endsAt;
-        this.updatedBy = updatedBy;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-        this.newRecord = false;
-    }
-
     public static SiteBanner create(
         BannerPlacement placement,
         String title,
@@ -90,16 +60,12 @@ public class SiteBanner implements Persistable<UUID> {
         boolean active,
         @Nullable Instant startsAt,
         @Nullable Instant endsAt,
-        UUID adminId
-    ) {
+        UUID adminId) {
         var now = Instant.now();
         var banner = new SiteBanner(
-            UUID.randomUUID(), placement, title, imageKey, null, null, 0, false, null, null, adminId, now, now
-        );
+            UUID.randomUUID(), placement, title, imageKey, null, null, 0, false, null, null, adminId, now, now, true);
         banner.update(
-            placement, title, imageKey, mobileImageKey, linkUrl, sortOrder, active, startsAt, endsAt, adminId
-        );
-        banner.newRecord = true;
+            placement, title, imageKey, mobileImageKey, linkUrl, sortOrder, active, startsAt, endsAt, adminId);
         return banner;
     }
 
@@ -113,8 +79,7 @@ public class SiteBanner implements Persistable<UUID> {
         boolean active,
         @Nullable Instant startsAt,
         @Nullable Instant endsAt,
-        UUID adminId
-    ) {
+        UUID adminId) {
         ContentFields.requireValidWindow(startsAt, endsAt);
 
         this.placement = placement;

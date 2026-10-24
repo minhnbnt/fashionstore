@@ -1,8 +1,8 @@
 package com.minhnbnt.fashionstore.model;
 
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
-import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.PersistenceCreator;
 import org.springframework.data.annotation.Transient;
@@ -15,6 +15,7 @@ import java.util.UUID;
 
 @Table("address")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class Address implements Persistable<UUID> {
 
     @Id
@@ -22,15 +23,13 @@ public class Address implements Persistable<UUID> {
 
     private UUID userId;
 
-    private @Nullable String houseNumber;
+    private String recipientName;
 
-    private @Nullable String street;
+    private String phoneNumber;
 
-    private @Nullable String ward;
+    private String fullAddress;
 
-    private @Nullable String district;
-
-    private @Nullable String city;
+    private AddressLabel label;
 
     @Column("is_default")
     private boolean defaultAddress;
@@ -43,80 +42,34 @@ public class Address implements Persistable<UUID> {
     @Getter(AccessLevel.NONE)
     private boolean newRecord;
 
-    @PersistenceCreator
-    public Address(
-        UUID id,
-        UUID userId,
-        @Nullable String houseNumber,
-        @Nullable String street,
-        @Nullable String ward,
-        @Nullable String district,
-        @Nullable String city,
-        boolean defaultAddress,
-        Instant createdAt,
-        Instant updatedAt
-    ) {
-        this.id = id;
-        this.userId = userId;
-        this.houseNumber = houseNumber;
-        this.street = street;
-        this.ward = ward;
-        this.district = district;
-        this.city = city;
-        this.defaultAddress = defaultAddress;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-        this.newRecord = false;
-    }
-
     public static Address create(
         UUID userId,
-        @Nullable String houseNumber,
-        @Nullable String street,
-        @Nullable String ward,
-        @Nullable String district,
-        @Nullable String city,
+        String recipientName,
+        String phoneNumber,
+        String fullAddress,
+        AddressLabel label,
         boolean defaultAddress
     ) {
         var now = Instant.now();
-        var address = new Address(
+
+        return new Address(
             UUID.randomUUID(),
             userId,
-            houseNumber,
-            street,
-            ward,
-            district,
-            city,
+            recipientName,
+            phoneNumber,
+            fullAddress,
+            label,
             defaultAddress,
-            now,
-            now
+            now, now,
+            true
         );
-        address.newRecord = true;
-        return address;
     }
 
-    public void updateDetails(
-        @Nullable String houseNumber,
-        @Nullable String street,
-        @Nullable String ward,
-        @Nullable String district,
-        @Nullable String city
-    ) {
-        if (!isEmpty(houseNumber)) {
-            this.houseNumber = houseNumber;
-        }
-        if (!isEmpty(street)) {
-            this.street = street;
-        }
-        if (!isEmpty(ward)) {
-            this.ward = ward;
-        }
-        if (!isEmpty(district)) {
-            this.district = district;
-        }
-        if (!isEmpty(city)) {
-            this.city = city;
-        }
+    public void updateDetails(String recipientName, String phoneNumber, String fullAddress, AddressLabel label) {
+        this.recipientName = recipientName;
+        this.phoneNumber = phoneNumber;
+        this.fullAddress = fullAddress;
+        this.label = label;
         updatedAt = Instant.now();
     }
 
@@ -128,14 +81,6 @@ public class Address implements Persistable<UUID> {
     public void clearDefault() {
         defaultAddress = false;
         updatedAt = Instant.now();
-    }
-
-    private static boolean isEmpty(@Nullable String value) {
-        if (value == null) {
-            return true;
-        }
-
-        return value.isBlank();
     }
 
     @Override

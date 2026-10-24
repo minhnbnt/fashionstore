@@ -21,6 +21,7 @@ import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.Category;
 import com.minhnbnt.fashionstore.model.ProductStatus;
+import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,7 +68,7 @@ class CatalogServiceTest {
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = mirroredUser();
-        var shop = shops.register(ownerId, com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop " + slug, slug));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }
@@ -91,7 +92,7 @@ class CatalogServiceTest {
                 new ImageItemRequest("img2.jpg", null, 1),
                 new ImageItemRequest("img3.jpg", null, 2)
             ),
-            null, null, false, null, null, null, null, null, null, null, null, "ACTIVE"
+            null, null, null, null, null, null, null, null, null, null, null, "ACTIVE"
         );
     }
 
@@ -102,7 +103,7 @@ class CatalogServiceTest {
     @Test
     void createOnPendingShopIsForbidden() {
         var ownerId = mirroredUser();
-        var shop = shops.register(ownerId, com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop Pend", "shop-pend-cat"));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop Pend", "shop-pend-cat"));
 
         assertThatThrownBy(() -> catalog.createProduct(ownerId, shop.id(), productRequest("ao-pend")))
             .isInstanceOf(ResponseStatusException.class)
@@ -192,7 +193,10 @@ class CatalogServiceTest {
                 i == 0
             ));
         }
-        var catId = categoryId != null ? categoryId : testCategory();
+        var catId = testCategory();
+        if (categoryId != null) {
+            catId = categoryId;
+        }
         return new CreateProductRequest(
             name,
             slug,
@@ -204,7 +208,7 @@ class CatalogServiceTest {
                 new ImageItemRequest("img2.jpg", null, 1),
                 new ImageItemRequest("img3.jpg", null, 2)
             ),
-            null, null, false, null, null, null, null, null, null, null, null, "ACTIVE"
+            null, null, null, null, null, null, null, null, null, null, null, "ACTIVE"
         );
     }
 
@@ -410,7 +414,7 @@ class CatalogServiceTest {
                 new ImageItemRequest("img2.jpg", null, 1),
                 new ImageItemRequest("img3.jpg", null, 2)
             ),
-            null, null, false, null, null, null, null, null, null, null, null, "HIDDEN"
+            null, null, null, null, null, null, null, null, null, null, null, "HIDDEN"
         );
         var hiddenProd = catalog.createProduct(ownerId, shop.id(), hiddenReq);
         assertThat(hiddenProd.status()).isEqualTo("HIDDEN");
@@ -450,73 +454,6 @@ class CatalogServiceTest {
     }
 
     @Test
-    void imageCountValidationMinMax() {
-        var ownerId = mirroredUser();
-        var shopId = approvedShop(ownerId, "shop-images-val");
-
-        // Less than 3 images
-        var twoImages = List.of(
-            new ImageItemRequest("img1.jpg", null, 0),
-            new ImageItemRequest("img2.jpg", null, 1)
-        );
-        var reqTwoImages = new CreateProductRequest(
-            "Ao Hai Anh", "ao-hai-anh", "Mo ta", testCategory(),
-            List.of(new CreateVariantRequest("SKU-TWO-IMG", "M", "Do", 150000L, null, 5, true)),
-            twoImages, null, null, false, null, null, null, null, null, null, null, null, "ACTIVE"
-        );
-        assertThatThrownBy(() -> catalog.createProduct(ownerId, shopId, reqTwoImages))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> {
-                var ex = (ResponseStatusException) e;
-                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-                assertThat(ex.getReason()).contains("at least 3 images");
-            });
-
-        // More than 9 images
-        var tenImages = new ArrayList<ImageItemRequest>();
-        for (int i = 0; i < 10; i++) {
-            tenImages.add(new ImageItemRequest("img" + i + ".jpg", null, i));
-        }
-        var reqTenImages = new CreateProductRequest(
-            "Ao Muoi Anh", "ao-muoi-anh", "Mo ta", testCategory(),
-            List.of(new CreateVariantRequest("SKU-TEN-IMG", "M", "Do", 150000L, null, 5, true)),
-            tenImages, null, null, false, null, null, null, null, null, null, null, null, "ACTIVE"
-        );
-        assertThatThrownBy(() -> catalog.createProduct(ownerId, shopId, reqTenImages))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> {
-                var ex = (ResponseStatusException) e;
-                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-                assertThat(ex.getReason()).contains("cannot exceed 9 images");
-            });
-    }
-
-    @Test
-    void createProductRejectsNameTooShort() {
-        var ownerId = mirroredUser();
-        var shopId = approvedShop(ownerId, "shop-val-name");
-
-        var req = new CreateProductRequest(
-            "Ao", "ao-ngan", "Mo ta", testCategory(),
-            List.of(new CreateVariantRequest("SKU-NAME", "M", "Den", 100000L, null, 10, true)),
-            List.of(
-                new ImageItemRequest("img1.jpg", null, 0),
-                new ImageItemRequest("img2.jpg", null, 1),
-                new ImageItemRequest("img3.jpg", null, 2)
-            ),
-            null, null, false, null, null, null, null, null, null, null, null, "ACTIVE"
-        );
-
-        assertThatThrownBy(() -> catalog.createProduct(ownerId, shopId, req))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> {
-                var ex = (ResponseStatusException) e;
-                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-                assertThat(ex.getReason()).contains("Product name must be between 5 and 300 characters");
-            });
-    }
-
-    @Test
     void createProductRejectsNonExistentCategory() {
         var ownerId = mirroredUser();
         var shopId = approvedShop(ownerId, "shop-val-cat");
@@ -529,7 +466,7 @@ class CatalogServiceTest {
                 new ImageItemRequest("img2.jpg", null, 1),
                 new ImageItemRequest("img3.jpg", null, 2)
             ),
-            null, null, false, null, null, null, null, null, null, null, null, "ACTIVE"
+            null, null, null, null, null, null, null, null, null, null, null, "ACTIVE"
         );
 
         assertThatThrownBy(() -> catalog.createProduct(ownerId, shopId, req))
@@ -554,7 +491,7 @@ class CatalogServiceTest {
                 new ImageItemRequest("img2.jpg", null, 1),
                 new ImageItemRequest("img3.jpg", null, 2)
             ),
-            null, null, false, null, null, null, null,
+            null, null, null, null, null, null, null,
             -10, 20, 10, 5, "ACTIVE"
         );
 

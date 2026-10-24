@@ -1,8 +1,10 @@
 package com.minhnbnt.fashionstore.features.cart;
 
+import com.minhnbnt.fashionstore.test.ProductTestFixtures;
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.cart.CartCheckoutRequest;
 import com.minhnbnt.fashionstore.dto.cart.CartItemRequest;
+import com.minhnbnt.fashionstore.dto.cart.CartItemResponse;
 import com.minhnbnt.fashionstore.dto.cart.CheckoutBlockedItem;
 import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
@@ -17,6 +19,7 @@ import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.Product;
 import com.minhnbnt.fashionstore.model.ProductVariant;
+import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -63,13 +66,13 @@ class CartServiceTest {
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = mirroredUser();
-        var shop = shops.register(ownerId, com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop " + slug, slug));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }
 
     private UUID pendingShop(UUID ownerId, String slug) {
-        var shop = shops.register(ownerId, com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop " + slug, slug));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
         return shop.id();
     }
 
@@ -77,7 +80,7 @@ class CartServiceTest {
         var created = catalog.createProduct(
             ownerId,
             shopId,
-            new CreateProductRequest(
+            ProductTestFixtures.request(
                 "Ao " + slug,
                 slug,
                 null,
@@ -93,7 +96,7 @@ class CartServiceTest {
         var created = catalog.createProduct(
             ownerId,
             shopId,
-            new CreateProductRequest(
+            ProductTestFixtures.request(
                 "Ao " + slug,
                 slug,
                 null,
@@ -116,7 +119,11 @@ class CartServiceTest {
     }
 
     private static CartCheckoutRequest shipping() {
-        return new CartCheckoutRequest("An", "0901", "Ha Noi", 0L);
+        return new CartCheckoutRequest("An", "0901", "Ha Noi", 0L, null);
+    }
+
+    private static CartCheckoutRequest shipping(List<UUID> variantIds) {
+        return new CartCheckoutRequest("An", "0901", "Ha Noi", 0L, variantIds);
     }
 
     @Test
@@ -208,6 +215,86 @@ class CartServiceTest {
 
         assertThat(orders.getMine(buyerId)).isEmpty();
         assertThat(carts.getCart(buyerId).items()).hasSize(2);
+    }
+
+    @Test
+    void checkoutSelectedItemsOnlyKeepsRestInCart() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopA = approvedShop(ownerId, "shop-cart-g1");
+        var shopB = approvedShop(ownerId, "shop-cart-g2");
+        var variantA = variantInShop(ownerId, shopA, "ao-cart-g1", "SKU-CART-G1", 10);
+        var variantB = variantInShop(ownerId, shopB, "ao-cart-g2", "SKU-CART-G2", 10);
+        carts.addItem(buyerId, new CartItemRequest(variantA, 1));
+        carts.addItem(buyerId, new CartItemRequest(variantB, 2));
+
+        var placed = carts.checkout(buyerId, shipping(List.of(variantA)));
+
+        assertThat(placed).hasSize(1);
+        assertThat(placed.get(0).shopId()).isEqualTo(shopA);
+        var remaining = carts.getCart(buyerId);
+        assertThat(remaining.items()).extracting(CartItemResponse::variantId).containsExactly(variantB);
+        assertThat(remaining.subtotal()).isEqualTo(200000L);
+    }
+
+    @Test
+    void checkoutWithVariantNotInCartFails() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-cart-h");
+        var variantId = variantInShop(ownerId, shopId, "ao-cart-h", "SKU-CART-H", 10);
+        carts.addItem(buyerId, new CartItemRequest(variantId, 1));
+
+        assertThatThrownBy(() -> carts.checkout(buyerId, shipping(List.of(variantId, UUID.randomUUID()))))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+
+        assertThat(orders.getMine(buyerId)).isEmpty();
+        assertThat(carts.getCart(buyerId).items()).hasSize(1);
+    }
+
+    @Test
+    void checkoutSelectedAcrossShopsSplitsAndKeepsRest() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopA = approvedShop(ownerId, "shop-cart-i1");
+        var shopB = approvedShop(ownerId, "shop-cart-i2");
+        var variantA = variantInShop(ownerId, shopA, "ao-cart-i1", "SKU-CART-I1", 10);
+        var variantB = variantInShop(ownerId, shopB, "ao-cart-i2", "SKU-CART-I2", 10);
+        var leftOut = variantInShop(ownerId, shopA, "ao-cart-i3", "SKU-CART-I3", 10);
+        carts.addItem(buyerId, new CartItemRequest(variantA, 1));
+        carts.addItem(buyerId, new CartItemRequest(variantB, 2));
+        carts.addItem(buyerId, new CartItemRequest(leftOut, 1));
+
+        var placed = carts.checkout(buyerId, shipping(List.of(variantA, variantB)));
+
+        assertThat(placed).hasSize(2);
+        assertThat(placed).extracting(order -> order.shopId()).containsExactlyInAnyOrder(shopA, shopB);
+        assertThat(carts.getCart(buyerId).items())
+            .extracting(CartItemResponse::variantId)
+            .containsExactly(leftOut);
+    }
+
+    @Test
+    void checkoutSelectedBlockedOnSoldOutPlacesNothing() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-cart-j");
+        var soldOut = variantInShop(ownerId, shopId, "ao-cart-j1", "SKU-CART-J1", 0);
+        var fine = variantInShop(ownerId, shopId, "ao-cart-j2", "SKU-CART-J2", 10);
+        var leftOut = variantInShop(ownerId, shopId, "ao-cart-j3", "SKU-CART-J3", 10);
+        carts.addItem(buyerId, new CartItemRequest(soldOut, 1));
+        carts.addItem(buyerId, new CartItemRequest(fine, 1));
+        carts.addItem(buyerId, new CartItemRequest(leftOut, 1));
+
+        assertThatThrownBy(() -> carts.checkout(buyerId, shipping(List.of(soldOut, fine))))
+            .isInstanceOf(CartCheckoutBlockedException.class)
+            .satisfies(e -> assertThat(((CartCheckoutBlockedException) e).getItems())
+                .extracting(CheckoutBlockedItem::variantId)
+                .containsExactly(soldOut));
+
+        assertThat(orders.getMine(buyerId)).isEmpty();
+        assertThat(carts.getCart(buyerId).items()).hasSize(3);
     }
 
     @Test

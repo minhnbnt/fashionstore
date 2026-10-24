@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -13,6 +14,7 @@ import java.util.UUID;
 
 @Table("order_status_history")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class OrderStatusHistory implements Persistable<UUID> {
 
     @Id
@@ -33,43 +35,28 @@ public class OrderStatusHistory implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public OrderStatusHistory(
-        UUID id,
-        UUID orderId,
-        @Nullable String fromStatus,
-        String toStatus,
-        @Nullable UUID changedBy,
-        String note,
-        Instant createdAt
-    ) {
-        this.id = id;
-        this.orderId = orderId;
-        this.fromStatus = fromStatus;
-        this.toStatus = toStatus;
-        this.changedBy = changedBy;
-        this.note = note;
-        this.createdAt = createdAt;
-        this.newRecord = false;
+    public static OrderStatusHistory record(
+        UUID orderId, @Nullable OrderStatus from, OrderStatus to, @Nullable UUID changedBy) {
+        return record(orderId, from, to, changedBy, "");
     }
 
     public static OrderStatusHistory record(
         UUID orderId,
         @Nullable OrderStatus from,
         OrderStatus to,
-        @Nullable UUID changedBy
+        @Nullable UUID changedBy,
+        String note
     ) {
-        var history = new OrderStatusHistory(
+        return new OrderStatusHistory(
             UUID.randomUUID(),
             orderId,
             from == null ? null : from.name(),
             to.name(),
             changedBy,
-            "",
-            Instant.now()
+            note,
+            Instant.now(),
+            true
         );
-        history.newRecord = true;
-        return history;
     }
 
     @Override

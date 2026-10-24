@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -15,6 +16,7 @@ import java.util.UUID;
 
 @Table("product")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class Product implements Persistable<UUID> {
 
     @Id
@@ -67,80 +69,6 @@ public class Product implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public Product(
-        UUID id,
-        UUID shopId,
-        @Nullable UUID categoryId,
-        String name,
-        String slug,
-        String description,
-        ProductStatus status,
-        @Nullable ProductViolationType violationType,
-        @Nullable String statusReason,
-        @Nullable UUID createdBy,
-        @Nullable String videoKey,
-        @Nullable String garmentKey,
-        @Nullable Boolean tryOnEnabled,
-        @Nullable String material,
-        @Nullable String origin,
-        @Nullable String careInstructions,
-        @Nullable String sizeGuide,
-        @Nullable Integer weightGrams,
-        @Nullable Integer lengthCm,
-        @Nullable Integer widthCm,
-        @Nullable Integer heightCm,
-        Instant createdAt,
-        Instant updatedAt
-    ) {
-        this.id = id;
-        this.shopId = shopId;
-        this.categoryId = categoryId;
-        this.name = name;
-        this.slug = slug;
-        this.description = description;
-        this.status = status;
-        this.violationType = violationType;
-        this.statusReason = statusReason;
-        this.createdBy = createdBy;
-        this.videoKey = videoKey;
-        this.garmentKey = garmentKey;
-        this.tryOnEnabled = tryOnEnabled != null && tryOnEnabled;
-        this.material = material;
-        this.origin = origin;
-        this.careInstructions = careInstructions;
-        this.sizeGuide = sizeGuide;
-        this.weightGrams = weightGrams;
-        this.lengthCm = lengthCm;
-        this.widthCm = widthCm;
-        this.heightCm = heightCm;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-        this.newRecord = false;
-    }
-
-    public Product(
-        UUID id,
-        UUID shopId,
-        @Nullable UUID categoryId,
-        String name,
-        String slug,
-        String description,
-        ProductStatus status,
-        @Nullable ProductViolationType violationType,
-        @Nullable String statusReason,
-        @Nullable UUID createdBy,
-        Instant createdAt,
-        Instant updatedAt
-    ) {
-        this(
-            id, shopId, categoryId, name, slug, description, status,
-            violationType, statusReason, createdBy,
-            null, null, false, null, null, null, null, null, null, null, null,
-            createdAt, updatedAt
-        );
-    }
-
     public static Product create(
         UUID shopId,
         @Nullable UUID categoryId,
@@ -162,7 +90,7 @@ public class Product implements Persistable<UUID> {
         @Nullable UUID createdBy
     ) {
         var now = Instant.now();
-        var product = new Product(
+        return new Product(
             UUID.randomUUID(),
             shopId,
             categoryId,
@@ -185,10 +113,10 @@ public class Product implements Persistable<UUID> {
             widthCm,
             heightCm,
             now,
-            now
+            now,
+            true
+
         );
-        product.newRecord = true;
-        return product;
     }
 
     public static Product create(
@@ -222,9 +150,11 @@ public class Product implements Persistable<UUID> {
                 "Product was banned for a policy violation and cannot be activated"
             );
         }
+
         if (status != ProductStatus.HIDDEN) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only hidden products can be activated");
         }
+
         status = ProductStatus.ACTIVE;
         updatedAt = Instant.now();
     }

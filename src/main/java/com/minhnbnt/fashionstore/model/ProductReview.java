@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -15,6 +16,7 @@ import java.util.UUID;
 
 @Table("product_review")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class ProductReview implements Persistable<UUID> {
 
     @Id
@@ -49,40 +51,6 @@ public class ProductReview implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public ProductReview(
-        UUID id,
-        UUID orderId,
-        UUID productId,
-        UUID shopId,
-        UUID buyerId,
-        short rating,
-        @Nullable String comment,
-        String[] imageKeys,
-        @Nullable String sellerReply,
-        @Nullable Instant repliedAt,
-        boolean isReported,
-        @Nullable String reportReason,
-        Instant createdAt,
-        Instant updatedAt
-    ) {
-        this.id = id;
-        this.orderId = orderId;
-        this.productId = productId;
-        this.shopId = shopId;
-        this.buyerId = buyerId;
-        this.rating = rating;
-        this.comment = comment;
-        this.imageKeys = imageKeys;
-        this.sellerReply = sellerReply;
-        this.repliedAt = repliedAt;
-        this.isReported = isReported;
-        this.reportReason = reportReason;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-        this.newRecord = false;
-    }
-
     public static ProductReview create(
         UUID orderId,
         UUID productId,
@@ -90,10 +58,9 @@ public class ProductReview implements Persistable<UUID> {
         UUID buyerId,
         short rating,
         @Nullable String comment,
-        String[] imageKeys
-    ) {
+        String[] imageKeys) {
         var now = Instant.now();
-        var review = new ProductReview(
+        return new ProductReview(
             UUID.randomUUID(),
             orderId,
             productId,
@@ -107,10 +74,8 @@ public class ProductReview implements Persistable<UUID> {
             false,
             null,
             now,
-            now
-        );
-        review.newRecord = true;
-        return review;
+            now,
+            true);
     }
 
     public void reply(String reply) {

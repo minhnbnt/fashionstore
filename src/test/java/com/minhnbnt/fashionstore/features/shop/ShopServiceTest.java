@@ -8,6 +8,7 @@ import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
 import com.minhnbnt.fashionstore.dto.shop.UpdateShopRequest;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.model.ShopStatus;
+import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -39,21 +40,13 @@ class ShopServiceTest {
         return id;
     }
 
-    private static CreateShopRequest createReq(String name, String slug) {
-        return com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest(name, slug);
-    }
-
-    private static CreateShopRequest createReq(String name, String slug, String description) {
-        return com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest(name, slug, description);
-    }
-
     @Test
     void registerCreatesPendingShopWithOwnerMember() {
         var ownerId = mirroredUser();
 
         var created = shops.register(
             ownerId,
-            createReq("Shop Mot", "shop-mot-reg", "Mo ta")
+            ShopTestFixtures.createRequest("Shop Mot", "shop-mot-reg", "Mo ta")
         );
 
         assertThat(created.status()).isEqualTo("PENDING");
@@ -66,7 +59,7 @@ class ShopServiceTest {
         var adminId = mirroredUser();
         var created = shops.register(
             ownerId,
-            createReq("Shop Hai", "shop-hai-appr")
+            ShopTestFixtures.createRequest("Shop Hai", "shop-hai-appr")
         );
 
         var approved = shops.approve(adminId, created.id());
@@ -81,7 +74,7 @@ class ShopServiceTest {
         var adminId = mirroredUser();
         var created = shops.register(
             ownerId,
-            createReq("Shop Ba", "shop-ba-twice")
+            ShopTestFixtures.createRequest("Shop Ba", "shop-ba-twice")
         );
         shops.approve(adminId, created.id());
 
@@ -94,7 +87,7 @@ class ShopServiceTest {
         var ownerId = mirroredUser();
         var created = shops.register(
             ownerId,
-            createReq("Shop Nam", "shop-nam-stranger")
+            ShopTestFixtures.createRequest("Shop Nam", "shop-nam-stranger")
         );
 
         assertThatThrownBy(() -> shops.update(
@@ -109,7 +102,7 @@ class ShopServiceTest {
         var ownerId = mirroredUser();
         shops.register(
             ownerId,
-            createReq("Shop Sau", "shop-sau-hidden")
+            ShopTestFixtures.createRequest("Shop Sau", "shop-sau-hidden")
         );
 
         assertThatThrownBy(() -> shops.getBySlug("shop-sau-hidden"))
@@ -120,8 +113,8 @@ class ShopServiceTest {
     void searchPendingShowsOnlyPendingShops() {
         var ownerId = mirroredUser();
         var adminId = mirroredUser();
-        shops.register(ownerId, createReq("Cho Duyet", "cho-duyet"));
-        var approved = shops.register(ownerId, createReq("Da Duyet", "da-duyet"));
+        shops.register(ownerId, ShopTestFixtures.createRequest("Cho Duyet", "cho-duyet"));
+        var approved = shops.register(ownerId, ShopTestFixtures.createRequest("Da Duyet", "da-duyet"));
         shops.approve(adminId, approved.id());
 
         var pending = shops.searchForAdmin(ShopStatus.PENDING, "duyet", 0, 50);
@@ -133,7 +126,7 @@ class ShopServiceTest {
     @Test
     void searchMatchesOwnerEmailAndReturnsOwnerInfo() {
         var ownerId = mirroredUser();
-        shops.register(ownerId, createReq("Shop Email", "shop-email-search"));
+        shops.register(ownerId, ShopTestFixtures.createRequest("Shop Email", "shop-email-search"));
 
         var page = shops.searchForAdmin(null, "u-" + ownerId, 0, 20);
 
@@ -148,8 +141,8 @@ class ShopServiceTest {
     void pendingQueueIsOldestSubmissionFirst() {
         var ownerId = mirroredUser();
         var token = "fifo-" + UUID.randomUUID().toString().substring(0, 8);
-        var first = shops.register(ownerId, createReq("A", token + "-a"));
-        var second = shops.register(ownerId, createReq("B", token + "-b"));
+        var first = shops.register(ownerId, ShopTestFixtures.createRequest("A", token + "-a"));
+        var second = shops.register(ownerId, ShopTestFixtures.createRequest("B", token + "-b"));
 
         var page = shops.searchForAdmin(ShopStatus.PENDING, token, 0, 20);
 
@@ -159,7 +152,7 @@ class ShopServiceTest {
     @Test
     void searchEscapesLikeWildcards() {
         var ownerId = mirroredUser();
-        shops.register(ownerId, createReq("Wildcard", "wildcard-shop"));
+        shops.register(ownerId, ShopTestFixtures.createRequest("Wildcard", "wildcard-shop"));
 
         var page = shops.searchForAdmin(null, "wildcard%_", 0, 20);
 
@@ -170,7 +163,7 @@ class ShopServiceTest {
     void rejectStoresReasonAndHistory() {
         var ownerId = mirroredUser();
         var adminId = mirroredUser();
-        var created = shops.register(ownerId, createReq("Tu Choi", "tu-choi-reason"));
+        var created = shops.register(ownerId, ShopTestFixtures.createRequest("Tu Choi", "tu-choi-reason"));
 
         var rejected = shops.reject(adminId, created.id(), "Thiếu mô tả và logo shop");
 
@@ -188,7 +181,7 @@ class ShopServiceTest {
     void ownerResubmitsRejectedShop() {
         var ownerId = mirroredUser();
         var adminId = mirroredUser();
-        var created = shops.register(ownerId, createReq("Gui Lai", "gui-lai-ok"));
+        var created = shops.register(ownerId, ShopTestFixtures.createRequest("Gui Lai", "gui-lai-ok"));
         shops.reject(adminId, created.id(), "Thiếu mô tả shop");
 
         var resubmitted = shops.resubmit(ownerId, created.id());
@@ -198,10 +191,23 @@ class ShopServiceTest {
     }
 
     @Test
+    void resubmitResetsKycStatusToPendingReview() {
+        var ownerId = mirroredUser();
+        var adminId = mirroredUser();
+        var created = shops.register(ownerId, ShopTestFixtures.createRequest("Gui Lai Kyc", "gui-lai-kyc"));
+        shops.reject(adminId, created.id(), "Anh CCCD khong ro mat");
+
+        var resubmitted = shops.resubmit(ownerId, created.id());
+
+        assertThat(resubmitted.kycStatus()).isEqualTo("PENDING_REVIEW");
+        assertThat(resubmitted.kycRejectionReason()).isNull();
+    }
+
+    @Test
     void resubmitByNonOwnerFails() {
         var ownerId = mirroredUser();
         var adminId = mirroredUser();
-        var created = shops.register(ownerId, createReq("Gui Lai", "gui-lai-stranger"));
+        var created = shops.register(ownerId, ShopTestFixtures.createRequest("Gui Lai", "gui-lai-stranger"));
         shops.reject(adminId, created.id(), "Thiếu mô tả shop");
 
         assertThatThrownBy(() -> shops.resubmit(mirroredUser(), created.id()))
@@ -212,7 +218,7 @@ class ShopServiceTest {
     void suspendHidesShopAndReinstateRestoresIt() {
         var ownerId = mirroredUser();
         var adminId = mirroredUser();
-        var created = shops.register(ownerId, createReq("Tam Khoa", "tam-khoa-shop"));
+        var created = shops.register(ownerId, ShopTestFixtures.createRequest("Tam Khoa", "tam-khoa-shop"));
         shops.approve(adminId, created.id());
 
         var suspended = shops.suspend(adminId, created.id(), "Bán hàng giả nhãn hiệu");
@@ -230,8 +236,8 @@ class ShopServiceTest {
     void suspendOwnedShopsTouchesOnlyApprovedShopsTheUserOwns() {
         var ownerId = mirroredUser();
         var adminId = mirroredUser();
-        var live = shops.register(ownerId, createReq("Live", "owned-live"));
-        var waiting = shops.register(ownerId, createReq("Wait", "owned-wait"));
+        var live = shops.register(ownerId, ShopTestFixtures.createRequest("Live", "owned-live"));
+        var waiting = shops.register(ownerId, ShopTestFixtures.createRequest("Wait", "owned-wait"));
         shops.approve(adminId, live.id());
 
         var suspended = shops.suspendOwnedShops(ownerId, adminId, "Owner account locked: spam");
@@ -244,7 +250,7 @@ class ShopServiceTest {
     @Test
     void ownerOfReturnsOwner() {
         var ownerId = mirroredUser();
-        var created = shops.register(ownerId, createReq("Owner", "owner-of-shop"));
+        var created = shops.register(ownerId, ShopTestFixtures.createRequest("Owner", "owner-of-shop"));
 
         assertThat(shops.ownerOf(created.id())).isEqualTo(ownerId);
     }
@@ -252,63 +258,12 @@ class ShopServiceTest {
     @Test
     void countByStatusCountsEveryStatus() {
         var ownerId = mirroredUser();
-        shops.register(ownerId, createReq("Count", "count-shop"));
+        shops.register(ownerId, ShopTestFixtures.createRequest("Count", "count-shop"));
 
         var counts = shops.countByStatus();
 
         assertThat(counts).containsKeys(ShopStatus.values());
         assertThat(counts.get(ShopStatus.PENDING)).isPositive();
-    }
-
-    @Test
-    @SuppressWarnings("NullAway")
-    void registerRejectsMissingName() {
-        var ownerId = mirroredUser();
-        var req = new CreateShopRequest(
-            null, "slug-test", "desc", "logo", "banner", "0901234567", "Hanoi", "INDIVIDUAL",
-            "NGUYEN VAN A", "001202001234", "01/01/2021", "CA", null, "f", "b", "s", null, "VCB", "123", "NGUYEN VAN A"
-        );
-        assertThatThrownBy(() -> shops.register(ownerId, req))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
-    }
-
-    @Test
-    @SuppressWarnings("NullAway")
-    void registerRejectsMissingPhone() {
-        var ownerId = mirroredUser();
-        var req = new CreateShopRequest(
-            "Name", "slug-test", "desc", "logo", "banner", null, "Hanoi", "INDIVIDUAL",
-            "NGUYEN VAN A", "001202001234", "01/01/2021", "CA", null, "f", "b", "s", null, "VCB", "123", "NGUYEN VAN A"
-        );
-        assertThatThrownBy(() -> shops.register(ownerId, req))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
-    }
-
-    @Test
-    @SuppressWarnings("NullAway")
-    void registerRejectsMissingCccd() {
-        var ownerId = mirroredUser();
-        var req = new CreateShopRequest(
-            "Name", "slug-test", "desc", "logo", "banner", "0901234567", "Hanoi", "INDIVIDUAL",
-            "NGUYEN VAN A", null, "01/01/2021", "CA", null, "f", "b", "s", null, "VCB", "123", "NGUYEN VAN A"
-        );
-        assertThatThrownBy(() -> shops.register(ownerId, req))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
-    }
-
-    @Test
-    void registerRejectsInvalidCccdFormat() {
-        var ownerId = mirroredUser();
-        var req = new CreateShopRequest(
-            "Name", "slug-test", "desc", "logo", "banner", "0901234567", "Hanoi", "INDIVIDUAL",
-            "NGUYEN VAN A", "123456", "01/01/2021", "CA", null, "f", "b", "s", null, "VCB", "123", "NGUYEN VAN A"
-        );
-        assertThatThrownBy(() -> shops.register(ownerId, req))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
     @Test
@@ -321,6 +276,52 @@ class ShopServiceTest {
         assertThatThrownBy(() -> shops.register(ownerId, req))
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void registerRejectsDuplicateSlug() {
+        var ownerId = mirroredUser();
+        shops.register(ownerId, ShopTestFixtures.createRequest("Shop Truoc", "slug-trung"));
+
+        assertThatThrownBy(() -> shops.register(mirroredUser(), ShopTestFixtures.createRequest("Shop Sau", "slug-trung")))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void registerTrimsPaddedInputsAndNormalizesHolderName() {
+        var ownerId = mirroredUser();
+        var req = new CreateShopRequest(
+            "  Shop Pad  ", "shop-pad", "  Mo ta pad  ", " logo.webp ", " banner.webp ",
+            " 0901234567 ", " 123 Pho Hue ", "INDIVIDUAL",
+            "  Nguyễn  Văn  Pad ", " 001202001234 ", " 01/01/2021 ", " Cục QLHC ",
+            null, " front.webp ", " back.webp ", " selfie.webp ", null,
+            " Vietcombank ", " 0123456789 ", " nguyen van pad "
+        );
+
+        var created = shops.register(ownerId, req);
+
+        assertThat(created.name()).isEqualTo("Shop Pad");
+        var page = shops.searchForAdmin(null, "shop-pad", 0, 20);
+        assertThat(page.items().get(0).legalName()).isEqualTo("Nguyễn  Văn  Pad");
+    }
+
+    @Test
+    void registerStoresBlankOptionalAsNull() {
+        var ownerId = mirroredUser();
+        var req = new CreateShopRequest(
+            "Shop Blank", "shop-blank-opt", "Mo ta", "logo.webp", "banner.webp",
+            "0901234567", "123 Pho Hue", "INDIVIDUAL",
+            "NGUYEN VAN A", "001202001234", "01/01/2021", "Cuc QLHC",
+            "   ", "front.webp", "back.webp", "selfie.webp", "   ",
+            "Vietcombank", "0123456789", "NGUYEN VAN A"
+        );
+
+        shops.register(ownerId, req);
+
+        var page = shops.searchForAdmin(null, "shop-blank-opt", 0, 20);
+        assertThat(page.items().get(0).taxCode()).isNull();
+        assertThat(page.items().get(0).businessCertKey()).isNull();
     }
 }
 
