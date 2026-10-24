@@ -43,6 +43,9 @@ class ChatServiceUnitTest {
     @Mock
     private ShopMemberRepository members;
 
+    @Mock
+    private ShopAccessChecker access;
+
     @InjectMocks
     private ChatService chatService;
 

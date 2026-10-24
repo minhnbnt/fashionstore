@@ -3,6 +3,7 @@ package com.minhnbnt.fashionstore.features.shop;
 import com.minhnbnt.fashionstore.dto.shop.DecorationResponse;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.ShopDecoration;
+import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -46,7 +47,7 @@ public class ShopDecorationService {
 
     @Transactional
     public DecorationResponse saveDraft(@NonNull UUID userId, @NonNull UUID shopId, @NonNull String draftJson) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.DECORATION_WRITE);
 
         var deco = decorations.findByShopId(shopId)
             .orElseGet(() -> ShopDecoration.createDefault(shopId));
@@ -57,7 +58,7 @@ public class ShopDecorationService {
 
     @Transactional
     public DecorationResponse publish(@NonNull UUID userId, @NonNull UUID shopId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.DECORATION_WRITE);
 
         var deco = decorations.findByShopId(shopId)
             .orElseGet(() -> ShopDecoration.createDefault(shopId));
@@ -68,7 +69,7 @@ public class ShopDecorationService {
 
     @Transactional
     public DecorationResponse discardDraft(@NonNull UUID userId, @NonNull UUID shopId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.DECORATION_WRITE);
 
         var deco = decorations.findByShopId(shopId)
             .orElseGet(() -> ShopDecoration.createDefault(shopId));

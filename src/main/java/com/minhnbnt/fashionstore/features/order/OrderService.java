@@ -21,12 +21,12 @@ import com.minhnbnt.fashionstore.features.order.repository.OrderStatusHistoryRep
 import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.AdminCancelReason;
-import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.Order;
 import com.minhnbnt.fashionstore.model.OrderItem;
 import com.minhnbnt.fashionstore.model.OrderStatus;
 import com.minhnbnt.fashionstore.model.OrderStatusHistory;
 import com.minhnbnt.fashionstore.model.ProductStatus;
+import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.model.StockMovement;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
@@ -231,7 +231,7 @@ public class OrderService {
     public List<OrderResponse> listSellerOrders(@NonNull UUID userId) {
         var result = new ArrayList<OrderResponse>();
 
-        for (var shopId : members.findShopIdsByUser(userId)) {
+        for (var shopId : orderReadableShopIds(userId)) {
             for (var order : orders.findByShopIdOrderByCreatedAtDesc(shopId)) {
                 var orderItems = items.findByOrderId(order.getId());
                 result.add(toResponse(order, orderItems));
@@ -250,7 +250,7 @@ public class OrderService {
         @NonNull CancelOrderRequest request
     ) {
         var order = requireOrder(orderId);
-        access.requireShopRole(userId, order.getShopId(), MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_CANCEL);
 
         var from = order.getStatus();
         var orderItems = items.findByOrderId(order.getId());
@@ -340,10 +340,10 @@ public class OrderService {
     ) {
         List<UUID> shopIds;
         if (shopId != null) {
-            access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+            access.requireShopPermission(userId, shopId, ShopPermission.ORDER_READ);
             shopIds = List.of(shopId);
         } else {
-            shopIds = members.findShopIdsByUser(userId);
+            shopIds = orderReadableShopIds(userId);
         }
 
         var result = new ArrayList<OrderResponse>();
@@ -380,7 +380,7 @@ public class OrderService {
     @Transactional
     public OrderResponse confirm(@NonNull UUID userId, @NonNull UUID orderId) {
         var order = requireOrder(orderId);
-        access.requireShopRole(userId, order.getShopId(), MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_PROCESS);
 
         var from = order.getStatus();
 
@@ -403,7 +403,7 @@ public class OrderService {
     @Transactional
     public OrderResponse ship(@NonNull UUID userId, @NonNull UUID orderId) {
         var order = requireOrder(orderId);
-        access.requireShopRole(userId, order.getShopId(), MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_PROCESS);
 
         var from = order.getStatus();
         order.ship();
@@ -416,7 +416,7 @@ public class OrderService {
     @Transactional
     public OrderResponse deliver(@NonNull UUID userId, @NonNull UUID orderId) {
         var order = requireOrder(orderId);
-        access.requireShopRole(userId, order.getShopId(), MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_PROCESS);
 
         var from = order.getStatus();
         order.deliver();
@@ -435,6 +435,20 @@ public class OrderService {
     @Transactional(readOnly = true)
     public int getSoldQuantityForProduct(@NonNull UUID productId) {
         return items.countSoldQuantityByProductId(productId);
+    }
+
+    /**
+     * Danh sách shop mà user được xem đơn: chỉ shop đã cấp ORDER_READ.
+     */
+    private List<UUID> orderReadableShopIds(UUID userId) {
+        var result = new ArrayList<UUID>();
+        for (var shopId : members.findShopIdsByUser(userId)) {
+            if (access.permissionsOf(userId, shopId).contains(ShopPermission.ORDER_READ)) {
+                result.add(shopId);
+            }
+        }
+
+        return result;
     }
 
     private Order requireBuyerOrder(UUID buyerId, UUID orderId) {

@@ -11,10 +11,10 @@ import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.SellerSettlementRepository;
 import com.minhnbnt.fashionstore.features.order.repository.SellerWithdrawalRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
-import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.SellerSettlement;
 import com.minhnbnt.fashionstore.model.SellerWithdrawal;
 import com.minhnbnt.fashionstore.model.SettlementStatus;
+import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -56,7 +56,7 @@ public class RevenueService {
 
     @Transactional(readOnly = true)
     public RevenueSummaryResponse getSummary(@NonNull UUID userId, @NonNull UUID shopId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         var row = orders.sumDeliveredRevenue(shopId);
         var walletBalance = settlements.sumAvailableBalance(shopId);
@@ -73,7 +73,7 @@ public class RevenueService {
 
     @Transactional(readOnly = true)
     public List<DailyRevenueResponse> getDailyRevenue(@NonNull UUID userId, @NonNull UUID shopId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         return orders.sumDailyRevenue(shopId).stream()
             .map(row -> new DailyRevenueResponse(
@@ -90,7 +90,7 @@ public class RevenueService {
         @NonNull UUID shopId,
         int limit
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         var max = Math.clamp(limit, 1, 50);
         return items.findTopProducts(shopId, max).stream()
@@ -109,7 +109,7 @@ public class RevenueService {
         @NonNull UUID shopId,
         @Nullable String statusFilter
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         List<SellerSettlement> list;
         if (statusFilter != null && !statusFilter.isBlank()) {
@@ -142,7 +142,7 @@ public class RevenueService {
         @NonNull UUID userId,
         @NonNull CreateWithdrawalRequest request
     ) {
-        access.requireShopRole(userId, request.shopId(), MemberRole.OWNER);
+        access.requireShopPermission(userId, request.shopId(), ShopPermission.REVENUE_WITHDRAW);
 
         var available = settlements.sumAvailableBalance(request.shopId());
         if (request.amount() > available) {
@@ -187,7 +187,7 @@ public class RevenueService {
 
     @Transactional(readOnly = true)
     public List<WithdrawalResponse> listWithdrawals(@NonNull UUID userId, @NonNull UUID shopId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         return withdrawals.findByShopIdOrderByCreatedAtDesc(shopId).stream()
             .map(RevenueService::toWithdrawalResponse)

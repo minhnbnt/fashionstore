@@ -9,8 +9,8 @@ import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.model.ChatConversation;
 import com.minhnbnt.fashionstore.model.ChatMessage;
-import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.Shop;
+import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -58,7 +58,7 @@ public class ChatService {
         @NonNull UUID shopId,
         boolean onlyUnread
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.CHAT_ACCESS);
 
         var list = conversations.findByShopIdOrderByLastMessageAtDesc(shopId);
         if (onlyUnread) {
@@ -101,15 +101,15 @@ public class ChatService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found");
         }
 
-        var isBuyer = conv.getBuyerId().equals(userId);
         var isSeller = members.findRole(conv.getShopId(), userId).isPresent();
-
-        if (!isBuyer && !isSeller) {
+        if (isSeller) {
+            access.requireShopPermission(userId, conv.getShopId(), ShopPermission.CHAT_ACCESS);
+        } else if (!conv.getBuyerId().equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a participant in this conversation");
         }
 
         var senderType = "SELLER";
-        if (isBuyer) {
+        if (!isSeller) {
             senderType = "BUYER";
         }
 
@@ -122,11 +122,11 @@ public class ChatService {
         );
         messages.save(msg);
 
-        conv.recordNewMessage(request.content(), isBuyer);
+        conv.recordNewMessage(request.content(), !isSeller);
         conversations.save(conv);
 
         // Auto reply if buyer sent message and shop has auto reply text
-        if (isBuyer) {
+        if (!isSeller) {
             var shop = shops.findById(conv.getShopId()).orElse(null);
             if (shop != null && shop.getAutoReplyText() != null && !shop.getAutoReplyText().isBlank()) {
                 var ownerId = members.findOwner(conv.getShopId()).orElse(null);
@@ -155,25 +155,28 @@ public class ChatService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found");
         }
 
-        var isBuyer = conv.getBuyerId().equals(userId);
         var isSeller = members.findRole(conv.getShopId(), userId).isPresent();
-
-        if (isBuyer) {
-            conv.markReadByBuyer();
+        if (isSeller) {
+            access.requireShopPermission(userId, conv.getShopId(), ShopPermission.CHAT_ACCESS);
+            conv.markReadBySeller();
             conversations.save(conv);
             return;
         }
 
-        if (isSeller) {
-            conv.markReadBySeller();
+        if (conv.getBuyerId().equals(userId)) {
+            conv.markReadByBuyer();
             conversations.save(conv);
         }
     }
 
     private void verifyParticipant(UUID userId, ChatConversation conv) {
-        var isBuyer = conv.getBuyerId().equals(userId);
         var isSeller = members.findRole(conv.getShopId(), userId).isPresent();
-        if (!isBuyer && !isSeller) {
+        if (isSeller) {
+            access.requireShopPermission(userId, conv.getShopId(), ShopPermission.CHAT_ACCESS);
+            return;
+        }
+
+        if (!conv.getBuyerId().equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a participant in this conversation");
         }
     }

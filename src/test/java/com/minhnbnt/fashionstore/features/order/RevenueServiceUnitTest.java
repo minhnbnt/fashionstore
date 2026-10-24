@@ -5,8 +5,8 @@ import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.SellerSettlementRepository;
 import com.minhnbnt.fashionstore.features.order.repository.SellerWithdrawalRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
-import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.SellerWithdrawal;
+import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
@@ -58,7 +58,7 @@ class RevenueServiceUnitTest {
 
         var summary = revenueService.getSummary(userId, shopId);
 
-        verify(access).requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        verify(access).requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
         assertThat(summary.totalRevenue()).isEqualTo(100000L);
         assertThat(summary.walletBalance()).isEqualTo(95000L);
         assertThat(summary.holdingBalance()).isEqualTo(5000L);

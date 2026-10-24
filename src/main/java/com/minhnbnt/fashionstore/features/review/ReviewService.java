@@ -13,10 +13,10 @@ import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.review.repository.ReviewRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
-import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.OrderStatus;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.model.Review;
+import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -119,7 +119,7 @@ public class ReviewService {
         @NonNull UUID shopId,
         boolean onlyUnreplied
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVIEW_READ);
 
         var list = onlyUnreplied
             ? reviews.findUnrepliedByShopIdOrderByCreatedAtDesc(shopId)
@@ -208,7 +208,7 @@ public class ReviewService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Review not found");
         }
 
-        access.requireShopRole(userId, product.getShopId(), MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, product.getShopId(), ShopPermission.REVIEW_REPLY);
 
         return review;
     }
