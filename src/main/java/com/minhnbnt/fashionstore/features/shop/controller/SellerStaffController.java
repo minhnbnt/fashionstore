@@ -46,7 +46,11 @@ public class SellerStaffController {
     private final ShopStaffService staffService;
 
     @GetMapping("/roles")
-    @Operation(summary = "Danh sách vai trò của shop", description = "Lấy danh sách các vai trò mặc định (Quản lý, CSKH, Kho vận, Marketing) và các vai trò tùy chỉnh.")
+    @Operation(
+        operationId = "listRoles",
+        summary = "Danh sách vai trò của shop",
+        description = "Lấy danh sách các vai trò mặc định (Quản lý, CSKH, Kho vận, Marketing) và các vai trò tùy chỉnh."
+    )
     @ApiResponse(responseCode = "200", description = "Danh sách vai trò")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không có quyền xem vai trò shop")
@@ -63,7 +67,11 @@ public class SellerStaffController {
 
     @PostMapping("/roles")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Tạo vai trò tùy chỉnh", description = "Chủ shop tạo nhóm quyền mới cho nhân viên.")
+    @Operation(
+        operationId = "createRole",
+        summary = "Tạo vai trò tùy chỉnh",
+        description = "Chủ shop tạo nhóm quyền mới cho nhân viên."
+    )
     @ApiResponse(responseCode = "201", description = "Tạo vai trò thành công")
     @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
@@ -82,7 +90,11 @@ public class SellerStaffController {
     }
 
     @PutMapping("/roles/{roleId}")
-    @Operation(summary = "Cập nhật vai trò tùy chỉnh", description = "Chỉnh sửa tên và quyền của vai trò tùy chỉnh. Không thể sửa vai trò hệ thống.")
+    @Operation(
+        operationId = "updateRole",
+        summary = "Cập nhật vai trò tùy chỉnh",
+        description = "Chỉnh sửa tên và quyền của vai trò tùy chỉnh. Không thể sửa vai trò hệ thống."
+    )
     @ApiResponse(responseCode = "200", description = "Cập nhật thành công")
     @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
@@ -104,7 +116,11 @@ public class SellerStaffController {
 
     @DeleteMapping("/roles/{roleId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Xóa vai trò tùy chỉnh", description = "Xóa một vai trò tùy chỉnh. Không thể xóa vai trò hệ thống.")
+    @Operation(
+        operationId = "deleteRole",
+        summary = "Xóa vai trò tùy chỉnh",
+        description = "Xóa một vai trò tùy chỉnh. Không thể xóa vai trò hệ thống."
+    )
     @ApiResponse(responseCode = "204", description = "Đã xóa vai trò thành công")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Chỉ chủ shop mới được xóa vai trò")
@@ -123,7 +139,11 @@ public class SellerStaffController {
     }
 
     @GetMapping("/members")
-    @Operation(summary = "Danh sách thành viên shop", description = "Lấy danh sách chủ shop và nhân viên kèm theo vai trò chi tiết.")
+    @Operation(
+        operationId = "listMembers",
+        summary = "Danh sách thành viên shop",
+        description = "Lấy danh sách chủ shop và nhân viên kèm theo vai trò chi tiết."
+    )
     @ApiResponse(responseCode = "200", description = "Danh sách thành viên")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không có quyền xem thành viên shop")
@@ -140,7 +160,11 @@ public class SellerStaffController {
 
     @PostMapping("/invitations")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Mời nhân viên vào shop", description = "Gửi lời mời tham gia shop cho tài khoản đã đăng ký theo email kèm theo vai trò. Lời mời được giao qua thông báo trong website, không gửi email.")
+    @Operation(
+        operationId = "inviteStaff",
+        summary = "Mời nhân viên vào shop",
+        description = "Gửi lời mời tham gia shop cho tài khoản đã đăng ký theo email kèm theo vai trò. Lời mời được giao qua thông báo trong website, không gửi email."
+    )
     @ApiResponse(responseCode = "201", description = "Tạo lời mời thành công")
     @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
@@ -205,7 +229,11 @@ public class SellerStaffController {
 
     @PatchMapping("/members/{memberId}/role")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Thay đổi vai trò của nhân viên", description = "Chủ shop cập nhật vai trò/quyền hạn mới cho một nhân viên.")
+    @Operation(
+        operationId = "changeMemberRole",
+        summary = "Thay đổi vai trò của nhân viên",
+        description = "Chủ shop cập nhật vai trò/quyền hạn mới cho một nhân viên."
+    )
     @ApiResponse(responseCode = "204", description = "Cập nhật vai trò thành công")
     @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
@@ -255,6 +283,7 @@ public class SellerStaffController {
     @DeleteMapping("/members/{memberId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(
+        operationId = "removeMember",
         summary = "Vô hiệu hóa nhân viên khỏi shop",
         description = "Chủ shop vô hiệu hóa nhân viên: nhân viên mất quyền truy cập shop ngay lập tức "
             + "nhưng vẫn còn trong danh sách thành viên để có thể kích hoạt lại."
