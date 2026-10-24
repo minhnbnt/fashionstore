@@ -116,6 +116,11 @@ public class ProductVariant implements Persistable<UUID> {
         this.updatedAt = Instant.now();
     }
 
+    public void setPrice(long price) {
+        this.price = price;
+        this.updatedAt = Instant.now();
+    }
+
     public void setLowStockThreshold(int lowStockThreshold) {
         this.lowStockThreshold = lowStockThreshold;
         this.updatedAt = Instant.now();

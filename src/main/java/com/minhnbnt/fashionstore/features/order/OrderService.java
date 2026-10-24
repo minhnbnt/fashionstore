@@ -432,6 +432,11 @@ public class OrderService {
         return items.hasActiveOrdersForProduct(productId);
     }
 
+    @Transactional(readOnly = true)
+    public int getSoldQuantityForProduct(@NonNull UUID productId) {
+        return items.countSoldQuantityByProductId(productId);
+    }
+
     private Order requireBuyerOrder(UUID buyerId, UUID orderId) {
         var order = orders.findById(orderId).orElse(null);
         if (order == null) {

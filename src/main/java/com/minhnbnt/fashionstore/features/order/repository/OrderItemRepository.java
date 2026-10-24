@@ -19,6 +19,14 @@ public interface OrderItemRepository extends CrudRepository<OrderItem, UUID> {
     """)
     boolean hasActiveOrdersForProduct(UUID productId);
 
+    @Query("""
+        SELECT COALESCE(SUM(oi.quantity), 0) FROM order_item oi
+        JOIN orders o ON o.id = oi.order_id
+        WHERE oi.product_id = :productId
+          AND o.status IN ('CONFIRMED', 'SHIPPING', 'DELIVERED')
+    """)
+    int countSoldQuantityByProductId(UUID productId);
+
     public record TopProductRow(UUID productId, String productName, long totalQuantity, long totalRevenue) {
     }
 
