@@ -17,6 +17,8 @@ public interface ProductVariantRepository extends CrudRepository<ProductVariant,
 
     Optional<ProductVariant> findByShopIdAndId(UUID shopId, UUID id);
 
+    Optional<ProductVariant> findByShopIdAndSku(UUID shopId, String sku);
+
     /**
      * Trừ kho có điều kiện: trả false khi tồn kho không đủ, caller phải coi như thất bại.
      */

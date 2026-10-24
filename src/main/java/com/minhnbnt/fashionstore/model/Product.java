@@ -240,6 +240,67 @@ public class Product implements Persistable<UUID> {
         updatedAt = Instant.now();
     }
 
+    public void updateAll(
+        @Nullable String name,
+        @Nullable String description,
+        @Nullable UUID categoryId,
+        @Nullable String videoKey,
+        @Nullable String garmentKey,
+        @Nullable Boolean tryOnEnabled,
+        @Nullable String material,
+        @Nullable String origin,
+        @Nullable String careInstructions,
+        @Nullable String sizeGuide,
+        @Nullable Integer weightGrams,
+        @Nullable Integer lengthCm,
+        @Nullable Integer widthCm,
+        @Nullable Integer heightCm
+    ) {
+        if (name != null) {
+            this.name = name;
+        }
+        if (description != null) {
+            this.description = description;
+        }
+        if (categoryId != null) {
+            this.categoryId = categoryId;
+        }
+        if (videoKey != null) {
+            this.videoKey = videoKey;
+        }
+        if (garmentKey != null) {
+            this.garmentKey = garmentKey;
+        }
+        if (tryOnEnabled != null) {
+            this.tryOnEnabled = tryOnEnabled;
+        }
+        if (material != null) {
+            this.material = material;
+        }
+        if (origin != null) {
+            this.origin = origin;
+        }
+        if (careInstructions != null) {
+            this.careInstructions = careInstructions;
+        }
+        if (sizeGuide != null) {
+            this.sizeGuide = sizeGuide;
+        }
+        if (weightGrams != null) {
+            this.weightGrams = weightGrams;
+        }
+        if (lengthCm != null) {
+            this.lengthCm = lengthCm;
+        }
+        if (widthCm != null) {
+            this.widthCm = widthCm;
+        }
+        if (heightCm != null) {
+            this.heightCm = heightCm;
+        }
+        updatedAt = Instant.now();
+    }
+
     @Override
     public UUID getId() {
         return id;

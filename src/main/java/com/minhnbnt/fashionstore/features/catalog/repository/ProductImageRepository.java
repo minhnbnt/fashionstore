@@ -12,4 +12,6 @@ public interface ProductImageRepository extends CrudRepository<ProductImage, UUI
     List<ProductImage> findByProductIdOrderBySortOrderAsc(UUID productId);
 
     Optional<ProductImage> findByProductIdAndId(UUID productId, UUID id);
+
+    void deleteByProductId(UUID productId);
 }

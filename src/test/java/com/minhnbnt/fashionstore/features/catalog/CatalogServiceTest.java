@@ -7,11 +7,16 @@ import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ImageItemRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSearchRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSort;
+import com.minhnbnt.fashionstore.dto.catalog.SellerProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
+import com.minhnbnt.fashionstore.dto.catalog.UpdateVariantRequest;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
+import com.minhnbnt.fashionstore.dto.order.CheckoutItemRequest;
+import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
 import com.minhnbnt.fashionstore.features.catalog.repository.CategoryRepository;
 import com.minhnbnt.fashionstore.features.identity.UserService;
+import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.Category;
@@ -45,6 +50,9 @@ class CatalogServiceTest {
 
     @Autowired
     private UserService users;
+
+    @Autowired
+    private OrderService orders;
 
     @Autowired
     private CategoryRepository categories;
@@ -520,5 +528,155 @@ class CatalogServiceTest {
         var rejected = catalog.rejectProduct(adminId, prodToReject.id(), "Ảnh sản phẩm không đạt chuẩn");
         assertThat(rejected.status()).isEqualTo("BANNED");
         assertThat(rejected.statusReason()).isEqualTo("Ảnh sản phẩm không đạt chuẩn");
+    }
+
+    @Test
+    void sellerCanUpdateProductAndTrackAuditLogs() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-edit-audit");
+
+        var created = catalog.createProduct(ownerId, shopId, productRequest("ao-edit-test"));
+        var initialVariant = created.variants().getFirst();
+
+        // 1. Update product info, stock, price and add a new variant
+        var updateReq = new UpdateProductRequest(
+            "Áo Thun Cập Nhật",
+            "Mô tả mới đã cập nhật",
+            created.categoryId(),
+            "ACTIVE",
+            List.of(
+                new UpdateVariantRequest(
+                    initialVariant.id(),
+                    initialVariant.sku(),
+                    "M",
+                    "Trắng",
+                    150000L,
+                    180000L,
+                    25,
+                    true
+                ),
+                new UpdateVariantRequest(
+                    null,
+                    "SKU-NEW-VAR-" + UUID.randomUUID().toString().substring(0, 6),
+                    "L",
+                    "Đen",
+                    160000L,
+                    190000L,
+                    40,
+                    false
+                )
+            ),
+            List.of(
+                new ImageItemRequest("img-new-1.jpg", null, 0),
+                new ImageItemRequest("img-new-2.jpg", null, 1)
+            ),
+            null,
+            "garment-new.png",
+            true,
+            "100% Linen",
+            "Việt Nam",
+            "Giặt tay nhẹ nhàng",
+            "Size M: 50-60kg",
+            300, 30, 20, 5
+        );
+
+        var updated = catalog.updateProduct(ownerId, shopId, created.id(), updateReq);
+        assertThat(updated.name()).isEqualTo("Áo Thun Cập Nhật");
+        assertThat(updated.description()).isEqualTo("Mô tả mới đã cập nhật");
+        assertThat(updated.videoKey()).isNull();
+        assertThat(updated.garmentKey()).isEqualTo("garment-new.png");
+        assertThat(updated.tryOnEnabled()).isTrue();
+        assertThat(updated.material()).isEqualTo("100% Linen");
+        assertThat(updated.weightGrams()).isEqualTo(300);
+        assertThat(updated.images()).hasSize(2);
+        assertThat(updated.variants()).hasSize(2);
+
+        // 2. Check seller product detail
+        var detail = catalog.getSellerProductDetail(ownerId, shopId, created.id());
+        assertThat(detail.name()).isEqualTo("Áo Thun Cập Nhật");
+
+        // 3. Check audit logs
+        var auditLogs = catalog.getAuditLogs(ownerId, shopId, created.id());
+        assertThat(auditLogs).isNotEmpty();
+        var firstLog = auditLogs.getFirst();
+        assertThat(firstLog.action()).isEqualTo("UPDATE_PRODUCT");
+        assertThat(firstLog.changesSummary()).contains("Tồn kho");
+
+        // 4. Toggle status
+        var toggled = catalog.toggleProductStatus(ownerId, shopId, created.id());
+        assertThat(toggled.status()).isEqualTo("HIDDEN");
+
+        var toggledAgain = catalog.toggleProductStatus(ownerId, shopId, created.id());
+        assertThat(toggledAgain.status()).isEqualTo("ACTIVE");
+
+        var logsAfterToggle = catalog.getAuditLogs(ownerId, shopId, created.id());
+        assertThat(logsAfterToggle).hasSizeGreaterThanOrEqualTo(3);
+        assertThat(logsAfterToggle.getFirst().action()).isEqualTo("TOGGLE_STATUS");
+    }
+
+    @Test
+    void deleteProductSoftDeletesSuccessfullyWhenNoActiveOrders() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-del-ok");
+        var created = catalog.createProduct(ownerId, shopId, productRequest("ao-soft-delete-ok"));
+
+        catalog.deleteProduct(ownerId, shopId, created.id());
+
+        // Verify product status is DELETED in seller view
+        var sellerList = catalog.listSellerProducts(ownerId, shopId, "DELETED", null, 0, 10);
+        assertThat(sellerList).extracting(SellerProductResponse::id).contains(created.id());
+
+        // Verify buyer cannot see deleted product
+        assertThatThrownBy(() -> catalog.getDetail(created.id()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    void deleteProductThrowsConflictWhenActiveOrdersExist() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-del-active");
+        var created = catalog.createProduct(ownerId, shopId, productRequest("ao-soft-delete-conflict"));
+        var variantId = created.variants().getFirst().id();
+
+        // Create an order in PENDING status for this product
+        var buyerId = mirroredUser();
+        orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901234567", "Hanoi", 0L)
+        );
+
+        // Attempting to delete product with active order must fail with 409
+        assertThatThrownBy(() -> catalog.deleteProduct(ownerId, shopId, created.id()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> {
+                var ex = (ResponseStatusException) e;
+                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+                assertThat(ex.getReason()).contains("Cannot delete product with active orders");
+            });
+    }
+
+    @Test
+    void toggleProductStatusHideAndActivate() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-hide-act");
+        var created = catalog.createProduct(ownerId, shopId, productRequest("ao-toggle-hide"));
+
+        // Hide product
+        var hidden = catalog.updateProduct(ownerId, shopId, created.id(), new UpdateProductRequest(null, null, null, "HIDDEN", null));
+        assertThat(hidden.status()).isEqualTo("HIDDEN");
+
+        // Buyer cannot see hidden product
+        assertThatThrownBy(() -> catalog.getDetail(created.id()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+
+        // Reactivate product
+        var reactivated = catalog.updateProduct(ownerId, shopId, created.id(), new UpdateProductRequest(null, null, null, "ACTIVE", null));
+        assertThat(reactivated.status()).isEqualTo("ACTIVE");
+
+        // Buyer can see active product again
+        var detail = catalog.getDetail(created.id());
+        assertThat(detail.status()).isEqualTo("ACTIVE");
     }
 }

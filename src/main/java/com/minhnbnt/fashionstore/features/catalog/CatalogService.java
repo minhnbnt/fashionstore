@@ -7,6 +7,7 @@ import com.minhnbnt.fashionstore.dto.catalog.CategoryResponse;
 import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ImageResponse;
+import com.minhnbnt.fashionstore.dto.catalog.ProductAuditLogResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSearchRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSearchResponse;
@@ -22,6 +23,7 @@ import com.minhnbnt.fashionstore.dto.catalog.StockMovementResponse;
 import com.minhnbnt.fashionstore.dto.common.PageResponse;
 import com.minhnbnt.fashionstore.features.catalog.repository.CategoryRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductAdminQueryRepository;
+import com.minhnbnt.fashionstore.features.catalog.repository.ProductAuditLogRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductImageRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductModerationHistoryRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductReportRepository;
@@ -36,6 +38,7 @@ import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.infrastructure.media.VideoMetadataService;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.Product;
+import com.minhnbnt.fashionstore.model.ProductAuditLog;
 import com.minhnbnt.fashionstore.model.ProductImage;
 import com.minhnbnt.fashionstore.model.ProductModerationHistory;
 import com.minhnbnt.fashionstore.model.ProductStatus;
@@ -53,10 +56,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import tools.jackson.databind.ObjectMapper;
+
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.List;
 import java.util.Objects;
@@ -98,6 +105,10 @@ public class CatalogService {
     private final ShopAccessChecker access;
 
     private final VideoMetadataService videoMetadataService;
+
+    private final ProductAuditLogRepository auditLogs;
+
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public ProductResponse createProduct(
@@ -269,22 +280,118 @@ public class CatalogService {
 
         access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
 
+        if (product.getStatus() == ProductStatus.DELETED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Deleted product cannot be modified");
+        }
+
         if (request.categoryId() != null) {
             requireCategoryExists(request.categoryId());
         }
 
-        product.updateDetails(request.name(), request.description(), request.categoryId());
+        if (request.videoKey() != null && !request.videoKey().isBlank()
+            && !request.videoKey().equals(product.getVideoKey())) {
+            videoMetadataService.validateVideoDuration(request.videoKey(), 60.0);
+        }
+
+        var changes = new ArrayList<String>();
+        var oldValues = new LinkedHashMap<String, Object>();
+        var newValues = new LinkedHashMap<String, Object>();
+
+        if (request.name() != null && !request.name().equals(product.getName())) {
+            changes.add("Đổi tên: " + product.getName() + " -> " + request.name());
+            oldValues.put("name", product.getName());
+            newValues.put("name", request.name());
+        }
+        if (request.categoryId() != null && !request.categoryId().equals(product.getCategoryId())) {
+            changes.add("Đổi danh mục ngành hàng");
+            oldValues.put("categoryId", product.getCategoryId());
+            newValues.put("categoryId", request.categoryId());
+        }
+        if (request.description() != null && !request.description().equals(product.getDescription())) {
+            changes.add("Cập nhật mô tả sản phẩm");
+            oldValues.put("description", product.getDescription());
+            newValues.put("description", request.description());
+        }
+        if (request.videoKey() != null && !request.videoKey().equals(product.getVideoKey())) {
+            changes.add("Cập nhật video sản phẩm");
+            oldValues.put("videoKey", product.getVideoKey());
+            newValues.put("videoKey", request.videoKey());
+        }
+        if (request.garmentKey() != null && !request.garmentKey().equals(product.getGarmentKey())) {
+            changes.add("Cập nhật ảnh garment thử đồ ảo");
+            oldValues.put("garmentKey", product.getGarmentKey());
+            newValues.put("garmentKey", request.garmentKey());
+        }
+        if (request.tryOnEnabled() != null && request.tryOnEnabled() != product.isTryOnEnabled()) {
+            if (request.tryOnEnabled()) {
+                changes.add("Bật thử đồ ảo");
+            } else {
+                changes.add("Tắt thử đồ ảo");
+            }
+            oldValues.put("tryOnEnabled", product.isTryOnEnabled());
+            newValues.put("tryOnEnabled", request.tryOnEnabled());
+        }
+        if (request.status() != null && !request.status().equalsIgnoreCase(product.getStatus().name())) {
+            changes.add("Đổi trạng thái: " + product.getStatus().name() + " -> " + request.status());
+            oldValues.put("status", product.getStatus().name());
+            newValues.put("status", request.status());
+        }
+
+        product.updateAll(
+            request.name(),
+            request.description(),
+            request.categoryId(),
+            request.videoKey(),
+            request.garmentKey(),
+            request.tryOnEnabled(),
+            request.material(),
+            request.origin(),
+            request.careInstructions(),
+            request.sizeGuide(),
+            request.weightGrams(),
+            request.lengthCm(),
+            request.widthCm(),
+            request.heightCm()
+        );
 
         if (request.status() != null) {
             applyStatus(product, request.status());
         }
 
+        if (request.images() != null) {
+            images.deleteByProductId(product.getId());
+            var newImages = request.images().stream()
+                .map(img -> ProductImage.create(
+                    product.getId(),
+                    img.variantId(),
+                    img.s3Key(),
+                    img.sortOrder()
+                ))
+                .toList();
+            images.saveAll(newImages);
+            changes.add("Cập nhật lại " + newImages.size() + " ảnh sản phẩm");
+        }
+
         if (request.variants() != null) {
-            applyVariantUpdates(product, request.variants());
+            applyVariantUpdates(product, request.variants(), changes, oldValues, newValues);
         }
 
         var saved = products.save(product);
         keywordScanner.scan(saved.getId(), saved.getName(), saved.getDescription());
+
+        var summary = String.join("; ", changes);
+        if (summary.isBlank()) {
+            summary = "Cập nhật sản phẩm";
+        }
+        auditLogs.save(ProductAuditLog.record(
+            saved.getId(),
+            shopId,
+            userId,
+            "UPDATE_PRODUCT",
+            summary,
+            toJson(oldValues),
+            toJson(newValues)
+        ));
 
         return toResponse(saved);
     }
@@ -520,44 +627,205 @@ public class CatalogService {
     }
 
     private void applyStatus(Product product, String status) {
-        if ("HIDDEN".equals(status)) {
+        if (status.equalsIgnoreCase(product.getStatus().name())) {
+            return;
+        }
+
+        if ("HIDDEN".equalsIgnoreCase(status)) {
             product.hide();
             return;
         }
 
-        product.activate();
+        if ("ACTIVE".equalsIgnoreCase(status)) {
+            product.activate();
+        }
     }
 
-    private void applyVariantUpdates(Product product, List<UpdateVariantRequest> updates) {
+    private void applyVariantUpdates(
+        Product product,
+        List<UpdateVariantRequest> updates,
+        List<String> changes,
+        Map<String, Object> oldValues,
+        Map<String, Object> newValues
+    ) {
         for (var update : updates) {
-            var variant = requireVariantInProduct(product.getId(), update.id());
+            if (update.id() != null) {
+                var variant = requireVariantInProduct(product.getId(), update.id());
 
-            var price = update.price() == null ? variant.getPrice() : update.price();
-            var compareAtPrice = update.compareAtPrice() == null
-                ? variant.getCompareAtPrice()
-                : update.compareAtPrice();
-            requireValidPrice(price, compareAtPrice);
+                var price = update.price();
+                if (price == null) {
+                    price = variant.getPrice();
+                }
+                var compareAtPrice = update.compareAtPrice();
+                if (compareAtPrice == null) {
+                    compareAtPrice = variant.getCompareAtPrice();
+                }
+                requireValidPrice(price, compareAtPrice);
 
-            if (Boolean.TRUE.equals(update.defaultVariant()) && !variant.isDefaultVariant()) {
-                unsetCurrentDefault(product.getId(), variant.getId());
-            }
+                if (Boolean.TRUE.equals(update.defaultVariant()) && !variant.isDefaultVariant()) {
+                    unsetCurrentDefault(product.getId(), variant.getId());
+                }
 
-            if (Boolean.FALSE.equals(update.defaultVariant()) && variant.isDefaultVariant()) {
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Cannot unset the only default variant"
+                if (Boolean.FALSE.equals(update.defaultVariant()) && variant.isDefaultVariant()) {
+                    throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Cannot unset the only default variant"
+                    );
+                }
+
+                if (update.stockQuantity() != null && update.stockQuantity() != variant.getStockQuantity()) {
+                    changes.add("Tồn kho " + variant.getSize() + "/" + variant.getColor() + ": "
+                        + variant.getStockQuantity() + " -> " + update.stockQuantity());
+                    oldValues.put("stock_" + variant.getId(), variant.getStockQuantity());
+                    newValues.put("stock_" + variant.getId(), update.stockQuantity());
+                }
+
+                if (update.price() != null && !update.price().equals(variant.getPrice())) {
+                    changes.add("Giá bán " + variant.getSize() + "/" + variant.getColor() + ": "
+                        + variant.getPrice() + " -> " + update.price());
+                    oldValues.put("price_" + variant.getId(), variant.getPrice());
+                    newValues.put("price_" + variant.getId(), update.price());
+                }
+
+                variant.updateDetails(
+                    update.sku(),
+                    update.size(),
+                    update.color(),
+                    update.price(),
+                    update.compareAtPrice(),
+                    update.stockQuantity(),
+                    update.defaultVariant()
                 );
+
+                variants.save(variant);
+            } else {
+                if (update.sku() == null || update.sku().isBlank()
+                    || update.size() == null || update.size().isBlank()
+                    || update.color() == null || update.color().isBlank()
+                    || update.price() == null) {
+                    throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "New variant requires sku, size, color and price"
+                    );
+                }
+                var existingSku = variants.findByShopIdAndSku(product.getShopId(), update.sku().trim()).orElse(null);
+                if (existingSku != null) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "SKU already taken");
+                }
+                int stock = 0;
+                if (update.stockQuantity() != null) {
+                    stock = update.stockQuantity();
+                }
+                var newVar = ProductVariant.create(
+                    product.getShopId(),
+                    product.getId(),
+                    update.sku().trim(),
+                    update.size().trim(),
+                    update.color().trim(),
+                    update.price(),
+                    update.compareAtPrice(),
+                    stock,
+                    Boolean.TRUE.equals(update.defaultVariant())
+                );
+                if (Boolean.TRUE.equals(update.defaultVariant())) {
+                    unsetCurrentDefault(product.getId(), newVar.getId());
+                }
+                variants.save(newVar);
+                changes.add("Thêm biến thể mới: " + newVar.getSize() + " - " + newVar.getColor() + " (SKU: " + newVar.getSku() + ")");
+                newValues.put("new_variant_" + newVar.getSku(), newVar.getSize() + "/" + newVar.getColor());
             }
-
-            variant.updatePricing(
-                update.price(),
-                update.compareAtPrice(),
-                update.stockQuantity(),
-                update.defaultVariant()
-            );
-
-            variants.save(variant);
         }
+    }
+
+    private @Nullable String toJson(@Nullable Object value) {
+        if (value == null) {
+            return null;
+        }
+
+        return objectMapper.writeValueAsString(value);
+    }
+
+    @Transactional(readOnly = true)
+    public ProductResponse getSellerProductDetail(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        @NonNull UUID productId
+    ) {
+        var product = products.findByShopIdAndId(shopId, productId).orElse(null);
+        if (product == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+
+        return toResponse(product);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductAuditLogResponse> getAuditLogs(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        @NonNull UUID productId
+    ) {
+        var product = products.findByShopIdAndId(shopId, productId).orElse(null);
+        if (product == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+
+        return auditLogs.findByProductIdOrderByCreatedAtDesc(productId).stream()
+            .map(log -> new ProductAuditLogResponse(
+                log.getId(),
+                log.getProductId(),
+                log.getShopId(),
+                log.getChangedBy(),
+                log.getAction(),
+                log.getChangesSummary(),
+                log.getOldValues(),
+                log.getNewValues(),
+                log.getCreatedAt()
+            ))
+            .toList();
+    }
+
+    @Transactional
+    public ProductResponse toggleProductStatus(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        @NonNull UUID productId
+    ) {
+        var product = products.findByShopIdAndId(shopId, productId).orElse(null);
+        if (product == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+
+        var oldStatus = product.getStatus().name();
+        String newStatus;
+        if (product.getStatus() == ProductStatus.ACTIVE) {
+            product.hide();
+            newStatus = "HIDDEN";
+        } else if (product.getStatus() == ProductStatus.HIDDEN) {
+            product.activate();
+            newStatus = "ACTIVE";
+        } else {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Cannot toggle status of " + product.getStatus() + " product"
+            );
+        }
+        var saved = products.save(product);
+
+        auditLogs.save(ProductAuditLog.record(
+            productId,
+            shopId,
+            userId,
+            "TOGGLE_STATUS",
+            "Chuyển trạng thái sản phẩm từ " + oldStatus + " sang " + newStatus,
+            toJson(Map.of("status", oldStatus)),
+            toJson(Map.of("status", newStatus))
+        ));
+
+        return toResponse(saved);
     }
 
     private void unsetCurrentDefault(UUID productId, UUID exceptVariantId) {

@@ -141,6 +141,27 @@ public class ProductVariant implements Persistable<UUID> {
         updatedAt = Instant.now();
     }
 
+    public void updateDetails(
+        @Nullable String sku,
+        @Nullable String size,
+        @Nullable String color,
+        @Nullable Long price,
+        @Nullable Long compareAtPrice,
+        @Nullable Integer stockQuantity,
+        @Nullable Boolean defaultVariant
+    ) {
+        if (sku != null && !sku.isBlank()) {
+            this.sku = sku;
+        }
+        if (size != null && !size.isBlank()) {
+            this.size = size;
+        }
+        if (color != null && !color.isBlank()) {
+            this.color = color;
+        }
+        updatePricing(price, compareAtPrice, stockQuantity, defaultVariant);
+    }
+
     public void archiveSku(String suffix) {
         this.sku = this.sku + suffix;
         this.updatedAt = Instant.now();
