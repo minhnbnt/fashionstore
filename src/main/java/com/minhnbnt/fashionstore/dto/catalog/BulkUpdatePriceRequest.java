@@ -23,7 +23,10 @@ public record BulkUpdatePriceRequest(
     @Pattern(regexp = "^(FIXED|PERCENT)$", message = "Mode must be FIXED or PERCENT")
     String mode,
 
-    @Schema(description = "Giá trị: số tiền (VND) nếu mode FIXED, hoặc phần trăm (-90 đến 500) nếu mode PERCENT", example = "199000")
+    @Schema(
+        description = "Giá trị: số tiền (VND) nếu mode FIXED, hoặc phần trăm (-90 đến 500) nếu mode PERCENT",
+        example = "199000"
+    )
     @DecimalMin(value = "-90.0", message = "Value cannot be less than -90")
     @DecimalMax(value = "1000000000.0", message = "Value cannot exceed 1,000,000,000")
     double value

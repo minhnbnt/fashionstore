@@ -723,7 +723,11 @@ class CatalogServiceTest {
         var buyerId = mirroredUser();
         orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(p2VariantId, 1)), "Bình", "0912345678", "Hanoi", 0L)
+            new CheckoutRequest(
+                shopId,
+                List.of(new CheckoutItemRequest(p2VariantId, 1)),
+                "Bình", "0912345678", "Hanoi", 0L
+            )
         );
 
         var delResult = catalog.bulkDeleteProducts(

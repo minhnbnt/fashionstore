@@ -1018,7 +1018,9 @@ public class CatalogService {
         if (q != null) {
             search = q;
         }
-        return listSellerProducts(userId, shopId, status, null, "ALL", 0L, 0L, search, "createdAt", "desc", page, limit);
+        return listSellerProducts(
+            userId, shopId, status, null, "ALL", 0L, 0L, search, "createdAt", "desc", page, limit
+        );
     }
 
     @Transactional(readOnly = true)
@@ -1038,7 +1040,10 @@ public class CatalogService {
     ) {
         access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
         List<Product> all;
-        if (!statusFilter.isBlank() && !"ALL".equalsIgnoreCase(statusFilter) && !"OUT_OF_STOCK".equalsIgnoreCase(statusFilter)) {
+        var statusNeedsLookup = !statusFilter.isBlank()
+            && !"ALL".equalsIgnoreCase(statusFilter)
+            && !"OUT_OF_STOCK".equalsIgnoreCase(statusFilter);
+        if (statusNeedsLookup) {
             try {
                 var targetStatus = ProductStatus.valueOf(statusFilter.toUpperCase(Locale.ROOT));
                 all = products.findByShopIdAndStatusOrderByCreatedAtDesc(shopId, targetStatus);
@@ -1166,7 +1171,8 @@ public class CatalogService {
             }
             if (product.getStatus() == ProductStatus.BANNED) {
                 failedCount++;
-                messages.add("Sản phẩm '" + product.getName() + "' bị cấm vi phạm chính sách, chỉ Admin mới có quyền mở");
+                messages.add("Sản phẩm '" + product.getName()
+                    + "' bị cấm vi phạm chính sách, chỉ Admin mới có quyền mở");
                 continue;
             }
 
@@ -1181,7 +1187,8 @@ public class CatalogService {
                     product.activate();
                 } else {
                     failedCount++;
-                    messages.add("Sản phẩm '" + product.getName() + "' ở trạng thái " + oldStatus + ", không thể bật bán");
+                    messages.add("Sản phẩm '" + product.getName()
+                        + "' ở trạng thái " + oldStatus + ", không thể bật bán");
                     continue;
                 }
             } else if (targetStatus == ProductStatus.HIDDEN) {
