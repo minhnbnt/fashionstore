@@ -17,9 +17,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -29,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -142,8 +145,6 @@ class ShopStaffServiceUnitTest {
         var request = new InviteStaffRequest("missing@store.com", roleId);
 
         when(roles.findByShopIdAndId(shopId, roleId)).thenReturn(Optional.of(role));
-        when(invitations.findByShopIdAndAcceptedAtIsNullAndRevokedAtIsNullOrderByCreatedAtDesc(shopId))
-            .thenReturn(List.of());
         when(identity.findByEmail("missing@store.com")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> staffService.inviteStaff(ownerId, shopId, request))
@@ -227,6 +228,8 @@ class ShopStaffServiceUnitTest {
         var request = new InviteStaffRequest("STAFF@store.com", roleId);
 
         when(roles.findByShopIdAndId(shopId, roleId)).thenReturn(Optional.of(role));
+        when(identity.findByEmail("staff@store.com"))
+            .thenReturn(Optional.of(new AccountInfo(UUID.randomUUID(), "staff@store.com", "Staff")));
         when(invitations.findByShopIdAndAcceptedAtIsNullAndRevokedAtIsNullOrderByCreatedAtDesc(shopId))
             .thenReturn(List.of(pending));
 
@@ -270,6 +273,7 @@ class ShopStaffServiceUnitTest {
 
         when(invitations.findByToken(inv.getToken())).thenReturn(Optional.of(inv));
         when(members.findMember(shopId, userId)).thenReturn(Optional.empty());
+        when(invitations.claimPending(inv.getId())).thenReturn(1);
 
         staffService.acceptInvitation(userId, inv.getToken());
 
@@ -287,6 +291,7 @@ class ShopStaffServiceUnitTest {
 
         when(invitations.findByToken(inv.getToken())).thenReturn(Optional.of(inv));
         when(members.findMember(shopId, userId)).thenReturn(Optional.of(deactivated));
+        when(invitations.claimPending(inv.getId())).thenReturn(1);
 
         staffService.acceptInvitation(userId, inv.getToken());
 
@@ -323,12 +328,248 @@ class ShopStaffServiceUnitTest {
 
         when(invitations.findByToken(inv.getToken())).thenReturn(Optional.of(inv));
         when(members.findMember(shopId, userId)).thenReturn(Optional.empty());
+        when(invitations.claimPending(inv.getId())).thenReturn(1);
 
         staffService.acceptInvitation(userId, inv.getToken());
 
-        assertThat(inv.getAcceptedAt()).isNotNull();
+        verify(invitations).claimPending(inv.getId());
         verify(members).add(any(ShopMember.class));
         verify(audits).save(any());
+    }
+
+    @Test
+    void acceptInvitationFallsBackToEmailWhenInviteeIdMissing() {
+        var actorId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var roleId = UUID.randomUUID();
+        var inv = ShopInvitation.create(shopId, "staff@store.com", roleId, UUID.randomUUID(), null);
+
+        when(invitations.findByToken(inv.getToken())).thenReturn(Optional.of(inv));
+        when(identity.findById(actorId))
+            .thenReturn(Optional.of(new AccountInfo(actorId, "STAFF@Store.com", "Staff")));
+        when(invitations.claimPending(inv.getId())).thenReturn(1);
+        when(members.findMember(shopId, actorId)).thenReturn(Optional.empty());
+
+        staffService.acceptInvitation(actorId, inv.getToken());
+
+        verify(members).add(any(ShopMember.class));
+    }
+
+    @Test
+    void acceptInvitationRejectsDifferentEmailWhenInviteeIdMissing() {
+        var actorId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var roleId = UUID.randomUUID();
+        var inv = ShopInvitation.create(shopId, "staff@store.com", roleId, UUID.randomUUID(), null);
+
+        when(invitations.findByToken(inv.getToken())).thenReturn(Optional.of(inv));
+        when(identity.findById(actorId))
+            .thenReturn(Optional.of(new AccountInfo(actorId, "other@store.com", "Other")));
+
+        assertThatThrownBy(() -> staffService.acceptInvitation(actorId, inv.getToken()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus(
+                (ResponseStatusException) e,
+                HttpStatus.FORBIDDEN,
+                "Invitation does not belong to this account"
+            ));
+        verify(invitations, never()).claimPending(any());
+    }
+
+    @Test
+    void acceptInvitationRejectsExpired() {
+        var userId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var inv = expiredInvitation(shopId, UUID.randomUUID(), UUID.randomUUID());
+
+        when(invitations.findByToken(inv.getToken())).thenReturn(Optional.of(inv));
+
+        assertThatThrownBy(() -> staffService.acceptInvitation(userId, inv.getToken()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus(
+                (ResponseStatusException) e,
+                HttpStatus.GONE,
+                "Invitation has expired"
+            ));
+        verify(invitations, never()).claimPending(any());
+    }
+
+    @Test
+    void acceptInvitationRejectsActiveMemberInsteadOfDemotingOwner() {
+        var ownerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var roleId = UUID.randomUUID();
+        var inv = ShopInvitation.create(shopId, "owner@store.com", roleId, UUID.randomUUID(), ownerId);
+        var owner = ShopMember.owner(shopId, ownerId);
+
+        when(invitations.findByToken(inv.getToken())).thenReturn(Optional.of(inv));
+        when(invitations.claimPending(inv.getId())).thenReturn(1);
+        when(members.findMember(shopId, ownerId)).thenReturn(Optional.of(owner));
+
+        assertThatThrownBy(() -> staffService.acceptInvitation(ownerId, inv.getToken()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus(
+                (ResponseStatusException) e,
+                HttpStatus.CONFLICT,
+                "This account is already a member of the shop"
+            ));
+        verify(members, never()).updateStatus(any(), any(), any());
+        verify(members, never()).updateRole(any(), any(), any(), any());
+    }
+
+    @Test
+    void acceptInvitationReturnsConflictWhenClaimLoses() {
+        var userId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var inv = ShopInvitation.create(shopId, "staff@store.com", UUID.randomUUID(), UUID.randomUUID(), userId);
+
+        when(invitations.findByToken(inv.getToken())).thenReturn(Optional.of(inv));
+        when(invitations.claimPending(inv.getId())).thenReturn(0);
+
+        assertThatThrownBy(() -> staffService.acceptInvitation(userId, inv.getToken()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus(
+                (ResponseStatusException) e,
+                HttpStatus.CONFLICT,
+                "Invitation has already been accepted"
+            ));
+        verify(members, never()).add(any());
+        verify(audits, never()).save(any());
+    }
+
+    @Test
+    void acceptInvitationConvertsDuplicateMemberInsertToConflict() {
+        var userId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var inv = ShopInvitation.create(shopId, "staff@store.com", UUID.randomUUID(), UUID.randomUUID(), userId);
+
+        when(invitations.findByToken(inv.getToken())).thenReturn(Optional.of(inv));
+        when(invitations.claimPending(inv.getId())).thenReturn(1);
+        when(members.findMember(shopId, userId)).thenReturn(Optional.empty());
+        doThrow(new DataIntegrityViolationException("duplicate key"))
+            .when(members).add(any(ShopMember.class));
+
+        assertThatThrownBy(() -> staffService.acceptInvitation(userId, inv.getToken()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus(
+                (ResponseStatusException) e,
+                HttpStatus.CONFLICT,
+                "This account is already a member of the shop"
+            ));
+    }
+
+    @Test
+    void getInvitationDetailReportsStatusPrecedence() {
+        var userId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var roleId = UUID.randomUUID();
+        var ownerId = UUID.randomUUID();
+
+        var revokedAndAccepted = ShopInvitation.create(shopId, "staff@store.com", roleId, ownerId, userId);
+        revokedAndAccepted.revoke();
+        revokedAndAccepted.accept();
+
+        var acceptedAndExpired = expiredInvitation(shopId, roleId, ownerId);
+        acceptedAndExpired.accept();
+
+        var expired = expiredInvitation(shopId, roleId, ownerId);
+        var pending = ShopInvitation.create(shopId, "staff@store.com", roleId, ownerId, userId);
+
+        when(invitations.findByToken(revokedAndAccepted.getToken())).thenReturn(Optional.of(revokedAndAccepted));
+        when(invitations.findByToken(acceptedAndExpired.getToken())).thenReturn(Optional.of(acceptedAndExpired));
+        when(invitations.findByToken(expired.getToken())).thenReturn(Optional.of(expired));
+        when(invitations.findByToken(pending.getToken())).thenReturn(Optional.of(pending));
+
+        assertThat(staffService.getInvitationDetail(userId, revokedAndAccepted.getToken()).status())
+            .isEqualTo("REVOKED");
+        assertThat(staffService.getInvitationDetail(userId, acceptedAndExpired.getToken()).status())
+            .isEqualTo("ACCEPTED");
+        assertThat(staffService.getInvitationDetail(userId, expired.getToken()).status()).isEqualTo("EXPIRED");
+        assertThat(staffService.getInvitationDetail(userId, pending.getToken()).status()).isEqualTo("PENDING");
+    }
+
+    @Test
+    void listInvitationsExcludesExpired() {
+        var userId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var roleId = UUID.randomUUID();
+        var ownerId = UUID.randomUUID();
+        var pending = ShopInvitation.create(shopId, "staff@store.com", roleId, ownerId, userId);
+        var expired = expiredInvitation(shopId, roleId, ownerId);
+
+        when(invitations.findByShopIdAndAcceptedAtIsNullAndRevokedAtIsNullOrderByCreatedAtDesc(shopId))
+            .thenReturn(List.of(pending, expired));
+
+        var result = staffService.listInvitations(userId, shopId);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().id()).isEqualTo(pending.getId());
+    }
+
+    @Test
+    void revokeInvitationRejectsAcceptedInvitation() {
+        var ownerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var inv = ShopInvitation.create(shopId, "staff@store.com", UUID.randomUUID(), ownerId, UUID.randomUUID());
+        inv.accept();
+
+        when(invitations.findByShopIdAndId(shopId, inv.getId())).thenReturn(Optional.of(inv));
+
+        assertThatThrownBy(() -> staffService.revokeInvitation(ownerId, shopId, inv.getId()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus(
+                (ResponseStatusException) e,
+                HttpStatus.CONFLICT,
+                "Invitation has already been accepted"
+            ));
+        verify(audits, never()).save(any());
+    }
+
+    @Test
+    void revokeInvitationRequiresOwner() {
+        var actorId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var invitationId = UUID.randomUUID();
+
+        doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "Forbidden"))
+            .when(access).requireShopRole(actorId, shopId, MemberRole.OWNER);
+
+        assertThatThrownBy(() -> staffService.revokeInvitation(actorId, shopId, invitationId))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.FORBIDDEN, "Forbidden"));
+        verify(invitations, never()).findByShopIdAndId(any(), any());
+    }
+
+    @Test
+    void revokeInvitationIsIdempotent() {
+        var ownerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var inv = ShopInvitation.create(shopId, "staff@store.com", UUID.randomUUID(), ownerId, UUID.randomUUID());
+        inv.revoke();
+
+        when(invitations.findByShopIdAndId(shopId, inv.getId())).thenReturn(Optional.of(inv));
+
+        staffService.revokeInvitation(ownerId, shopId, inv.getId());
+
+        verify(invitations, never()).save(any());
+        verify(audits, never()).save(any());
+        verify(notifications, never()).deleteByRefId(any());
+    }
+
+    private static ShopInvitation expiredInvitation(UUID shopId, UUID roleId, UUID ownerId) {
+        return new ShopInvitation(
+            UUID.randomUUID(),
+            shopId,
+            "staff@store.com",
+            roleId,
+            UUID.randomUUID().toString(),
+            Instant.now().minusSeconds(60),
+            null,
+            null,
+            null,
+            ownerId,
+            Instant.now().minusSeconds(3600),
+            false);
     }
 
     private static void assertStatus(ResponseStatusException e, HttpStatus expected, String reason) {

@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -128,6 +129,13 @@ public class ShopStaffService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot delete system roles");
         }
 
+        // Xóa thông báo trước khi cascade xóa lời mời, tránh người được mời giữ link chết.
+        for (var inv : invitations.findByShopIdOrderByCreatedAtDesc(shopId)) {
+            if (inv.getRoleId().equals(roleId) && inv.getAcceptedAt() == null && !inv.isRevoked()) {
+                notifications.deleteByRefId(inv.getId());
+            }
+        }
+
         roles.delete(role);
         audits.save(ShopMemberAudit.record(shopId, userId, "DELETE_ROLE", "ROLE", role.getId(), role.getName()));
     }
@@ -177,7 +185,6 @@ public class ShopStaffService {
         }
 
         var email = request.email().trim().toLowerCase(Locale.ROOT);
-        releaseOrRejectPendingInvitation(shopId, email);
 
         var account = identity.findByEmail(email).orElse(null);
         if (account == null) {
@@ -186,6 +193,8 @@ public class ShopStaffService {
         if (account.id().equals(userId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot invite yourself");
         }
+
+        releaseOrRejectPendingInvitation(shopId, email);
 
         var existingMember = members.findMember(shopId, account.id()).orElse(null);
         if (existingMember != null) {
@@ -201,6 +210,9 @@ public class ShopStaffService {
         try {
             invitations.save(inv);
         } catch (DataIntegrityViolationException e) {
+            if (!isPendingInvitationConflict(e)) {
+                throw e;
+            }
             throw new ResponseStatusException(
                 HttpStatus.CONFLICT,
                 "A pending invitation already exists for this email"
@@ -245,6 +257,9 @@ public class ShopStaffService {
         var inv = invitations.findByShopIdAndId(shopId, invitationId).orElse(null);
         if (inv == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Invitation not found");
+        }
+        if (inv.isRevoked()) {
+            return;
         }
         if (inv.getAcceptedAt() != null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Invitation has already been accepted");
@@ -311,17 +326,27 @@ public class ShopStaffService {
 
         requireInvitee(inv, userId);
 
-        var existing = members.findMember(inv.getShopId(), userId).orElse(null);
-        if (existing == null) {
-            var member = ShopMember.staff(inv.getShopId(), userId, inv.getRoleId(), inv.getCreatedBy());
-            members.add(member);
-        } else {
-            members.updateStatus(inv.getShopId(), userId, "ACTIVE");
-            members.updateRole(inv.getShopId(), userId, MemberRole.STAFF, inv.getRoleId());
+        if (invitations.claimPending(inv.getId()) == 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Invitation has already been accepted");
         }
 
-        inv.accept();
-        invitations.save(inv);
+        var existing = members.findMember(inv.getShopId(), userId).orElse(null);
+        if (existing == null) {
+            try {
+                members.add(ShopMember.staff(inv.getShopId(), userId, inv.getRoleId(), inv.getCreatedBy()));
+            } catch (DataIntegrityViolationException e) {
+                throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "This account is already a member of the shop"
+                );
+            }
+        } else if ("DEACTIVATED".equals(existing.getStatus())) {
+            members.updateStatus(inv.getShopId(), userId, "ACTIVE");
+            members.updateRole(inv.getShopId(), userId, MemberRole.STAFF, inv.getRoleId());
+        } else {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This account is already a member of the shop");
+        }
+
         notifications.deleteByRefId(inv.getId());
 
         audits.save(ShopMemberAudit.record(
@@ -451,6 +476,22 @@ public class ShopStaffService {
         if (!inv.getEmail().equalsIgnoreCase(actor.email())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Invitation does not belong to this account");
         }
+    }
+
+    /**
+     * Chỉ coi là trùng lời mời pending khi lỗi là unique violation của index tương ứng;
+     * lỗi toàn vẹn khác phải nổi lên nguyên trạng.
+     */
+    private static boolean isPendingInvitationConflict(DataIntegrityViolationException e) {
+        var cause = e.getMostSpecificCause();
+        if (cause instanceof SQLException sql && "23505".equals(sql.getSQLState())) {
+            return true;
+        }
+        var message = cause.getMessage();
+        if (message == null) {
+            return false;
+        }
+        return message.contains("uq_shop_invitation_pending");
     }
 
     private static String invitationStatus(ShopInvitation inv) {

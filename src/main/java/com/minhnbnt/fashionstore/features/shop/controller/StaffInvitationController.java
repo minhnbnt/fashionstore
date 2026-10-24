@@ -31,7 +31,7 @@ public class StaffInvitationController {
 
     @GetMapping("/{token}")
     @Operation(
-        operationId = "getInvitationDetail",
+        operationId = "getInvitation",
         summary = "Chi tiết lời mời theo token",
         description = "Trả về shop, vai trò, email được mời và trạng thái lời mời để trang chấp nhận hiển thị."
     )
