@@ -53,7 +53,7 @@ public class SellerShopDecorationController {
     @ApiResponse(responseCode = "200", description = "Bản nháp sau khi lưu")
     @ApiResponse(responseCode = "400", description = "Body không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền DECORATION_WRITE")
     @SecurityRequirement(name = "bearerAuth")
     public DecorationResponse saveDraft(
         @AuthenticationPrincipal Jwt jwt,
@@ -70,7 +70,7 @@ public class SellerShopDecorationController {
     @Operation(summary = "Xuất bản bản nháp lên trang chủ shop", description = "Chuyển draft thành layout chính thức hiển thị cho khách hàng.")
     @ApiResponse(responseCode = "200", description = "Layout sau khi xuất bản")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền DECORATION_WRITE")
     @SecurityRequirement(name = "bearerAuth")
     public DecorationResponse publish(
         @AuthenticationPrincipal Jwt jwt,
@@ -86,7 +86,7 @@ public class SellerShopDecorationController {
     @Operation(summary = "Hủy bỏ bản nháp", description = "Hủy các thay đổi trong bản nháp chưa xuất bản.")
     @ApiResponse(responseCode = "200", description = "Layout sau khi hủy nháp")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền DECORATION_WRITE")
     @SecurityRequirement(name = "bearerAuth")
     public DecorationResponse discardDraft(
         @AuthenticationPrincipal Jwt jwt,

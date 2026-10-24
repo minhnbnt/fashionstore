@@ -34,7 +34,7 @@ public class SellerReturnController {
     private final ReturnRequestService returns;
 
     @GetMapping
-    @Operation(summary = "Danh sách yêu cầu đổi/trả", description = "Lọc theo shop hoặc trạng thái (REQUESTED, APPROVED, REJECTED, COMPLETED).")
+    @Operation(summary = "Danh sách yêu cầu đổi/trả", description = "Cần quyền RETURN_PROCESS. Lọc theo shop hoặc trạng thái (REQUESTED, APPROVED, REJECTED, COMPLETED).")
     @ApiResponse(responseCode = "200", description = "Danh sách yêu cầu")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @SecurityRequirement(name = "bearerAuth")
@@ -53,7 +53,7 @@ public class SellerReturnController {
     @Operation(summary = "Chi tiết yêu cầu đổi/trả")
     @ApiResponse(responseCode = "200", description = "Chi tiết yêu cầu")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền RETURN_PROCESS")
     @ApiResponse(responseCode = "404", description = "Yêu cầu không tồn tại")
     @SecurityRequirement(name = "bearerAuth")
     public ReturnRequestResponse detail(
@@ -71,7 +71,7 @@ public class SellerReturnController {
     @ApiResponse(responseCode = "200", description = "Yêu cầu sau khi duyệt")
     @ApiResponse(responseCode = "400", description = "Body không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền RETURN_PROCESS")
     @ApiResponse(responseCode = "404", description = "Yêu cầu không tồn tại")
     @ApiResponse(responseCode = "409", description = "Sai trạng thái")
     @SecurityRequirement(name = "bearerAuth")
@@ -91,7 +91,7 @@ public class SellerReturnController {
     @ApiResponse(responseCode = "200", description = "Yêu cầu sau khi từ chối")
     @ApiResponse(responseCode = "400", description = "Body không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền RETURN_PROCESS")
     @ApiResponse(responseCode = "404", description = "Yêu cầu không tồn tại")
     @ApiResponse(responseCode = "409", description = "Sai trạng thái")
     @SecurityRequirement(name = "bearerAuth")
@@ -110,7 +110,7 @@ public class SellerReturnController {
     @Operation(summary = "Xác nhận hoàn tất đổi/trả", description = "APPROVED -> COMPLETED.")
     @ApiResponse(responseCode = "200", description = "Yêu cầu sau khi hoàn tất")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền RETURN_PROCESS")
     @ApiResponse(responseCode = "404", description = "Yêu cầu không tồn tại")
     @ApiResponse(responseCode = "409", description = "Sai trạng thái")
     @SecurityRequirement(name = "bearerAuth")

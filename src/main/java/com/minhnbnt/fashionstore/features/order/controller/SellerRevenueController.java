@@ -41,7 +41,7 @@ public class SellerRevenueController {
     @Operation(summary = "Tổng quan doanh thu", description = "Tổng doanh thu đơn đã giao, số lượng đơn, giá trị trung bình đơn, số dư ví khả dụng và đang giữ.")
     @ApiResponse(responseCode = "200", description = "Dữ liệu tổng quan doanh thu")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền REVENUE_READ")
     @SecurityRequirement(name = "bearerAuth")
     public RevenueSummaryResponse summary(
         @AuthenticationPrincipal Jwt jwt,
@@ -57,7 +57,7 @@ public class SellerRevenueController {
     @Operation(summary = "Biểu đồ doanh thu theo ngày", description = "Doanh thu từng ngày của shop để vẽ biểu đồ.")
     @ApiResponse(responseCode = "200", description = "Doanh thu theo ngày")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền REVENUE_READ")
     @SecurityRequirement(name = "bearerAuth")
     public List<DailyRevenueResponse> byDay(
         @AuthenticationPrincipal Jwt jwt,
@@ -73,7 +73,7 @@ public class SellerRevenueController {
     @Operation(summary = "Top sản phẩm bán chạy", description = "Danh sách sản phẩm có doanh thu và số lượng bán cao nhất.")
     @ApiResponse(responseCode = "200", description = "Top sản phẩm")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền REVENUE_READ")
     @SecurityRequirement(name = "bearerAuth")
     public List<TopProductRevenueResponse> topProducts(
         @AuthenticationPrincipal Jwt jwt,
@@ -90,7 +90,7 @@ public class SellerRevenueController {
     @Operation(summary = "Danh sách giải ngân (Settlements)", description = "Lọc các khoản tiền đang giữ (HOLDING) hoặc đã vào ví (RELEASED).")
     @ApiResponse(responseCode = "200", description = "Danh sách giải ngân")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền REVENUE_READ")
     @SecurityRequirement(name = "bearerAuth")
     public List<SettlementResponse> settlements(
         @AuthenticationPrincipal Jwt jwt,
@@ -105,11 +105,11 @@ public class SellerRevenueController {
 
     @PostMapping("/withdrawals")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Yêu cầu rút tiền về ngân hàng", description = "Chỉ OWNER của shop mới có quyền yêu cầu rút tiền.")
+    @Operation(summary = "Yêu cầu rút tiền về ngân hàng", description = "Cần quyền REVENUE_WITHDRAW.")
     @ApiResponse(responseCode = "201", description = "Yêu cầu rút tiền đã tạo")
     @ApiResponse(responseCode = "400", description = "Số dư không đủ hoặc thông tin ngân hàng thiếu")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Chỉ chủ shop mới được rút tiền")
+    @ApiResponse(responseCode = "403", description = "Thiếu quyền REVENUE_WITHDRAW")
     @SecurityRequirement(name = "bearerAuth")
     public WithdrawalResponse requestWithdrawal(
         @AuthenticationPrincipal Jwt jwt,
@@ -125,7 +125,7 @@ public class SellerRevenueController {
     @Operation(summary = "Lịch sử rút tiền", description = "Danh sách các yêu cầu rút tiền của shop.")
     @ApiResponse(responseCode = "200", description = "Danh sách yêu cầu rút tiền")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền REVENUE_READ")
     @SecurityRequirement(name = "bearerAuth")
     public List<WithdrawalResponse> listWithdrawals(
         @AuthenticationPrincipal Jwt jwt,
