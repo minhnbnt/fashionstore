@@ -41,7 +41,6 @@ import com.minhnbnt.fashionstore.features.review.ReviewService;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.infrastructure.media.VideoMetadataService;
-import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.Product;
 import com.minhnbnt.fashionstore.model.ProductAuditLog;
 import com.minhnbnt.fashionstore.model.ProductImage;
@@ -50,6 +49,7 @@ import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.model.ProductVariant;
 import com.minhnbnt.fashionstore.model.ProductViolationType;
 import com.minhnbnt.fashionstore.model.ReportStatus;
+import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.model.StockMovement;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
@@ -122,7 +122,7 @@ public class CatalogService {
         @NonNull UUID shopId,
         @NonNull CreateProductRequest request
     ) {
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
 
         requireSingleDefault(request.variants());
 
@@ -284,7 +284,7 @@ public class CatalogService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
         }
 
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
 
         if (product.getStatus() == ProductStatus.DELETED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Deleted product cannot be modified");
@@ -414,7 +414,7 @@ public class CatalogService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
         }
 
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
 
         for (var item : request.images()) {
             if (item.variantId() != null) {
@@ -761,7 +761,7 @@ public class CatalogService {
         if (product == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
         }
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_READ);
 
         return toResponse(product);
     }
@@ -776,7 +776,7 @@ public class CatalogService {
         if (product == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
         }
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_READ);
 
         return auditLogs.findByProductIdOrderByCreatedAtDesc(productId).stream()
             .map(log -> new ProductAuditLogResponse(
@@ -803,7 +803,7 @@ public class CatalogService {
         if (product == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
         }
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
 
         var oldStatus = product.getStatus().name();
         String newStatus;
@@ -963,7 +963,7 @@ public class CatalogService {
 
     @Transactional
     public void deleteProduct(@NonNull UUID userId, @NonNull UUID shopId, @NonNull UUID productId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
         var product = products.findByShopIdAndId(shopId, productId).orElse(null);
         if (product == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
@@ -989,7 +989,7 @@ public class CatalogService {
         @NonNull UUID productId,
         @NonNull UUID imageId
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
         var product = products.findByShopIdAndId(shopId, productId).orElse(null);
         if (product == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
@@ -1038,7 +1038,7 @@ public class CatalogService {
         int page,
         int limit
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.PRODUCT_READ);
         List<Product> all;
         var statusNeedsLookup = !statusFilter.isBlank()
             && !"ALL".equalsIgnoreCase(statusFilter)
@@ -1151,7 +1151,7 @@ public class CatalogService {
         @NonNull UUID shopId,
         @NonNull BulkUpdateProductStatusRequest request
     ) {
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
         var targetStatus = ProductStatus.valueOf(request.status());
         var successCount = 0;
         var failedCount = 0;
@@ -1223,7 +1223,7 @@ public class CatalogService {
         @NonNull UUID shopId,
         @NonNull BulkDeleteProductsRequest request
     ) {
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
         var successCount = 0;
         var failedCount = 0;
         var messages = new ArrayList<String>();
@@ -1276,7 +1276,7 @@ public class CatalogService {
         @NonNull UUID shopId,
         @NonNull BulkUpdatePriceRequest request
     ) {
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
         var successCount = 0;
         var failedCount = 0;
         var messages = new ArrayList<String>();
@@ -1345,7 +1345,7 @@ public class CatalogService {
         @NonNull UUID shopId,
         @NonNull BulkUpdateStockRequest request
     ) {
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.INVENTORY_WRITE);
         var successCount = 0;
         var failedCount = 0;
         var messages = new ArrayList<String>();
@@ -1410,7 +1410,7 @@ public class CatalogService {
         @NonNull UUID shopId,
         boolean onlyLowStock
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.INVENTORY_READ);
         var variantsList = variants.findByShopId(shopId);
         var result = new ArrayList<InventoryItemResponse>();
         for (var v : variantsList) {
@@ -1446,7 +1446,7 @@ public class CatalogService {
         @NonNull UUID variantId,
         @NonNull AdjustStockRequest request
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.INVENTORY_WRITE);
         var variant = variants.findByShopIdAndId(shopId, variantId).orElse(null);
         if (variant == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found");
@@ -1493,7 +1493,7 @@ public class CatalogService {
         @NonNull UUID shopId,
         @NonNull UUID variantId
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.INVENTORY_READ);
         var variant = variants.findByShopIdAndId(shopId, variantId).orElse(null);
         if (variant == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found");
@@ -1514,7 +1514,7 @@ public class CatalogService {
     @Transactional
     @SuppressWarnings("StringSplitter")
     public BulkImportResult bulkImport(@NonNull UUID userId, @NonNull UUID shopId, byte[] csvBytes) {
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
         var content = new String(csvBytes, StandardCharsets.UTF_8);
         var lines = Pattern.compile("\\r?\\n").split(content);
         var success = 0;
@@ -1566,7 +1566,7 @@ public class CatalogService {
 
     @Transactional(readOnly = true)
     public String exportCsv(@NonNull UUID userId, @NonNull UUID shopId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.PRODUCT_READ);
         var allProducts = products.findByShopIdOrderByCreatedAtDesc(shopId);
         var sb = new StringBuilder("name,slug,description,sku,size,color,price,stockQuantity,status\n");
         for (var p : allProducts) {
