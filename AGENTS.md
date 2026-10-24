@@ -12,7 +12,7 @@ Spring Boot 4 + Data JDBC + Postgres + GoTrue JWT + versitygw S3. Marketplace nh
 ## Quy tắc nhanh
 
 - Cấm ternary (`? :`): `if` + early `return`.
-- Entity cấm `@Data`/`@Setter`/`@EqualsAndHashCode`; mặc định non-null (NullAway), nullable gắn `@Nullable`.
+- Entity cấm `@Data`/`@Setter`/`@EqualsAndHashCode`; mặc định non-null (NullAway). Hạn chế tối đa `@Nullable` — chỉ dùng khi nghiệp vụ thật sự optional (xem `docs/code-guide.md`).
 - Exception/message tiếng Anh. DB chỉ lưu S3 key, không lưu URL.
 - Testcontainers dùng image Postgres của project, không đổi sang stock image.
 - `./gradlew test` xanh rồi mới xong việc.
