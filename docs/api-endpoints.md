@@ -267,3 +267,24 @@ Chi tiết luồng này xem `docs/wishlist.md`.
 | [x] | 95 | GET | `/api/notifications/unread-count` | Số lượng thông báo chưa đọc (Unread Count) |
 | [x] | 96 | PATCH | `/api/notifications/{id}/read` | Đánh dấu một thông báo đã đọc |
 | [x] | 97 | POST | `/api/notifications/mark-all-read` | Đánh dấu tất cả thông báo của user đã đọc |
+
+## Flow 17 — Thống kê & Báo cáo Shop (Seller Statistics & Reporting)
+
+| Xong | # | Method | Path | Mô tả |
+|------|---|--------|------|-------|
+| [x] | 98 | GET | `/api/seller/shops/{shopId}/stats/dashboard` | Dashboard tổng quan: doanh thu hôm nay/hôm qua, đơn hàng, lượt truy cập |
+| [x] | 99 | GET | `/api/seller/shops/{shopId}/stats/performance` | Hiệu suất shop: tỷ lệ phản hồi chat, hủy đơn, giao đúng hạn, rating |
+| [x] | 100 | GET | `/api/seller/shops/{shopId}/stats/alerts` | Cảnh báo vận hành: đơn chờ, hết hàng, đổi trả |
+| [x] | 101 | GET | `/api/seller/shops/{shopId}/stats/revenue/detail` | Chi tiết doanh thu theo chu kỳ (day, week, month, year) |
+| [x] | 102 | GET | `/api/seller/shops/{shopId}/stats/revenue/comparison` | So sánh doanh thu chu kỳ hiện tại vs kỳ trước |
+| [x] | 103 | GET | `/api/seller/shops/{shopId}/stats/revenue/by-category` | Doanh thu phân bổ theo danh mục sản phẩm |
+| [x] | 104 | GET | `/api/seller/shops/{shopId}/stats/revenue/by-payment` | Doanh thu theo phương thức thanh toán (COD, VNPAY, MOMO) |
+| [x] | 105 | GET | `/api/seller/shops/{shopId}/stats/revenue/order-status-summary` | Tổng hợp giá trị đơn hoàn thành, đơn hủy, đổi trả |
+| [x] | 106 | GET | `/api/seller/shops/{shopId}/stats/revenue/export` | Xuất báo cáo doanh thu CSV/Excel |
+| [x] | 107 | GET | `/api/seller/shops/{shopId}/stats/products/top-selling` | Top sản phẩm bán chạy nhất |
+| [x] | 108 | GET | `/api/seller/shops/{shopId}/stats/products/low-conversion` | Sản phẩm xem nhiều mua ít (tỷ lệ chuyển đổi thấp) |
+| [x] | 109 | GET | `/api/seller/shops/{shopId}/stats/products/out-of-stock` | Sản phẩm hết hàng |
+| [x] | 110 | GET | `/api/seller/shops/{shopId}/stats/products/slow-moving` | Sản phẩm tồn kho lâu ngày không bán được |
+| [x] | 111 | GET | `/api/seller/shops/{shopId}/stats/customers/overview` | Tổng quan khách hàng: mới, quay lại, retention rate, AOV |
+| [x] | 112 | GET | `/api/seller/shops/{shopId}/stats/customers/top` | Top khách hàng chi tiêu nhiều nhất |
+| [x] | 113 | GET | `/api/seller/shops/{shopId}/stats/customers/follower-trend` | Tăng trưởng người theo dõi shop |
