@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Read model cho màn admin quản lý tài khoản.
@@ -133,18 +134,12 @@ public class UserAdminQueryRepository {
             GROUP BY day
             """;
 
-        var rows = jdbc.sql(sql)
+        return jdbc.sql(sql)
             .param("zone", zone.getId())
             .param("from", OffsetDateTime.ofInstant(from, ZoneOffset.UTC))
             .query((rs, rowNum) -> Map.entry(rs.getObject("day", LocalDate.class), rs.getLong("total")))
-            .list();
-
-        var result = new HashMap<LocalDate, Long>();
-        for (var row : rows) {
-            result.put(row.getKey(), row.getValue());
-        }
-
-        return result;
+            .stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     private record Filter(String where, Map<String, Object> params) {

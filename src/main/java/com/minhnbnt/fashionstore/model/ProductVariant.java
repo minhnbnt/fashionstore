@@ -61,8 +61,7 @@ public class ProductVariant implements Persistable<UUID> {
         int lowStockThreshold,
         boolean defaultVariant,
         Instant createdAt,
-        Instant updatedAt
-    ) {
+        Instant updatedAt) {
         this.id = id;
         this.shopId = shopId;
         this.productId = productId;
@@ -92,8 +91,7 @@ public class ProductVariant implements Persistable<UUID> {
         long price,
         @Nullable Long compareAtPrice,
         int stockQuantity,
-        boolean defaultVariant
-    ) {
+        boolean defaultVariant) {
         var now = Instant.now();
         var variant = new ProductVariant(
             UUID.randomUUID(),
@@ -108,8 +106,7 @@ public class ProductVariant implements Persistable<UUID> {
             5,
             defaultVariant,
             now,
-            now
-        );
+            now);
         variant.newRecord = true;
         return variant;
     }
@@ -133,8 +130,7 @@ public class ProductVariant implements Persistable<UUID> {
         @Nullable Long price,
         @Nullable Long compareAtPrice,
         @Nullable Integer stockQuantity,
-        @Nullable Boolean defaultVariant
-    ) {
+        @Nullable Boolean defaultVariant) {
         if (price != null) {
             this.price = price;
         }

@@ -6,17 +6,17 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.UUID;
 
-@SuppressWarnings("MultipleNullnessAnnotations")
 public record CreateProductRequest(
-    @Schema(example = "Áo thun đen", description = "Tên sản phẩm (5-300 ký tự)")
+    @Schema(example = "Áo thun đen", description = "Tên sản phẩm (tối đa 300 ký tự)")
     @NotBlank(message = "Product name is required")
-    @Size(min = 5, max = 300, message = "Product name must be between 5 and 300 characters")
+    @Size(max = 300, message = "Product name cannot exceed 300 characters")
     String name,
 
     @Schema(description = "Slug duy nhất trong shop", example = "ao-thun-den")
@@ -25,13 +25,11 @@ public record CreateProductRequest(
     String slug,
 
     @Schema(description = "Mô tả chi tiết rich text")
-    @NotBlank(message = "Product description is required")
     @Size(max = 20000, message = "Product description cannot exceed 20000 characters")
     @Nullable
     String description,
 
-    @Schema(description = "Danh mục ngành hàng")
-    @NotNull(message = "Category is required")
+    @Schema(description = "Danh mục ngành hàng, null nếu chưa phân loại")
     @Nullable
     UUID categoryId,
 
@@ -44,7 +42,6 @@ public record CreateProductRequest(
     @NotNull(message = "Product images are required")
     @Size(min = 3, max = 9, message = "Product requires between 3 and 9 images")
     @Valid
-    @Nullable
     List<ImageItemRequest> images,
 
     @Schema(description = "S3 key video giới thiệu sản phẩm (tối đa 60s)", nullable = true)
@@ -77,64 +74,27 @@ public record CreateProductRequest(
 
     @Schema(description = "Cân nặng đóng gói tính bằng grams", nullable = true, example = "250")
     @Nullable
-    @jakarta.validation.constraints.Positive(message = "Package weight must be positive")
+    @Positive(message = "Package weight must be positive")
     Integer weightGrams,
 
     @Schema(description = "Chiều dài đóng gói (cm)", nullable = true, example = "25")
     @Nullable
-    @jakarta.validation.constraints.Positive(message = "Package length must be positive")
+    @Positive(message = "Package length must be positive")
     Integer lengthCm,
 
     @Schema(description = "Chiều rộng đóng gói (cm)", nullable = true, example = "18")
     @Nullable
-    @jakarta.validation.constraints.Positive(message = "Package width must be positive")
+    @Positive(message = "Package width must be positive")
     Integer widthCm,
 
     @Schema(description = "Chiều cao đóng gói (cm)", nullable = true, example = "5")
     @Nullable
-    @jakarta.validation.constraints.Positive(message = "Package height must be positive")
+    @Positive(message = "Package height must be positive")
     Integer heightCm,
 
     @Schema(description = "Trạng thái mong muốn khi đăng bán: ACTIVE (Đang bán) hoặc HIDDEN (Tạm ẩn)", nullable = true, example = "ACTIVE")
     @Nullable
+    @Pattern(regexp = "ACTIVE|HIDDEN", message = "Status must be ACTIVE or HIDDEN")
     String status
 ) {
-    public CreateProductRequest(
-        String name,
-        String slug,
-        @Nullable String description,
-        @Nullable UUID categoryId,
-        List<CreateVariantRequest> variants
-    ) {
-        this(
-            resolveName(name),
-            slug,
-            resolveDescription(description, name),
-            categoryId,
-            variants,
-            List.of(
-                new ImageItemRequest("test/img1.jpg", null, 0),
-                new ImageItemRequest("test/img2.jpg", null, 1),
-                new ImageItemRequest("test/img3.jpg", null, 2)
-            ),
-            null, null, false,
-            null, null, null, null,
-            null, null, null, null,
-            null
-        );
-    }
-
-    private static String resolveName(String name) {
-        if (name != null && name.trim().length() < 5) {
-            return name + " - Thời Trang";
-        }
-        return name;
-    }
-
-    private static String resolveDescription(@Nullable String description, String name) {
-        if (description != null && !description.isBlank()) {
-            return description;
-        }
-        return "Mô tả chi tiết sản phẩm " + name;
-    }
 }

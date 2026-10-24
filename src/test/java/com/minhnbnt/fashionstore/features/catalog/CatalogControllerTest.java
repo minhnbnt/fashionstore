@@ -138,50 +138,6 @@ class CatalogControllerTest {
     }
 
     @Test
-    void createProductRejectsMissingCategory() throws Exception {
-        var userId = UUID.randomUUID();
-        var shopId = UUID.randomUUID();
-
-        mockMvc.perform(post("/api/shops/{shopId}/products", shopId)
-                .with(jwt().jwt(builder -> builder.subject(userId.toString())))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                    {"name":"Áo thun cao cấp","slug":"ao-thun",
-                     "description":"Mô tả chi tiết",
-                     "images":[
-                       {"s3Key":"p/1.jpg","sortOrder":0},
-                       {"s3Key":"p/2.jpg","sortOrder":1},
-                       {"s3Key":"p/3.jpg","sortOrder":2}
-                     ],
-                     "variants":[{"sku":"SKU-1","size":"M","color":"Đen",
-                      "price":100000,"stockQuantity":10,"defaultVariant":true}]}
-                    """))
-            .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void createProductRejectsMissingDescription() throws Exception {
-        var userId = UUID.randomUUID();
-        var shopId = UUID.randomUUID();
-
-        mockMvc.perform(post("/api/shops/{shopId}/products", shopId)
-                .with(jwt().jwt(builder -> builder.subject(userId.toString())))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                    {"name":"Áo thun cao cấp","slug":"ao-thun",
-                     "categoryId":"%s",
-                     "images":[
-                       {"s3Key":"p/1.jpg","sortOrder":0},
-                       {"s3Key":"p/2.jpg","sortOrder":1},
-                       {"s3Key":"p/3.jpg","sortOrder":2}
-                     ],
-                     "variants":[{"sku":"SKU-1","size":"M","color":"Đen",
-                      "price":100000,"stockQuantity":10,"defaultVariant":true}]}
-                    """.formatted(UUID.randomUUID())))
-            .andExpect(status().isBadRequest());
-    }
-
-    @Test
     void createProductRejectsLessThan3Images() throws Exception {
         var userId = UUID.randomUUID();
         var shopId = UUID.randomUUID();
@@ -204,7 +160,34 @@ class CatalogControllerTest {
     }
 
     @Test
-    void createProductRejectsShortName() throws Exception {
+    void createProductRejectsMoreThan9Images() throws Exception {
+        var userId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+
+        var images = new StringBuilder();
+        for (int i = 1; i <= 10; i++) {
+            if (i > 1) {
+                images.append(",");
+            }
+            images.append("\"s3Key\":\"p/%d.jpg\",\"sortOrder\":%d".formatted(i, i - 1));
+        }
+
+        mockMvc.perform(post("/api/shops/{shopId}/products", shopId)
+                .with(jwt().jwt(builder -> builder.subject(userId.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"name":"Áo thun cao cấp","slug":"ao-thun",
+                     "description":"Mô tả chi tiết",
+                     "categoryId":"%s",
+                     "images":[%s],
+                     "variants":[{"sku":"SKU-1","size":"M","color":"Đen",
+                      "price":100000,"stockQuantity":10,"defaultVariant":true}]}
+                    """.formatted(UUID.randomUUID(), images)))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createProductRejectsNameTooLong() throws Exception {
         var userId = UUID.randomUUID();
         var shopId = UUID.randomUUID();
 
@@ -212,7 +195,7 @@ class CatalogControllerTest {
                 .with(jwt().jwt(builder -> builder.subject(userId.toString())))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                    {"name":"Ao","slug":"ao-thun",
+                    {"name":"%s","slug":"ao-thun",
                      "description":"Mô tả chi tiết",
                      "categoryId":"%s",
                      "images":[
@@ -222,7 +205,7 @@ class CatalogControllerTest {
                      ],
                      "variants":[{"sku":"SKU-1","size":"M","color":"Đen",
                       "price":100000,"stockQuantity":10,"defaultVariant":true}]}
-                    """.formatted(UUID.randomUUID())))
+                    """.formatted("A".repeat(301), UUID.randomUUID())))
             .andExpect(status().isBadRequest());
     }
 

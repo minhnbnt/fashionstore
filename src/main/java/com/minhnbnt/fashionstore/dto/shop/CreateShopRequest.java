@@ -42,6 +42,7 @@ public record CreateShopRequest(
 
     @Schema(description = "Loại hình người bán: INDIVIDUAL hoặc CORPORATE", example = "INDIVIDUAL", nullable = true)
     @Nullable
+    @Pattern(regexp = "INDIVIDUAL|CORPORATE")
     String sellerType,
 
     @Schema(description = "Họ và tên thật của chủ shop theo CCCD", example = "NGUYEN HOANG HIEP")
@@ -56,6 +57,7 @@ public record CreateShopRequest(
 
     @Schema(description = "Ngày cấp CCCD", example = "20/05/2021")
     @NotBlank(message = "ID issued date is required")
+    @Pattern(regexp = "^\\d{2}/\\d{2}/\\d{4}$", message = "ID issued date must be in dd/MM/yyyy format")
     String idIssuedDate,
 
     @Schema(description = "Nơi cấp CCCD", example = "Cục Cảnh sát QLHC về TTXH")

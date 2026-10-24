@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -13,6 +14,7 @@ import java.util.UUID;
 
 @Table("stock_movement")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class StockMovement implements Persistable<UUID> {
 
     @Id
@@ -33,44 +35,9 @@ public class StockMovement implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public StockMovement(
-        UUID id,
-        UUID variantId,
-        UUID shopId,
-        int delta,
-        String reason,
-        @Nullable UUID referenceId,
-        Instant createdAt
-    ) {
-        this.id = id;
-        this.variantId = variantId;
-        this.shopId = shopId;
-        this.delta = delta;
-        this.reason = reason;
-        this.referenceId = referenceId;
-        this.createdAt = createdAt;
-        this.newRecord = false;
-    }
-
     public static StockMovement record(
-        UUID variantId,
-        UUID shopId,
-        int delta,
-        String reason,
-        @Nullable UUID referenceId
-    ) {
-        var movement = new StockMovement(
-            UUID.randomUUID(),
-            variantId,
-            shopId,
-            delta,
-            reason,
-            referenceId,
-            Instant.now()
-        );
-        movement.newRecord = true;
-        return movement;
+        UUID variantId, UUID shopId, int delta, String reason, @Nullable UUID referenceId) {
+        return new StockMovement(UUID.randomUUID(), variantId, shopId, delta, reason, referenceId, Instant.now(), true);
     }
 
     @Override

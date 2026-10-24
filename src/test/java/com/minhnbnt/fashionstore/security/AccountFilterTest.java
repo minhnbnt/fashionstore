@@ -2,7 +2,6 @@ package com.minhnbnt.fashionstore.security;
 
 import com.minhnbnt.fashionstore.config.SecurityConfig;
 import com.minhnbnt.fashionstore.dto.identity.UserResponse;
-import com.minhnbnt.fashionstore.dto.shop.ShopResponse;
 import com.minhnbnt.fashionstore.features.identity.AccountProvisioner;
 import com.minhnbnt.fashionstore.features.identity.UserController;
 import com.minhnbnt.fashionstore.features.identity.UserService;
@@ -10,6 +9,7 @@ import com.minhnbnt.fashionstore.features.shop.ShopController;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.AccountStatus;
 import com.minhnbnt.fashionstore.model.UserRole;
+import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -107,7 +107,7 @@ class AccountFilterTest {
     void lockedAccountCanStillBrowsePublicPages() throws Exception {
         accountIs(AccountStatus.LOCKED);
         when(shops.getBySlug("shop")).thenReturn(
-            new ShopResponse(UUID.randomUUID(), "Shop", "shop", "", null, null, "APPROVED", null, Instant.now())
+            ShopTestFixtures.response(UUID.randomUUID(), "APPROVED")
         );
 
         mockMvc.perform(get("/api/shops/shop").with(user()))
@@ -141,7 +141,7 @@ class AccountFilterTest {
     @Test
     void nonUuidSubjectSkipsProvisioning() throws Exception {
         when(shops.getBySlug("shop")).thenReturn(
-            new ShopResponse(UUID.randomUUID(), "Shop", "shop", "", null, null, "APPROVED", null, Instant.now())
+            ShopTestFixtures.response(UUID.randomUUID(), "APPROVED")
         );
 
         mockMvc.perform(get("/api/shops/shop").with(jwt().jwt(builder -> builder.subject("not-a-uuid"))))

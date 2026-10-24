@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -18,6 +19,7 @@ import java.util.UUID;
  */
 @Table("site_page")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class SitePage implements Persistable<UUID> {
 
     @Id
@@ -48,36 +50,6 @@ public class SitePage implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public SitePage(
-        UUID id,
-        String slug,
-        String title,
-        String content,
-        @Nullable String metaDescription,
-        PageFooterGroup footerGroup,
-        int sortOrder,
-        PageStatus status,
-        @Nullable Instant publishedAt,
-        @Nullable UUID updatedBy,
-        Instant createdAt,
-        Instant updatedAt
-    ) {
-        this.id = id;
-        this.slug = slug;
-        this.title = title;
-        this.content = content;
-        this.metaDescription = metaDescription;
-        this.footerGroup = footerGroup;
-        this.sortOrder = sortOrder;
-        this.status = status;
-        this.publishedAt = publishedAt;
-        this.updatedBy = updatedBy;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-        this.newRecord = false;
-    }
-
     /**
      * Trang mới luôn là nháp, admin xem lại rồi mới xuất bản.
      */
@@ -88,15 +60,23 @@ public class SitePage implements Persistable<UUID> {
         @Nullable String metaDescription,
         PageFooterGroup footerGroup,
         int sortOrder,
-        UUID adminId
-    ) {
+        UUID adminId) {
         var now = Instant.now();
         var page = new SitePage(
-            UUID.randomUUID(), slug, title, content, null, footerGroup, sortOrder,
-            PageStatus.DRAFT, null, adminId, now, now
-        );
+            UUID.randomUUID(),
+            slug,
+            title,
+            content,
+            null,
+            footerGroup,
+            sortOrder,
+            PageStatus.DRAFT,
+            null,
+            adminId,
+            now,
+            now,
+            true);
         page.update(slug, title, content, metaDescription, footerGroup, sortOrder, adminId);
-        page.newRecord = true;
         return page;
     }
 
@@ -107,8 +87,7 @@ public class SitePage implements Persistable<UUID> {
         @Nullable String metaDescription,
         PageFooterGroup footerGroup,
         int sortOrder,
-        UUID adminId
-    ) {
+        UUID adminId) {
         this.slug = slug;
         this.title = title.trim();
         this.content = content;

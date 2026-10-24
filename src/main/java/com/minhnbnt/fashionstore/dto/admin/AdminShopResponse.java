@@ -6,6 +6,8 @@ import org.jspecify.annotations.Nullable;
 import java.time.Instant;
 import java.util.UUID;
 
+// TODO(v10): backfill + SET NOT NULL on the eKYC columns required at registration, then drop their @Nullable here.
+// Keep @Nullable on genuinely optional fields (taxCode, businessCertKey, phone, address) and lifecycle fields (approvedAt, rejection reasons, owner join).
 public record AdminShopResponse(
     UUID id,
 
@@ -120,31 +122,4 @@ public record AdminShopResponse(
     @Nullable
     String kycRejectionReason
 ) {
-    public AdminShopResponse(
-        UUID id,
-        String name,
-        String slug,
-        String description,
-        @Nullable String logoKey,
-        @Nullable String bannerKey,
-        String status,
-        @Nullable String statusReason,
-        @Nullable UUID ownerId,
-        @Nullable String ownerEmail,
-        @Nullable String ownerName,
-        @Nullable String ownerStatus,
-        Instant submittedAt,
-        @Nullable Instant approvedAt,
-        Instant createdAt,
-        Instant updatedAt
-    ) {
-        this(
-            id, name, slug, description, logoKey, bannerKey, status, statusReason,
-            ownerId, ownerEmail, ownerName, ownerStatus, submittedAt, approvedAt,
-            createdAt, updatedAt,
-            null, null, null, null, null, null, null,
-            null, null, null, null, null, null, null,
-            "PENDING_REVIEW", null
-        );
-    }
 }

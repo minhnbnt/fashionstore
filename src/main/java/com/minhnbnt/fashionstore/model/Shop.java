@@ -139,8 +139,7 @@ public class Shop implements Persistable<UUID> {
         @Nullable String kycRejectionReason,
         @Nullable Boolean isTrusted,
         Instant createdAt,
-        Instant updatedAt
-    ) {
+        Instant updatedAt) {
         this.id = id;
         this.name = name;
         this.slug = slug;
@@ -153,8 +152,10 @@ public class Shop implements Persistable<UUID> {
         this.approvedAt = approvedAt;
         if (submittedAt != null) {
             this.submittedAt = submittedAt;
+        } else if (createdAt != null) {
+            this.submittedAt = createdAt;
         } else {
-            this.submittedAt = createdAt != null ? createdAt : Instant.now();
+            this.submittedAt = Instant.now();
         }
         this.phone = phone;
         this.address = address;
@@ -214,21 +215,6 @@ public class Shop implements Persistable<UUID> {
         String slug,
         String description,
         @Nullable String logoKey,
-        @Nullable String bannerKey
-    ) {
-        return create(
-            name, slug, description, logoKey, bannerKey,
-            null, null, "INDIVIDUAL", null, null,
-            null, null, null, null, null,
-            null, null, null, null, null
-        );
-    }
-
-    public static Shop create(
-        String name,
-        String slug,
-        String description,
-        @Nullable String logoKey,
         @Nullable String bannerKey,
         @Nullable String phone,
         @Nullable String address,
@@ -244,10 +230,12 @@ public class Shop implements Persistable<UUID> {
         @Nullable String businessCertKey,
         @Nullable String bankName,
         @Nullable String bankAccount,
-        @Nullable String bankHolder
-    ) {
+        @Nullable String bankHolder) {
         var now = Instant.now();
-        var effectiveSellerType = (sellerType != null) ? sellerType : "INDIVIDUAL";
+        var effectiveSellerType = "INDIVIDUAL";
+        if (sellerType != null) {
+            effectiveSellerType = sellerType;
+        }
         var shop = new Shop(
             UUID.randomUUID(), name, slug, description, logoKey, bannerKey,
             ShopStatus.PENDING, null, null, null, now,
@@ -300,6 +288,8 @@ public class Shop implements Persistable<UUID> {
         }
         status = ShopStatus.PENDING;
         statusReason = null;
+        kycStatus = "PENDING_REVIEW";
+        kycRejectionReason = null;
         submittedAt = Instant.now();
         updatedAt = Instant.now();
     }
@@ -331,11 +321,7 @@ public class Shop implements Persistable<UUID> {
     }
 
     public void updateDetails(
-        @Nullable String name,
-        @Nullable String description,
-        @Nullable String logoKey,
-        @Nullable String bannerKey
-    ) {
+        @Nullable String name, @Nullable String description, @Nullable String logoKey, @Nullable String bannerKey) {
         if (name != null) {
             this.name = name;
         }
@@ -360,8 +346,7 @@ public class Shop implements Persistable<UUID> {
         @Nullable String bankAccount,
         @Nullable String bankHolder,
         @Nullable String autoReplyText,
-        @Nullable String workingHours
-    ) {
+        @Nullable String workingHours) {
         if (phone != null) {
             this.phone = phone;
         }

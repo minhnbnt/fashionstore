@@ -32,10 +32,10 @@ public final class Mp4DurationParser {
         try {
             return searchBox(dis, -1);
         } catch (EOFException e) {
-            log.debug("Đạt cuối luồng MP4 trước khi tìm thấy mvhd");
+            log.debug("Reached end of MP4 stream before finding mvhd atom");
             return OptionalDouble.empty();
         } catch (Exception e) {
-            log.warn("Lỗi khi phân tích thời lượng MP4: {}", e.getMessage());
+            log.warn("Failed to parse MP4 duration: {}", e.getMessage());
             return OptionalDouble.empty();
         }
     }
@@ -66,7 +66,11 @@ public final class Mp4DurationParser {
                 headerSize = 16;
             } else if (boxSize == 0) {
                 // Box kéo dài đến hết file
-                boxSize = limit > 0 ? (limit - bytesRead + headerSize) : Long.MAX_VALUE;
+                if (limit > 0) {
+                    boxSize = limit - bytesRead + headerSize;
+                } else {
+                    boxSize = Long.MAX_VALUE;
+                }
             }
 
             long payloadSize = boxSize - headerSize;
@@ -133,7 +137,7 @@ public final class Mp4DurationParser {
             if (skipped <= 0) {
                 // Đọc bỏ từng byte nếu skip không hiệu quả
                 if (dis.read() == -1) {
-                    throw new EOFException("Hết luồng khi skip");
+                    throw new EOFException("Stream ended while skipping");
                 }
                 remaining--;
             } else {

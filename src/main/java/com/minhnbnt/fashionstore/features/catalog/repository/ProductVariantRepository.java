@@ -1,6 +1,8 @@
 package com.minhnbnt.fashionstore.features.catalog.repository;
 
 import com.minhnbnt.fashionstore.model.ProductVariant;
+import org.springframework.data.jdbc.repository.query.Modifying;
+import org.springframework.data.jdbc.repository.query.Query;
 import org.springframework.data.repository.CrudRepository;
 
 import java.util.List;
@@ -16,4 +18,23 @@ public interface ProductVariantRepository extends CrudRepository<ProductVariant,
     Optional<ProductVariant> findByShopIdAndId(UUID shopId, UUID id);
 
     Optional<ProductVariant> findByShopIdAndSku(UUID shopId, String sku);
+
+    /**
+     * Trừ kho có điều kiện: trả false khi tồn kho không đủ, caller phải coi như thất bại.
+     */
+    @Modifying
+    @Query("""
+        UPDATE product_variant
+        SET stock_quantity = stock_quantity - :qty
+        WHERE id = :id AND stock_quantity >= :qty
+        """)
+    boolean decrementStock(UUID id, int qty);
+
+    @Modifying
+    @Query("""
+        UPDATE product_variant
+        SET stock_quantity = stock_quantity + :qty
+        WHERE id = :id
+        """)
+    boolean incrementStock(UUID id, int qty);
 }

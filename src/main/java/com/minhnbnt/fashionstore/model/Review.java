@@ -1,6 +1,7 @@
 package com.minhnbnt.fashionstore.model;
 
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -16,6 +17,7 @@ import java.util.UUID;
 
 @Table("review")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class Review implements Persistable<UUID> {
 
     @Id
@@ -47,45 +49,10 @@ public class Review implements Persistable<UUID> {
     @Getter(AccessLevel.NONE)
     private boolean newRecord;
 
-    @PersistenceCreator
-    public Review(
-        UUID id,
-        UUID productId,
-        UUID buyerId,
-        String buyerDisplayName,
-        int stars,
-        @Nullable String comment,
-        @Nullable String sellerReply,
-        @Nullable Instant repliedAt,
-        boolean isReported,
-        @Nullable String reportReason,
-        Instant createdAt,
-        Instant updatedAt
-    ) {
-        this.id = id;
-        this.productId = productId;
-        this.buyerId = buyerId;
-        this.buyerDisplayName = buyerDisplayName;
-        this.stars = stars;
-        this.comment = comment;
-        this.sellerReply = sellerReply;
-        this.repliedAt = repliedAt;
-        this.isReported = isReported;
-        this.reportReason = reportReason;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
-        this.newRecord = false;
-    }
-
     public static Review create(
-        UUID productId,
-        UUID buyerId,
-        String buyerDisplayName,
-        int stars,
-        @Nullable String comment
-    ) {
+        UUID productId, UUID buyerId, String buyerDisplayName, int stars, @Nullable String comment) {
         var now = Instant.now();
-        var review = new Review(
+        return new Review(
             UUID.randomUUID(),
             productId,
             buyerId,
@@ -97,10 +64,8 @@ public class Review implements Persistable<UUID> {
             false,
             null,
             now,
-            now
-        );
-        review.newRecord = true;
-        return review;
+            now,
+            true);
     }
 
     public void update(int stars, @Nullable String comment) {

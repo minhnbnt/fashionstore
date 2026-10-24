@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
@@ -13,6 +14,7 @@ import java.util.UUID;
 
 @Table("shop_decoration")
 @Getter
+@AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class ShopDecoration implements Persistable<UUID> {
 
     @Id
@@ -31,36 +33,9 @@ public class ShopDecoration implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    @PersistenceCreator
-    public ShopDecoration(
-        UUID id,
-        UUID shopId,
-        String layout,
-        @Nullable String draft,
-        @Nullable Instant publishedAt,
-        Instant updatedAt
-    ) {
-        this.id = id;
-        this.shopId = shopId;
-        this.layout = layout;
-        this.draft = draft;
-        this.publishedAt = publishedAt;
-        this.updatedAt = updatedAt;
-        this.newRecord = false;
-    }
-
     public static ShopDecoration createDefault(UUID shopId) {
         var now = Instant.now();
-        var deco = new ShopDecoration(
-            UUID.randomUUID(),
-            shopId,
-            "[]",
-            null,
-            null,
-            now
-        );
-        deco.newRecord = true;
-        return deco;
+        return new ShopDecoration(UUID.randomUUID(), shopId, "[]", null, null, now, true);
     }
 
     public void saveDraft(String draftJson) {

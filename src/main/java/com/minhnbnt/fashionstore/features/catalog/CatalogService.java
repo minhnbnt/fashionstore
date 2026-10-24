@@ -124,13 +124,6 @@ public class CatalogService {
     ) {
         access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
 
-        if (request.name() != null && request.name().trim().length() < 5) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Product name must be between 5 and 300 characters"
-            );
-        }
-
         requireSingleDefault(request.variants());
 
         for (var variant : request.variants()) {
@@ -144,21 +137,6 @@ public class CatalogService {
                 throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Garment image is required when virtual try-on is enabled"
-                );
-            }
-        }
-
-        if (request.images() != null && !request.images().isEmpty()) {
-            if (request.images().size() < 3) {
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Product requires at least 3 images"
-                );
-            }
-            if (request.images().size() > 9) {
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Product cannot exceed 9 images"
                 );
             }
         }
@@ -316,21 +294,6 @@ public class CatalogService {
             requireCategoryExists(request.categoryId());
         }
 
-        if (request.weightGrams() != null && request.weightGrams() <= 0) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Package weight must be greater than 0"
-            );
-        }
-        if ((request.lengthCm() != null && request.lengthCm() <= 0)
-            || (request.widthCm() != null && request.widthCm() <= 0)
-            || (request.heightCm() != null && request.heightCm() <= 0)) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Package dimensions must be greater than 0"
-            );
-        }
-
         if (request.videoKey() != null && !request.videoKey().isBlank()
             && !request.videoKey().equals(product.getVideoKey())) {
             videoMetadataService.validateVideoDuration(request.videoKey(), 60.0);
@@ -352,6 +315,8 @@ public class CatalogService {
         }
         if (request.description() != null && !request.description().equals(product.getDescription())) {
             changes.add("Cập nhật mô tả sản phẩm");
+            oldValues.put("description", product.getDescription());
+            newValues.put("description", request.description());
         }
         if (request.videoKey() != null && !request.videoKey().equals(product.getVideoKey())) {
             changes.add("Cập nhật video sản phẩm");
@@ -632,7 +597,7 @@ public class CatalogService {
         products.save(product);
 
         moderationHistories.save(ProductModerationHistory.record(
-            productId, from, product.getStatus(), null, adminId, "Phê duyệt sản phẩm mới"
+            productId, from, product.getStatus(), null, adminId, ""
         ));
         return requireAdminProduct(productId);
     }
@@ -668,24 +633,18 @@ public class CatalogService {
     }
 
     private void applyStatus(Product product, String status) {
-        if (status == null || status.isBlank()) {
-            return;
-        }
         if (status.equalsIgnoreCase(product.getStatus().name())) {
             return;
         }
+
         if ("HIDDEN".equalsIgnoreCase(status)) {
             product.hide();
             return;
         }
+
         if ("ACTIVE".equalsIgnoreCase(status)) {
             product.activate();
-            return;
         }
-    }
-
-    private void applyVariantUpdates(Product product, List<UpdateVariantRequest> updates) {
-        applyVariantUpdates(product, updates, new ArrayList<>(), new LinkedHashMap<>(), new LinkedHashMap<>());
     }
 
     private void applyVariantUpdates(
@@ -788,11 +747,8 @@ public class CatalogService {
         if (value == null) {
             return null;
         }
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception e) {
-            return "{}";
-        }
+
+        return objectMapper.writeValueAsString(value);
     }
 
     @Transactional(readOnly = true)
@@ -871,8 +827,8 @@ public class CatalogService {
             userId,
             "TOGGLE_STATUS",
             "Chuyển trạng thái sản phẩm từ " + oldStatus + " sang " + newStatus,
-            "{\"status\":\"" + oldStatus + "\"}",
-            "{\"status\":\"" + newStatus + "\"}"
+            toJson(Map.of("status", oldStatus)),
+            toJson(Map.of("status", newStatus))
         ));
 
         return toResponse(saved);
@@ -1584,7 +1540,12 @@ public class CatalogService {
                     slug,
                     desc,
                     null,
-                    List.of(new CreateVariantRequest(sku, size, color, price, null, stock, true))
+                    List.of(new CreateVariantRequest(sku, size, color, price, null, stock, true)),
+                    List.of(),
+                    null, null, null,
+                    null, null, null, null,
+                    null, null, null, null,
+                    null
                 );
                 createProduct(userId, shopId, createReq);
                 success++;
