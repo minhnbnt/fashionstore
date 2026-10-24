@@ -65,6 +65,7 @@ public final class ShopTestFixtures {
             null, null, null, null, null,
             null, null, null, null,
             "PENDING_REVIEW", null,
+            false,
             Instant.now()
         );
     }

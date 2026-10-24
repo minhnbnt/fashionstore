@@ -222,7 +222,12 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
                 context.ownerId(),
                 context.shopId(),
                 new CreateProductRequest(
-                    name, slug, "Nguồn " + source + ", mã " + sourceId + ". " + sourceUrl, categoryId, List.of(variant)
+                    name, slug, "Nguồn " + source + ", mã " + sourceId + ". " + sourceUrl, categoryId, List.of(variant),
+                    List.of(),
+                    null, null, null,
+                    null, null, null, null,
+                    null, null, null, null,
+                    null
                 )
             );
             catalogService.attachImages(

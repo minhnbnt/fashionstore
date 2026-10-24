@@ -20,6 +20,37 @@ public record ProductResponse(
     @Schema Instant updatedAt,
     @Schema(description = "Diem trung binh, null khi chua ai danh gia", nullable = true)
     @Nullable Double averageRating,
-    @Schema(description = "So luot danh gia") long reviewCount
+    @Schema(description = "So luot danh gia") long reviewCount,
+    @Schema(nullable = true) @Nullable String videoKey,
+    @Schema(nullable = true) @Nullable String garmentKey,
+    @Schema(description = "Hỗ trợ thử đồ ảo") Boolean tryOnEnabled,
+    @Schema(nullable = true) @Nullable String material,
+    @Schema(nullable = true) @Nullable String origin,
+    @Schema(nullable = true) @Nullable String careInstructions,
+    @Schema(nullable = true) @Nullable String sizeGuide,
+    @Schema(nullable = true) @Nullable Integer weightGrams,
+    @Schema(nullable = true) @Nullable Integer lengthCm,
+    @Schema(nullable = true) @Nullable Integer widthCm,
+    @Schema(nullable = true) @Nullable Integer heightCm
 ) {
+    public ProductResponse(
+        UUID id,
+        UUID shopId,
+        @Nullable UUID categoryId,
+        String name,
+        String slug,
+        String description,
+        String status,
+        List<VariantResponse> variants,
+        List<ImageResponse> images,
+        Instant updatedAt,
+        @Nullable Double averageRating,
+        long reviewCount
+    ) {
+        this(
+            id, shopId, categoryId, name, slug, description, status,
+            variants, images, updatedAt, averageRating, reviewCount,
+            null, null, false, null, null, null, null, null, null, null, null
+        );
+    }
 }

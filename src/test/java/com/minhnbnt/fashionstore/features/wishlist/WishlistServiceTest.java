@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.features.wishlist;
 
+import com.minhnbnt.fashionstore.test.ProductTestFixtures;
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
@@ -76,7 +77,7 @@ class WishlistServiceTest {
         var created = catalog.createProduct(
             ownerId,
             shopId,
-            new CreateProductRequest(
+            ProductTestFixtures.request(
                 "Ao " + slug,
                 slug,
                 null,
@@ -89,7 +90,7 @@ class WishlistServiceTest {
 
     private UUID productRowInShop(UUID ownerId, UUID shopId, String slug, String sku) {
         var product = products.save(Product.create(shopId, null, "Ao " + slug, slug, "", ownerId));
-        var variant = variants.save(ProductVariant.create(shopId, product.getId(), sku, "M", "Den", 100000L, null, 10, true));
+        variants.save(ProductVariant.create(shopId, product.getId(), sku, "M", "Den", 100000L, null, 10, true));
         return product.getId();
     }
 

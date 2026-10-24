@@ -26,10 +26,10 @@ public class UploadController {
     @PostMapping("/presign")
     @Operation(
         summary = "Xin URL upload",
-        description = "Chỉ nhận image/*. Frontend PUT file lên url, rồi lấy key gắn vào product."
+        description = "Nhận image/* hoặc video/*. Frontend PUT file lên url, rồi lấy key gắn vào product."
     )
     @ApiResponse(responseCode = "200", description = "Key và URL upload")
-    @ApiResponse(responseCode = "400", description = "Content-type không phải ảnh")
+    @ApiResponse(responseCode = "400", description = "Content-type không phải ảnh hoặc video")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @SecurityRequirement(name = "bearerAuth")
     public PresignResponse presign(@Valid @RequestBody PresignRequest request) {

@@ -31,7 +31,9 @@ import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepos
 import com.minhnbnt.fashionstore.features.catalog.repository.StockMovementRepository;
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.review.ReviewService;
+import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.infrastructure.media.VideoMetadataService;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.Product;
 import com.minhnbnt.fashionstore.model.ProductImage;
@@ -53,6 +55,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.regex.Pattern;
 import java.util.List;
@@ -88,9 +91,13 @@ public class CatalogService {
 
     private final ShopService shops;
 
+    private final ShopRepository shopRepository;
+
     private final ReviewService reviews;
 
     private final ShopAccessChecker access;
+
+    private final VideoMetadataService videoMetadataService;
 
     @Transactional
     public ProductResponse createProduct(
@@ -108,12 +115,84 @@ public class CatalogService {
 
         requireCategoryExists(request.categoryId());
 
+        if (Boolean.TRUE.equals(request.tryOnEnabled())) {
+            if (request.garmentKey() == null || request.garmentKey().isBlank()) {
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Garment image is required when virtual try-on is enabled"
+                );
+            }
+        }
+
+        if (request.weightGrams() != null && request.weightGrams() <= 0) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Package weight must be greater than 0"
+            );
+        }
+        if ((request.lengthCm() != null && request.lengthCm() <= 0)
+            || (request.widthCm() != null && request.widthCm() <= 0)
+            || (request.heightCm() != null && request.heightCm() <= 0)) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Package dimensions must be greater than 0"
+            );
+        }
+
+        videoMetadataService.validateVideoDuration(request.videoKey(), 60.0);
+
+        var shop = shopRepository.findById(shopId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found"));
+
+        ProductStatus initialStatus;
+        if (shop.isTrusted()) {
+            if ("HIDDEN".equalsIgnoreCase(request.status())) {
+                initialStatus = ProductStatus.HIDDEN;
+            } else {
+                initialStatus = ProductStatus.ACTIVE;
+            }
+        } else {
+            initialStatus = ProductStatus.PENDING;
+        }
+
+        var skuList = request.variants().stream()
+            .map(CreateVariantRequest::sku)
+            .map(String::trim)
+            .toList();
+        var uniqueSkuSet = new HashSet<>(skuList);
+        if (uniqueSkuSet.size() < skuList.size()) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Variant SKUs must be unique within the product"
+            );
+        }
+
+        var candidateSlug = request.slug();
+        if (candidateSlug == null || candidateSlug.isBlank()) {
+            candidateSlug = request.name().trim().toLowerCase()
+                .replaceAll("\\s+", "-")
+                .replaceAll("[^a-z0-9-]", "");
+        }
+        var finalSlug = resolveUniqueSlug(shopId, candidateSlug);
+
         var product = Product.create(
             shopId,
             request.categoryId(),
             request.name(),
-            request.slug(),
+            finalSlug,
             Objects.requireNonNullElse(request.description(), ""),
+            initialStatus,
+            request.videoKey(),
+            request.garmentKey(),
+            Boolean.TRUE.equals(request.tryOnEnabled()),
+            request.material(),
+            request.origin(),
+            request.careInstructions(),
+            request.sizeGuide(),
+            request.weightGrams(),
+            request.lengthCm(),
+            request.widthCm(),
+            request.heightCm(),
             userId
         );
         try {
@@ -140,6 +219,35 @@ public class CatalogService {
             variants.saveAll(createdVariants);
         } catch (DataIntegrityViolationException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "SKU already taken");
+        }
+
+        if (request.images() != null && !request.images().isEmpty()) {
+            var imageEntities = request.images().stream()
+                .map(img -> ProductImage.create(
+                    product.getId(),
+                    img.variantId(),
+                    img.s3Key(),
+                    img.sortOrder()
+                ))
+                .toList();
+            images.saveAll(imageEntities);
+        }
+
+        var variantImages = new ArrayList<ProductImage>();
+        for (int i = 0; i < request.variants().size(); i++) {
+            var reqVar = request.variants().get(i);
+            var createdVar = createdVariants.get(i);
+            if (reqVar.imageKey() != null && !reqVar.imageKey().isBlank()) {
+                variantImages.add(ProductImage.create(
+                    product.getId(),
+                    createdVar.getId(),
+                    reqVar.imageKey(),
+                    0
+                ));
+            }
+        }
+        if (!variantImages.isEmpty()) {
+            images.saveAll(variantImages);
         }
 
         keywordScanner.scan(product.getId(), product.getName(), product.getDescription());
@@ -314,7 +422,18 @@ public class CatalogService {
             variantResponses,
             imageResponses,
             adminQueries.history(productId),
-            adminQueries.reports(productId)
+            adminQueries.reports(productId),
+            product.getVideoKey(),
+            product.getGarmentKey(),
+            product.isTryOnEnabled(),
+            product.getMaterial(),
+            product.getOrigin(),
+            product.getCareInstructions(),
+            product.getSizeGuide(),
+            product.getWeightGrams(),
+            product.getLengthCm(),
+            product.getWidthCm(),
+            product.getHeightCm()
         );
     }
 
@@ -352,6 +471,34 @@ public class CatalogService {
 
         moderationHistories.save(ProductModerationHistory.record(
             productId, from, product.getStatus(), null, adminId, ""
+        ));
+        return requireAdminProduct(productId);
+    }
+
+    @Transactional
+    public AdminProductResponse approveProduct(@NonNull UUID adminId, @NonNull UUID productId) {
+        var product = lockedProduct(productId);
+        var from = product.getStatus();
+
+        product.approve();
+        products.save(product);
+
+        moderationHistories.save(ProductModerationHistory.record(
+            productId, from, product.getStatus(), null, adminId, ""
+        ));
+        return requireAdminProduct(productId);
+    }
+
+    @Transactional
+    public AdminProductResponse rejectProduct(@NonNull UUID adminId, @NonNull UUID productId, @NonNull String reason) {
+        var product = lockedProduct(productId);
+        var from = product.getStatus();
+
+        product.reject(reason);
+        products.save(product);
+
+        moderationHistories.save(ProductModerationHistory.record(
+            productId, from, product.getStatus(), ProductViolationType.OTHER, adminId, reason
         ));
         return requireAdminProduct(productId);
     }
@@ -492,7 +639,7 @@ public class CatalogService {
             return;
         }
         if (!categories.existsById(categoryId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Category does not exist");
         }
     }
 
@@ -511,15 +658,16 @@ public class CatalogService {
     }
 
     private static void requireValidPrice(long price, @Nullable Long compareAtPrice) {
-
-        if (compareAtPrice == null) {
-            return;
-        }
-
-        if (compareAtPrice <= price) {
+        if (price < 0) {
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
-                "compare_at_price must be greater than price"
+                "Price must not be negative"
+            );
+        }
+        if (compareAtPrice != null && compareAtPrice < 0) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Compare-at price must not be negative"
             );
         }
     }
@@ -551,6 +699,13 @@ public class CatalogService {
         }
         product.delete();
         products.save(product);
+
+        var variantList = variants.findByProductIdOrderByCreatedAtAsc(productId);
+        var delSuffix = "-del-" + UUID.randomUUID().toString().substring(0, 8);
+        for (var v : variantList) {
+            v.archiveSku(delSuffix);
+        }
+        variants.saveAll(variantList);
     }
 
     @Transactional
@@ -751,7 +906,12 @@ public class CatalogService {
                     slug,
                     desc,
                     null,
-                    List.of(new CreateVariantRequest(sku, size, color, price, null, stock, true))
+                    List.of(new CreateVariantRequest(sku, size, color, price, null, stock, true)),
+                    List.of(),
+                    null, null, null,
+                    null, null, null, null,
+                    null, null, null, null,
+                    null
                 );
                 createProduct(userId, shopId, createReq);
                 success++;
@@ -815,6 +975,20 @@ public class CatalogService {
             product.getCreatedAt(),
             product.getUpdatedAt()
         );
+    }
+
+    private String resolveUniqueSlug(UUID shopId, String baseSlug) {
+        var cleanBase = baseSlug.trim().toLowerCase();
+        if (cleanBase.isBlank()) {
+            cleanBase = "product";
+        }
+        var candidate = cleanBase;
+        var counter = 1;
+        while (products.findByShopIdAndSlug(shopId, candidate).isPresent()) {
+            candidate = cleanBase + "-" + counter;
+            counter++;
+        }
+        return candidate;
     }
 
     private static @Nullable String violationNameOf(Product product) {

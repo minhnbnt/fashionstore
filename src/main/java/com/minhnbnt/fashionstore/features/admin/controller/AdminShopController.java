@@ -157,6 +157,25 @@ public class AdminShopController {
         return adminShops.reinstate(adminIdOf(jwt), id);
     }
 
+    @PatchMapping("/{id}/trust")
+    @Operation(
+        operationId = "toggleShopTrust",
+        summary = "Bật/tắt cờ Shop uy tín",
+        description = "Shop uy tín được tự động duyệt sản phẩm ngay khi đăng bán."
+    )
+    @ApiResponse(responseCode = "200", description = "Đã cập nhật trạng thái uy tín")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải admin")
+    @ApiResponse(responseCode = "404", description = "Shop không tồn tại")
+    @SecurityRequirement(name = "bearerAuth")
+    public ShopResponse toggleTrust(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id shop") @PathVariable UUID id,
+        @RequestParam boolean trusted
+    ) {
+        return adminShops.setTrusted(adminIdOf(jwt), id, trusted);
+    }
+
     private static UUID adminIdOf(Jwt jwt) {
         var subject = Objects.requireNonNull(jwt.getSubject());
         return UUID.fromString(subject);

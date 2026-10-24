@@ -40,6 +40,28 @@ public class Product implements Persistable<UUID> {
 
     private @Nullable UUID createdBy;
 
+    private @Nullable String videoKey;
+
+    private @Nullable String garmentKey;
+
+    private boolean tryOnEnabled;
+
+    private @Nullable String material;
+
+    private @Nullable String origin;
+
+    private @Nullable String careInstructions;
+
+    private @Nullable String sizeGuide;
+
+    private @Nullable Integer weightGrams;
+
+    private @Nullable Integer lengthCm;
+
+    private @Nullable Integer widthCm;
+
+    private @Nullable Integer heightCm;
+
     private Instant createdAt;
 
     private Instant updatedAt;
@@ -53,6 +75,18 @@ public class Product implements Persistable<UUID> {
         String name,
         String slug,
         String description,
+        ProductStatus initialStatus,
+        @Nullable String videoKey,
+        @Nullable String garmentKey,
+        boolean tryOnEnabled,
+        @Nullable String material,
+        @Nullable String origin,
+        @Nullable String careInstructions,
+        @Nullable String sizeGuide,
+        @Nullable Integer weightGrams,
+        @Nullable Integer lengthCm,
+        @Nullable Integer widthCm,
+        @Nullable Integer heightCm,
         @Nullable UUID createdBy
     ) {
         var now = Instant.now();
@@ -63,12 +97,41 @@ public class Product implements Persistable<UUID> {
             name,
             slug,
             description,
-            ProductStatus.ACTIVE,
+            initialStatus,
             null,
             null,
             createdBy,
-            now, now,
+            videoKey,
+            garmentKey,
+            tryOnEnabled,
+            material,
+            origin,
+            careInstructions,
+            sizeGuide,
+            weightGrams,
+            lengthCm,
+            widthCm,
+            heightCm,
+            now,
+            now,
             true
+
+        );
+    }
+
+    public static Product create(
+        UUID shopId,
+        @Nullable UUID categoryId,
+        String name,
+        String slug,
+        String description,
+        @Nullable UUID createdBy
+    ) {
+        return create(
+            shopId, categoryId, name, slug, description,
+            ProductStatus.ACTIVE,
+            null, null, false, null, null, null, null, null, null, null, null,
+            createdBy
         );
     }
 
@@ -101,6 +164,7 @@ public class Product implements Persistable<UUID> {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Product is already deleted");
         }
         status = ProductStatus.DELETED;
+        slug = slug + "-del-" + UUID.randomUUID().toString().substring(0, 8);
         updatedAt = Instant.now();
     }
 
@@ -133,7 +197,37 @@ public class Product implements Persistable<UUID> {
         updatedAt = Instant.now();
     }
 
-    public void updateDetails(@Nullable String name, @Nullable String description, @Nullable UUID categoryId) {
+    /**
+     * Admin phê duyệt sản phẩm mới từ PENDING sang ACTIVE.
+     */
+    public void approve() {
+        if (status != ProductStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending products can be approved");
+        }
+        status = ProductStatus.ACTIVE;
+        statusReason = null;
+        violationType = null;
+        updatedAt = Instant.now();
+    }
+
+    /**
+     * Admin từ chối phê duyệt sản phẩm mới.
+     */
+    public void reject(String reason) {
+        if (status != ProductStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending products can be rejected");
+        }
+        status = ProductStatus.BANNED;
+        violationType = ProductViolationType.OTHER;
+        statusReason = reason;
+        updatedAt = Instant.now();
+    }
+
+    public void updateDetails(
+        @Nullable String name,
+        @Nullable String description,
+        @Nullable UUID categoryId
+    ) {
         if (name != null) {
             this.name = name;
         }

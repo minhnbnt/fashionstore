@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.features.catalog;
 
+import com.minhnbnt.fashionstore.test.ProductTestFixtures;
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.admin.CreateBannedKeywordRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
@@ -60,7 +61,7 @@ class BannedKeywordServiceTest {
         return catalog.createProduct(
             ownerId,
             shopId,
-            new CreateProductRequest(
+            ProductTestFixtures.request(
                 name,
                 slug,
                 description,

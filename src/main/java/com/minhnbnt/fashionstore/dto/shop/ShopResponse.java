@@ -117,6 +117,9 @@ public record ShopResponse(
     @Nullable
     String kycRejectionReason,
 
+    @Schema(description = "Shop uy tín (được duyệt sản phẩm tự động)")
+    Boolean isTrusted,
+
     Instant createdAt
 ) {
 }

@@ -5,9 +5,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
 public record PresignRequest(
-    @Schema(description = "Chỉ nhận image/*", example = "image/jpeg")
+    @Schema(description = "Chỉ nhận image/* hoặc video/*", example = "image/jpeg")
     @NotBlank
-    @Pattern(regexp = "^image/[a-zA-Z0-9.+-]+$")
+    @Pattern(regexp = "^(image|video)/[a-zA-Z0-9.+-]+$")
     String contentType
 ) {
 }

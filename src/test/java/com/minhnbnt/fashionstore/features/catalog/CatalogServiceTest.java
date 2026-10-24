@@ -12,8 +12,10 @@ import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
 import com.minhnbnt.fashionstore.features.catalog.repository.CategoryRepository;
 import com.minhnbnt.fashionstore.features.identity.UserService;
+import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.Category;
+import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -21,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
@@ -46,6 +49,9 @@ class CatalogServiceTest {
     @Autowired
     private CategoryRepository categories;
 
+    @Autowired
+    private JdbcClient jdbc;
+
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
         users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U", null));
@@ -59,13 +65,26 @@ class CatalogServiceTest {
         return shop.id();
     }
 
-    private static CreateProductRequest productRequest(String slug) {
+    private UUID testCategory() {
+        return categories.findAllByOrderBySortOrderAsc().stream()
+            .findFirst()
+            .map(Category::getId)
+            .orElseGet(() -> categories.save(Category.seed("Áo Nam", "ao-nam", 0)).getId());
+    }
+
+    private CreateProductRequest productRequest(String slug) {
         return new CreateProductRequest(
-            "Ao " + slug,
+            "Áo Thun " + slug,
             slug,
-            null,
-            null,
-            List.of(new CreateVariantRequest("SKU-" + slug, "M", "Den", 100000L, null, 10, true))
+            "Mô tả chi tiết " + slug,
+            testCategory(),
+            List.of(new CreateVariantRequest("SKU-" + slug, "M", "Den", 100000L, null, 10, true)),
+            List.of(
+                new ImageItemRequest("img1.jpg", null, 0),
+                new ImageItemRequest("img2.jpg", null, 1),
+                new ImageItemRequest("img3.jpg", null, 2)
+            ),
+            null, null, null, null, null, null, null, null, null, null, null, "ACTIVE"
         );
     }
 
@@ -147,7 +166,7 @@ class CatalogServiceTest {
         return new CreateVariantRequest(sku, size, color, price, null, 5, false);
     }
 
-    private static CreateProductRequest productIn(
+    private CreateProductRequest productIn(
         String slug,
         String name,
         @Nullable UUID categoryId,
@@ -166,7 +185,23 @@ class CatalogServiceTest {
                 i == 0
             ));
         }
-        return new CreateProductRequest(name, slug, null, categoryId, withDefault);
+        var catId = testCategory();
+        if (categoryId != null) {
+            catId = categoryId;
+        }
+        return new CreateProductRequest(
+            name,
+            slug,
+            "Mô tả chi tiết " + name,
+            catId,
+            withDefault,
+            List.of(
+                new ImageItemRequest("img1.jpg", null, 0),
+                new ImageItemRequest("img2.jpg", null, 1),
+                new ImageItemRequest("img3.jpg", null, 2)
+            ),
+            null, null, null, null, null, null, null, null, null, null, null, "ACTIVE"
+        );
     }
 
     private static ProductSearchRequest keyword(String q) {
@@ -349,5 +384,141 @@ class CatalogServiceTest {
         var detail = catalog.getDetail(created.id());
 
         assertThat(detail.categoryId()).isEqualTo(categoryId);
+    }
+
+    @Test
+    void productCreationStatusDependsOnShopTrust() {
+        var ownerId = mirroredUser();
+        var adminId = mirroredUser();
+        var shop = shops.register(ownerId, com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop Trust", "shop-trust-test"));
+        shops.approve(adminId, shop.id());
+
+        // Approved shop has kycStatus = VERIFIED, so it's trusted. Default status is ACTIVE
+        var activeProd = catalog.createProduct(ownerId, shop.id(), productRequest("ao-trusted-active"));
+        assertThat(activeProd.status()).isEqualTo("ACTIVE");
+
+        // When trusted shop explicitly sets status = HIDDEN:
+        var hiddenReq = new CreateProductRequest(
+            "Ao Hidden Shop", "ao-hidden-shop", "Desc", testCategory(),
+            List.of(new CreateVariantRequest("SKU-HIDDEN", "M", "Den", 100000L, null, 10, true)),
+            List.of(
+                new ImageItemRequest("img1.jpg", null, 0),
+                new ImageItemRequest("img2.jpg", null, 1),
+                new ImageItemRequest("img3.jpg", null, 2)
+            ),
+            null, null, null, null, null, null, null, null, null, null, null, "HIDDEN"
+        );
+        var hiddenProd = catalog.createProduct(ownerId, shop.id(), hiddenReq);
+        assertThat(hiddenProd.status()).isEqualTo("HIDDEN");
+
+        // Now set shop to untrusted (kyc_status = PENDING_REVIEW and is_trusted = false)
+        jdbc.sql("UPDATE shop SET is_trusted = false, kyc_status = 'PENDING_REVIEW' WHERE id = :id")
+            .param("id", shop.id())
+            .update();
+
+        var pendingProd = catalog.createProduct(ownerId, shop.id(), productRequest("ao-untrusted-pending"));
+        assertThat(pendingProd.status()).isEqualTo("PENDING");
+    }
+
+    @Test
+    void tryOnRequiresGarmentImage() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-try-on");
+
+        var tryOnReqWithoutGarment = new CreateProductRequest(
+            "Ao Thuc Te Ao", "ao-thuc-te-ao", "Mo ta", testCategory(),
+            List.of(new CreateVariantRequest("SKU-TRY-ON", "M", "Trang", 120000L, null, 10, true)),
+            List.of(
+                new ImageItemRequest("img1.jpg", null, 0),
+                new ImageItemRequest("img2.jpg", null, 1),
+                new ImageItemRequest("img3.jpg", null, 2)
+            ),
+            null, null, true, null, null, null, null, null, null, null, null, "ACTIVE"
+        );
+
+        assertThatThrownBy(() -> catalog.createProduct(ownerId, shopId, tryOnReqWithoutGarment))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> {
+                var ex = (ResponseStatusException) e;
+                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                assertThat(ex.getReason()).contains("Garment image is required");
+            });
+    }
+
+    @Test
+    void createProductRejectsNonExistentCategory() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-val-cat");
+
+        var req = new CreateProductRequest(
+            "Áo Thun Nam", "ao-thun-nam-cat", "Mo ta", UUID.randomUUID(),
+            List.of(new CreateVariantRequest("SKU-CAT", "M", "Den", 100000L, null, 10, true)),
+            List.of(
+                new ImageItemRequest("img1.jpg", null, 0),
+                new ImageItemRequest("img2.jpg", null, 1),
+                new ImageItemRequest("img3.jpg", null, 2)
+            ),
+            null, null, null, null, null, null, null, null, null, null, null, "ACTIVE"
+        );
+
+        assertThatThrownBy(() -> catalog.createProduct(ownerId, shopId, req))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> {
+                var ex = (ResponseStatusException) e;
+                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                assertThat(ex.getReason()).contains("Category does not exist");
+            });
+    }
+
+    @Test
+    void createProductRejectsInvalidPackaging() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-val-pkg");
+
+        var req = new CreateProductRequest(
+            "Áo Thun Nam", "ao-thun-nam-pkg", "Mo ta", testCategory(),
+            List.of(new CreateVariantRequest("SKU-PKG", "M", "Den", 100000L, null, 10, true)),
+            List.of(
+                new ImageItemRequest("img1.jpg", null, 0),
+                new ImageItemRequest("img2.jpg", null, 1),
+                new ImageItemRequest("img3.jpg", null, 2)
+            ),
+            null, null, null, null, null, null, null,
+            -10, 20, 10, 5, "ACTIVE"
+        );
+
+        assertThatThrownBy(() -> catalog.createProduct(ownerId, shopId, req))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> {
+                var ex = (ResponseStatusException) e;
+                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                assertThat(ex.getReason()).contains("Package weight must be greater than 0");
+            });
+    }
+
+    @Test
+    void adminCanApproveAndRejectPendingProduct() {
+        var ownerId = mirroredUser();
+        var adminId = mirroredUser();
+        var shop = shops.register(ownerId, com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop Moderation", "shop-moderation"));
+        shops.approve(adminId, shop.id());
+
+        // Make shop untrusted so products start as PENDING
+        jdbc.sql("UPDATE shop SET is_trusted = false, kyc_status = 'PENDING_REVIEW' WHERE id = :id")
+            .param("id", shop.id())
+            .update();
+
+        var prodToApprove = catalog.createProduct(ownerId, shop.id(), productRequest("ao-mod-approve"));
+        assertThat(prodToApprove.status()).isEqualTo("PENDING");
+
+        var approved = catalog.approveProduct(adminId, prodToApprove.id());
+        assertThat(approved.status()).isEqualTo("ACTIVE");
+
+        var prodToReject = catalog.createProduct(ownerId, shop.id(), productRequest("ao-mod-reject"));
+        assertThat(prodToReject.status()).isEqualTo("PENDING");
+
+        var rejected = catalog.rejectProduct(adminId, prodToReject.id(), "Ảnh sản phẩm không đạt chuẩn");
+        assertThat(rejected.status()).isEqualTo("BANNED");
+        assertThat(rejected.statusReason()).isEqualTo("Ảnh sản phẩm không đạt chuẩn");
     }
 }

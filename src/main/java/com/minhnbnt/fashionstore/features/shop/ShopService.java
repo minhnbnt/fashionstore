@@ -16,7 +16,6 @@ import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,18 +51,14 @@ public class ShopService {
 
     @Transactional
     public ShopResponse register(@NonNull UUID ownerId, @NonNull CreateShopRequest request) {
-        // Fraud prevention check 1: CCCD format (9 or 12 digits)
-        var cleanedId = request.idNumber().trim();
-        if (!cleanedId.matches("^\\d{9}$|^\\d{12}$")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID number must be 9 or 12 digits.");
-        }
 
-        // Fraud prevention check 2: Bank holder name MUST match legal name
         var normHolder = normalizeName(request.bankHolder());
         var normLegal = normalizeName(request.legalName());
         if (!normHolder.equalsIgnoreCase(normLegal)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Bank holder name must match the legal name on the national ID.");
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Bank account holder name must match ID card legal name"
+            );
         }
 
         var sellerType = trimOrNull(request.sellerType());
@@ -80,7 +75,7 @@ public class ShopService {
             request.address().trim(),
             sellerType,
             request.legalName().trim(),
-            cleanedId,
+            request.idNumber().trim(),
             request.idIssuedDate().trim(),
             request.idIssuedPlace().trim(),
             trimOrNull(request.taxCode()),
@@ -94,7 +89,7 @@ public class ShopService {
         );
         try {
             shops.save(shop);
-        } catch (DataIntegrityViolationException e) {
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Slug already taken");
         }
         members.add(ShopMember.owner(shop.getId(), ownerId));
@@ -135,6 +130,11 @@ public class ShopService {
     @Transactional
     public ShopResponse unsuspend(@NonNull UUID adminId, @NonNull UUID id) {
         return reinstate(adminId, id);
+    }
+
+    @Transactional
+    public ShopResponse setTrusted(@NonNull UUID adminId, @NonNull UUID id, boolean trusted) {
+        return transition(adminId, id, "", shop -> shop.setTrusted(trusted));
     }
 
     @Transactional
@@ -371,6 +371,7 @@ public class ShopService {
             shop.getBusinessCertKey(),
             shop.getKycStatus(),
             shop.getKycRejectionReason(),
+            shop.isTrusted(),
             shop.getCreatedAt()
         );
     }

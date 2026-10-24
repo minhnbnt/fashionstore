@@ -90,6 +90,8 @@ public class Shop implements Persistable<UUID> {
 
     private @Nullable String kycRejectionReason;
 
+    private boolean isTrusted;
+
     private Instant createdAt;
 
     private Instant updatedAt;
@@ -135,6 +137,7 @@ public class Shop implements Persistable<UUID> {
         @Nullable String idIssuedPlace,
         @Nullable String kycStatus,
         @Nullable String kycRejectionReason,
+        @Nullable Boolean isTrusted,
         Instant createdAt,
         Instant updatedAt) {
         this.id = id;
@@ -191,10 +194,21 @@ public class Shop implements Persistable<UUID> {
             this.kycStatus = kycStatus;
         }
         this.kycRejectionReason = kycRejectionReason;
+        this.isTrusted = isTrusted != null && isTrusted;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.newRecord = false;
     }
+
+    public boolean isTrusted() {
+        return isTrusted || "VERIFIED".equalsIgnoreCase(kycStatus);
+    }
+
+    public void setTrusted(boolean trusted) {
+        this.isTrusted = trusted;
+        this.updatedAt = Instant.now();
+    }
+
 
     public static Shop create(
         String name,
@@ -223,44 +237,17 @@ public class Shop implements Persistable<UUID> {
             effectiveSellerType = sellerType;
         }
         var shop = new Shop(
-            UUID.randomUUID(),
-            name,
-            slug,
-            description,
-            logoKey,
-            bannerKey,
-            ShopStatus.PENDING,
-            null,
-            null,
-            null,
-            now,
-            phone,
-            address,
-            null,
-            2,
-            effectiveSellerType,
-            taxCode,
-            idNumber,
-            idFrontKey,
-            businessCertKey,
-            null,
-            0,
-            0,
-            bankName,
-            bankAccount,
-            bankHolder,
-            null,
-            null,
-            legalName,
-            idFrontKey,
-            idBackKey,
-            idSelfieKey,
-            idIssuedDate,
-            idIssuedPlace,
-            "PENDING_REVIEW",
-            null,
-            now,
-            now);
+            UUID.randomUUID(), name, slug, description, logoKey, bannerKey,
+            ShopStatus.PENDING, null, null, null, now,
+            phone, address, null, 2, effectiveSellerType,
+            taxCode, idNumber, idFrontKey, businessCertKey,
+            null, 0, 0,
+            bankName, bankAccount, bankHolder,
+            null, null,
+            legalName, idFrontKey, idBackKey, idSelfieKey, idIssuedDate, idIssuedPlace,
+            "PENDING_REVIEW", null, false,
+            now, now
+        );
         shop.newRecord = true;
         return shop;
     }

@@ -68,6 +68,16 @@ public class AdminProductService {
     }
 
     @Transactional
+    public AdminProductResponse approve(@NonNull UUID adminId, @NonNull UUID productId) {
+        return catalog.approveProduct(adminId, productId);
+    }
+
+    @Transactional
+    public AdminProductResponse reject(@NonNull UUID adminId, @NonNull UUID productId, @NonNull String reason) {
+        return catalog.rejectProduct(adminId, productId, reason);
+    }
+
+    @Transactional
     public DismissReportsResponse dismissReports(
         @NonNull UUID adminId,
         @NonNull UUID productId,

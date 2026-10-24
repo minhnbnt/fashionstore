@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.features.catalog;
 
+import com.minhnbnt.fashionstore.test.ProductTestFixtures;
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.catalog.CreateProductReportRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
@@ -66,7 +67,7 @@ class ProductReportServiceTest {
         return catalog.createProduct(
             ownerId,
             shopId,
-            new CreateProductRequest(
+            ProductTestFixtures.request(
                 "Ao " + slug,
                 slug,
                 null,
