@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.features.admin.service;
 
+import com.minhnbnt.fashionstore.test.ProductTestFixtures;
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.admin.AdminOrderFilter;
 import com.minhnbnt.fashionstore.dto.admin.AdminOrderResponse;
@@ -90,7 +91,7 @@ class AdminOrderServiceTest {
         var created = catalog.createProduct(
             ownerId,
             shopId,
-            new CreateProductRequest(
+            ProductTestFixtures.request(
                 "Ao " + slug,
                 slug,
                 null,

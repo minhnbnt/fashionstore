@@ -246,7 +246,12 @@ public class TikiCatalogImporter implements ApplicationRunner {
             productSlug,
             "Sản phẩm tham khảo nhập từ danh mục công khai Tiki, mã nguồn " + sourceId + ".",
             categoryId,
-            List.of(variant)
+            List.of(variant),
+            List.of(),
+            null, null, null,
+            null, null, null, null,
+            null, null, null, null,
+            null
         );
 
         try {

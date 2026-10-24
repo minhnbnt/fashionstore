@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.features.cart;
 
+import com.minhnbnt.fashionstore.test.ProductTestFixtures;
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.cart.CartCheckoutRequest;
 import com.minhnbnt.fashionstore.dto.cart.CartItemRequest;
@@ -79,7 +80,7 @@ class CartServiceTest {
         var created = catalog.createProduct(
             ownerId,
             shopId,
-            new CreateProductRequest(
+            ProductTestFixtures.request(
                 "Ao " + slug,
                 slug,
                 null,
@@ -95,7 +96,7 @@ class CartServiceTest {
         var created = catalog.createProduct(
             ownerId,
             shopId,
-            new CreateProductRequest(
+            ProductTestFixtures.request(
                 "Ao " + slug,
                 slug,
                 null,

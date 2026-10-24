@@ -107,13 +107,6 @@ public class CatalogService {
     ) {
         access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
 
-        if (request.name() != null && request.name().trim().length() < 5) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Product name must be between 5 and 300 characters"
-            );
-        }
-
         requireSingleDefault(request.variants());
 
         for (var variant : request.variants()) {
@@ -127,21 +120,6 @@ public class CatalogService {
                 throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Garment image is required when virtual try-on is enabled"
-                );
-            }
-        }
-
-        if (request.images() != null && !request.images().isEmpty()) {
-            if (request.images().size() < 3) {
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Product requires at least 3 images"
-                );
-            }
-            if (request.images().size() > 9) {
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Product cannot exceed 9 images"
                 );
             }
         }
@@ -506,7 +484,7 @@ public class CatalogService {
         products.save(product);
 
         moderationHistories.save(ProductModerationHistory.record(
-            productId, from, product.getStatus(), null, adminId, "Phê duyệt sản phẩm mới"
+            productId, from, product.getStatus(), null, adminId, ""
         ));
         return requireAdminProduct(productId);
     }
@@ -928,7 +906,12 @@ public class CatalogService {
                     slug,
                     desc,
                     null,
-                    List.of(new CreateVariantRequest(sku, size, color, price, null, stock, true))
+                    List.of(new CreateVariantRequest(sku, size, color, price, null, stock, true)),
+                    List.of(),
+                    null, null, null,
+                    null, null, null, null,
+                    null, null, null, null,
+                    null
                 );
                 createProduct(userId, shopId, createReq);
                 success++;

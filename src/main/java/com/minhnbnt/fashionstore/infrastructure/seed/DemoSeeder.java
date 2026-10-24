@@ -281,7 +281,18 @@ public class DemoSeeder implements ApplicationRunner {
             for (var variant : variants) {
                 variantRequests.add(variant.request());
             }
-            return new CreateProductRequest(name, slug, description, categoryIds.get(categorySlug), variantRequests);
+            return new CreateProductRequest(
+                name,
+                slug,
+                description,
+                categoryIds.get(categorySlug),
+                variantRequests,
+                List.of(),
+                null, null, null,
+                null, null, null, null,
+                null, null, null, null,
+                null
+            );
         }
     }
 

@@ -85,6 +85,36 @@ class ShopControllerTest {
     }
 
     @Test
+    void registerShopRejectsInvalidCccdFormat() throws Exception {
+        mockMvc.perform(post("/api/shops")
+                .with(jwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "name": "Shop",
+                      "slug": "shop",
+                      "description": "desc",
+                      "logoKey": "logo",
+                      "bannerKey": "banner",
+                      "phone": "0901234567",
+                      "address": "Hanoi",
+                      "sellerType": "INDIVIDUAL",
+                      "legalName": "NGUYEN VAN A",
+                      "idNumber": "123456",
+                      "idIssuedDate": "01/01/2021",
+                      "idIssuedPlace": "CA",
+                      "idFrontKey": "f",
+                      "idBackKey": "b",
+                      "idSelfieKey": "s",
+                      "bankName": "VCB",
+                      "bankAccount": "123",
+                      "bankHolder": "NGUYEN VAN A"
+                    }
+                    """))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void registerShopRejectsMissingMandatoryFields() throws Exception {
         mockMvc.perform(post("/api/shops")
                 .with(jwt())

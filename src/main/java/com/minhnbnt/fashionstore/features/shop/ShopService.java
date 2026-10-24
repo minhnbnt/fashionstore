@@ -16,7 +16,6 @@ import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import jakarta.validation.Validator;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,15 +49,8 @@ public class ShopService {
 
     private final ShopAccessChecker access;
 
-    private final Validator validator;
-
     @Transactional
     public ShopResponse register(@NonNull UUID ownerId, @NonNull CreateShopRequest request) {
-        var violations = validator.validate(request);
-        if (!violations.isEmpty()) {
-            var violation = violations.iterator().next();
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, violation.getMessage());
-        }
 
         var normHolder = normalizeName(request.bankHolder());
         var normLegal = normalizeName(request.legalName());

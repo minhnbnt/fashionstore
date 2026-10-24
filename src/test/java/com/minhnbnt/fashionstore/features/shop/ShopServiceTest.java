@@ -267,18 +267,6 @@ class ShopServiceTest {
     }
 
     @Test
-    void registerRejectsInvalidCccdFormat() {
-        var ownerId = mirroredUser();
-        var req = new CreateShopRequest(
-            "Name", "slug-test", "desc", "logo", "banner", "0901234567", "Hanoi", "INDIVIDUAL",
-            "NGUYEN VAN A", "123456", "01/01/2021", "CA", null, "f", "b", "s", null, "VCB", "123", "NGUYEN VAN A"
-        );
-        assertThatThrownBy(() -> shops.register(ownerId, req))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
-    }
-
-    @Test
     void registerRejectsMismatchedBankHolder() {
         var ownerId = mirroredUser();
         var req = new CreateShopRequest(

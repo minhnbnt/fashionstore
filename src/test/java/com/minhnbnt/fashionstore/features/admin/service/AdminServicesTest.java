@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.features.admin.service;
 
+import com.minhnbnt.fashionstore.test.ProductTestFixtures;
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
@@ -202,7 +203,7 @@ class AdminServicesTest {
         var product = catalog.createProduct(
             ownerId,
             shopId,
-            new CreateProductRequest(
+            ProductTestFixtures.request(
                 "Ao stats",
                 "admin-stats-orders-ao",
                 null,
