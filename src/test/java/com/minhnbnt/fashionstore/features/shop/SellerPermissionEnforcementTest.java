@@ -6,6 +6,7 @@ import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.dto.order.CancelOrderRequest;
 import com.minhnbnt.fashionstore.dto.order.CreateWithdrawalRequest;
 import com.minhnbnt.fashionstore.dto.review.ReplyReviewRequest;
+import com.minhnbnt.fashionstore.dto.shop.UpdateShopProfileRequest;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
 import com.minhnbnt.fashionstore.features.chat.ChatService;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatConversationRepository;
@@ -64,6 +65,9 @@ class SellerPermissionEnforcementTest {
 
     @Autowired
     private ShopDecorationService decoration;
+
+    @Autowired
+    private ShopStatsService shopStats;
 
     @Autowired
     private ShopService shops;
@@ -381,5 +385,59 @@ class SellerPermissionEnforcementTest {
         assertThatThrownBy(() -> decoration.saveDraft(staffId, shopId, "[]"))
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertPermissionDenied((ResponseStatusException) e));
+    }
+
+    @Test
+    void staffCannotUpdateShopProfile() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "perm-profile-staff-" + UUID.randomUUID());
+        var staffId = staffWith(ownerId, shopId, ShopPermission.PRODUCT_WRITE);
+        var request = new UpdateShopProfileRequest(
+            "0909123456", "123 Le Loi", "Doi tra 7 ngay", 2,
+            "Vietcombank", "0123456789", "NGUYEN VAN B", null, null
+        );
+
+        assertThatThrownBy(() -> shops.updateProfile(staffId, shopId, request))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> {
+                var rse = (ResponseStatusException) e;
+                assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                assertThat(rse.getReason()).isEqualTo("Insufficient shop role");
+            });
+    }
+
+    @Test
+    void ownerCanUpdateShopProfile() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "perm-profile-owner-" + UUID.randomUUID());
+        var request = new UpdateShopProfileRequest(
+            "0909123456", "123 Le Loi", "Doi tra 7 ngay", 2,
+            "Vietcombank", "0123456789", "NGUYEN VAN OWNER", null, null
+        );
+
+        var updated = shops.updateProfile(ownerId, shopId, request);
+        assertThat(updated.phone()).isEqualTo("0909123456");
+        assertThat(updated.bankAccount()).isEqualTo("0123456789");
+    }
+
+    @Test
+    void staffWithoutRevenueReadCannotAccessDashboardStats() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "perm-stats-staff-deny-" + UUID.randomUUID());
+        var staffId = staffWith(ownerId, shopId, ShopPermission.ORDER_READ);
+
+        assertThatThrownBy(() -> shopStats.getDashboard(staffId, shopId))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertPermissionDenied((ResponseStatusException) e));
+    }
+
+    @Test
+    void staffWithRevenueReadCanAccessDashboardStats() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "perm-stats-staff-allow-" + UUID.randomUUID());
+        var staffId = staffWith(ownerId, shopId, ShopPermission.REVENUE_READ);
+
+        var dashboard = shopStats.getDashboard(staffId, shopId);
+        assertThat(dashboard).isNotNull();
     }
 }

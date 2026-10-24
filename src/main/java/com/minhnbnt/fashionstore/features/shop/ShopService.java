@@ -172,7 +172,7 @@ public class ShopService {
         if (shop == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found");
         }
-        access.requireShopRole(userId, id, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopRole(userId, id, MemberRole.OWNER);
         shop.updateProfile(
             request.phone(),
             request.address(),

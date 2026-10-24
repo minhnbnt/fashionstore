@@ -12,7 +12,7 @@ import com.minhnbnt.fashionstore.dto.shop.RevenueDetailResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopDashboardResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopPerformanceResponse;
 import com.minhnbnt.fashionstore.dto.shop.TopCustomerResponse;
-import com.minhnbnt.fashionstore.model.MemberRole;
+import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -43,7 +43,7 @@ public class ShopStatsService {
 
     @Transactional(readOnly = true)
     public ShopDashboardResponse getDashboard(@NonNull UUID userId, @NonNull UUID shopId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         var stats = repository.todayStats(shopId);
         var pending = repository.countPendingOrders(shopId);
@@ -62,7 +62,7 @@ public class ShopStatsService {
 
     @Transactional(readOnly = true)
     public ShopPerformanceResponse getPerformance(@NonNull UUID userId, @NonNull UUID shopId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         var perf = repository.shopPerformance(shopId);
         var chatResponseRate = 0.95; // Mặc định mục tiêu phản hồi CSKH
@@ -77,7 +77,7 @@ public class ShopStatsService {
 
     @Transactional(readOnly = true)
     public List<AlertResponse> getAlerts(@NonNull UUID userId, @NonNull UUID shopId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         var alerts = new ArrayList<AlertResponse>();
 
@@ -110,7 +110,7 @@ public class ShopStatsService {
         @NonNull UUID shopId,
         @NonNull String period
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         var now = Instant.now();
         var from = now.minus(60, ChronoUnit.DAYS);
@@ -155,7 +155,7 @@ public class ShopStatsService {
         @Nullable LocalDate fromDate,
         @Nullable LocalDate toDate
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         var from = calculateFromInstant(fromDate);
         var to = calculateToInstant(toDate);
@@ -170,7 +170,7 @@ public class ShopStatsService {
 
     @Transactional(readOnly = true)
     public List<RevenueByCategoryResponse> getRevenueByCategory(@NonNull UUID userId, @NonNull UUID shopId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         return repository.revenueByCategory(shopId).stream()
             .map(r -> new RevenueByCategoryResponse(r.categoryId(), r.categoryName(), r.revenue(), r.quantity()))
@@ -179,7 +179,7 @@ public class ShopStatsService {
 
     @Transactional(readOnly = true)
     public List<RevenueByPaymentResponse> getRevenueByPayment(@NonNull UUID userId, @NonNull UUID shopId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         return repository.revenueByPayment(shopId).stream()
             .map(r -> new RevenueByPaymentResponse(r.paymentMethod(), r.revenue(), r.orderCount()))
@@ -193,7 +193,7 @@ public class ShopStatsService {
         @Nullable LocalDate fromDate,
         @Nullable LocalDate toDate
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         var from = calculateFromInstant(fromDate);
         var to = calculateToInstant(toDate);
@@ -211,7 +211,7 @@ public class ShopStatsService {
 
     @Transactional(readOnly = true)
     public List<ProductStatsResponse> getTopSellingProducts(@NonNull UUID userId, @NonNull UUID shopId, int limit) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         var max = Math.clamp(limit, 1, 50);
         return repository.topSellingProducts(shopId, max).stream()
@@ -221,7 +221,7 @@ public class ShopStatsService {
 
     @Transactional(readOnly = true)
     public List<ProductStatsResponse> getLowConversionProducts(@NonNull UUID userId, @NonNull UUID shopId, int limit) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         var max = Math.clamp(limit, 1, 50);
         return repository.lowConversionProducts(shopId, max).stream()
@@ -231,7 +231,7 @@ public class ShopStatsService {
 
     @Transactional(readOnly = true)
     public List<ProductStatsResponse> getOutOfStockProducts(@NonNull UUID userId, @NonNull UUID shopId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         return repository.outOfStockProducts(shopId).stream()
             .map(this::mapProductStats)
@@ -240,7 +240,7 @@ public class ShopStatsService {
 
     @Transactional(readOnly = true)
     public List<ProductStatsResponse> getSlowMovingProducts(@NonNull UUID userId, @NonNull UUID shopId, int limit) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         var max = Math.clamp(limit, 1, 50);
         return repository.slowMovingProducts(shopId, max).stream()
@@ -250,7 +250,7 @@ public class ShopStatsService {
 
     @Transactional(readOnly = true)
     public CustomerStatsResponse getCustomerOverview(@NonNull UUID userId, @NonNull UUID shopId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         var overview = repository.customerOverview(shopId);
         var followers = repository.followerTrend(shopId);
@@ -275,7 +275,7 @@ public class ShopStatsService {
 
     @Transactional(readOnly = true)
     public List<TopCustomerResponse> getTopCustomers(@NonNull UUID userId, @NonNull UUID shopId, int limit) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         var max = Math.clamp(limit, 1, 50);
         return repository.topCustomers(shopId, max).stream()
@@ -291,7 +291,7 @@ public class ShopStatsService {
 
     @Transactional(readOnly = true)
     public FollowerTrendResponse getFollowerTrend(@NonNull UUID userId, @NonNull UUID shopId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         var followers = repository.followerTrend(shopId);
         var change = followers.totalFollowers() - followers.previousMonthFollowers();
@@ -306,7 +306,7 @@ public class ShopStatsService {
         @Nullable LocalDate fromDate,
         @Nullable LocalDate toDate
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         var from = calculateFromInstant(fromDate);
         var to = calculateToInstant(toDate);

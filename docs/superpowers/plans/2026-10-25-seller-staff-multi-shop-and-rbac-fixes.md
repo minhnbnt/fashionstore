@@ -42,17 +42,17 @@
 - Modify: `fashionstore/src/main/java/com/minhnbnt/fashionstore/features/shop/ShopMemberRepository.java`
 - Test: `fashionstore/src/test/java/com/minhnbnt/fashionstore/features/shop/ShopMemberRepositoryTest.java`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
   Tạo test trong `ShopMemberRepositoryTest.java` kiểm tra query `findMembershipsByUser(userId)`:
   Seed một user thuộc 2 shop (1 shop là OWNER, 1 shop là STAFF có role). Xác minh hàm trả về đủ 2 bản ghi với đầy đủ `shopName`, `role`, `roleName`, `memberStatus`, `permissions`.
-- [ ] **Step 2: Run test to confirm it fails**
+- [x] **Step 2: Run test to confirm it fails**
   Chạy `./gradlew test --tests com.minhnbnt.fashionstore.features.shop.ShopMemberRepositoryTest` và xác nhận test không biên dịch được do chưa có method/DTO.
-- [ ] **Step 3: Implement minimal code**
+- [x] **Step 3: Implement minimal code**
   - Tạo `SellerShopMembershipResponse.java` dạng Java record với đầy đủ `@Schema` cho từng trường.
   - Thêm `record UserShopMembershipRow` và method `findMembershipsByUser(UUID userId)` trong `ShopMemberRepository.java` sử dụng `jdbc.sql(...)`.
-- [ ] **Step 4: Run test to confirm it passes**
+- [x] **Step 4: Run test to confirm it passes**
   Chạy `./gradlew test --tests com.minhnbnt.fashionstore.features.shop.ShopMemberRepositoryTest` và xác nhận test PASS.
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
   `git commit -m "feat(shop): add multi-shop membership DTO and repository query"`
 
 ---
@@ -64,19 +64,19 @@
 - Modify: `fashionstore/src/main/java/com/minhnbnt/fashionstore/features/shop/ShopStatsService.java`
 - Test: `fashionstore/src/test/java/com/minhnbnt/fashionstore/features/shop/ShopSecurityRbacTest.java`
 
-- [ ] **Step 1: Write failing test**
-  Viết test kiểm tra phân quyền chặt chẽ trong `ShopSecurityRbacTest.java`:
+- [x] **Step 1: Write failing test**
+  Viết test kiểm tra phân quyền chặt chẽ trong `SellerPermissionEnforcementTest.java`:
   - Test 1: Nhân viên STAFF gọi `shopService.updateProfile(...)` phải ném `ResponseStatusException(HttpStatus.FORBIDDEN)`.
   - Test 2: Nhân viên STAFF không có quyền `REVENUE_READ` gọi `shopStatsService.getDashboard(...)` phải ném `ResponseStatusException(HttpStatus.FORBIDDEN)`.
   - Test 3: Chủ shop OWNER gọi 2 method trên thành công bình thường.
-- [ ] **Step 2: Run test to confirm it fails**
+- [x] **Step 2: Run test to confirm it fails**
   Chạy test và xác nhận thất bại do code hiện tại vẫn cho phép STAFF truy cập.
-- [ ] **Step 3: Implement minimal code**
+- [x] **Step 3: Implement minimal code**
   - Trong `ShopService.java`, sửa `updateProfile`: đổi `access.requireShopRole(userId, id, MemberRole.OWNER, MemberRole.STAFF)` thành `access.requireShopRole(userId, id, MemberRole.OWNER)`.
   - Trong `ShopStatsService.java`, đổi các method thống kê sang `access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ)`.
-- [ ] **Step 4: Run test to confirm it passes**
-  Chạy lại `ShopSecurityRbacTest` và xác nhận tất cả các case PASS.
-- [ ] **Step 5: Commit**
+- [x] **Step 4: Run test to confirm it passes**
+  Chạy lại `SellerPermissionEnforcementTest` và xác nhận tất cả các case PASS.
+- [x] **Step 5: Commit**
   `git commit -m "fix(security): restrict shop profile update to owner and require REVENUE_READ for statistics"`
 
 ---
