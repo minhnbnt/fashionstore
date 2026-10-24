@@ -5,6 +5,7 @@ import com.minhnbnt.fashionstore.dto.shop.InviteStaffRequest;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.ShopInvitation;
 import com.minhnbnt.fashionstore.model.ShopMember;
+import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.model.ShopRole;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -85,6 +87,34 @@ class ShopStaffServiceUnitTest {
 
         assertThatThrownBy(() -> staffService.createRole(userId, shopId, request))
             .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void myPermissionsRequiresActiveMember() {
+        var userId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+
+        when(access.permissionsOf(userId, shopId)).thenReturn(Set.of(ShopPermission.ORDER_READ));
+        when(access.isOwner(userId, shopId)).thenReturn(false);
+
+        var response = staffService.myPermissions(userId, shopId);
+
+        verify(access).requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        assertThat(response.permissions()).containsExactly("ORDER_READ");
+    }
+
+    @Test
+    void myPermissionsForStaffWithNoPermissionsReturnsEmpty() {
+        var userId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+
+        when(access.permissionsOf(userId, shopId)).thenReturn(Set.of());
+        when(access.isOwner(userId, shopId)).thenReturn(false);
+
+        var response = staffService.myPermissions(userId, shopId);
+
+        assertThat(response.isOwner()).isFalse();
+        assertThat(response.permissions()).isEmpty();
     }
 
     @Test

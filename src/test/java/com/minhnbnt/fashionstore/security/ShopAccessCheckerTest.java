@@ -110,6 +110,35 @@ class ShopAccessCheckerTest {
     }
 
     @Test
+    void requireShopPermissionAcceptsAnyOfRequiredPermissions() {
+        var userId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var roleId = UUID.randomUUID();
+
+        when(members.findAccess(shopId, userId))
+            .thenReturn(Optional.of(access(MemberRole.STAFF, roleId, "ACTIVE", "ORDER_READ")));
+
+        checker.requireShopPermission(
+            userId,
+            shopId,
+            ShopPermission.REVENUE_WITHDRAW,
+            ShopPermission.ORDER_READ
+        );
+    }
+
+    @Test
+    void deactivatedOwnerIsNotOwner() {
+        var userId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+
+        when(members.findAccess(shopId, userId))
+            .thenReturn(Optional.of(access(MemberRole.OWNER, null, "DEACTIVATED")));
+
+        assertThat(checker.isOwner(userId, shopId)).isFalse();
+        assertThat(checker.permissionsOf(userId, shopId)).isEmpty();
+    }
+
+    @Test
     void unknownPermissionStringIsIgnored() {
         var userId = UUID.randomUUID();
         var shopId = UUID.randomUUID();
