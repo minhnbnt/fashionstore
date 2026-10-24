@@ -18,12 +18,16 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,6 +42,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/seller/shops/{shopId}/stats")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Seller - Statistics", description = "Thống kê và Báo cáo dành cho Shop")
 public class SellerStatsController {
 
@@ -107,13 +112,17 @@ public class SellerStatsController {
         description = "Doanh thu theo chu kỳ ngày, tuần, tháng hoặc năm trong khoảng thời gian chỉ định."
     )
     @ApiResponse(responseCode = "200", description = "Dữ liệu doanh thu theo chu kỳ")
+    @ApiResponse(responseCode = "400", description = "Tham số không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
     @SecurityRequirement(name = "bearerAuth")
     public RevenueDetailResponse revenueDetail(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "ID shop") @PathVariable UUID shopId,
-        @Parameter(description = "Chu kỳ (day, week, month, year)") @RequestParam(defaultValue = "day") String period,
+        @Parameter(description = "Chu kỳ (day, week, month, year)")
+        @RequestParam(defaultValue = "day")
+        @Pattern(regexp = "(?i)day|week|month|year", message = "Period must be day, week, month, or year")
+        String period,
         @Parameter(description = "Từ ngày (YYYY-MM-DD)") @RequestParam(required = false) LocalDate from,
         @Parameter(description = "Đến ngày (YYYY-MM-DD)") @RequestParam(required = false) LocalDate to
     ) {
@@ -188,13 +197,17 @@ public class SellerStatsController {
         description = "So sánh doanh thu và số đơn giữa chu kỳ hiện tại và chu kỳ liền kề trước đó."
     )
     @ApiResponse(responseCode = "200", description = "Số liệu so sánh chu kỳ")
+    @ApiResponse(responseCode = "400", description = "Tham số không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
     @SecurityRequirement(name = "bearerAuth")
     public PeriodComparisonResponse periodComparison(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "ID shop") @PathVariable UUID shopId,
-        @Parameter(description = "Chu kỳ so sánh (day, week, month, year)") @RequestParam(defaultValue = "day") String period
+        @Parameter(description = "Chu kỳ so sánh (day, week, month, year)")
+        @RequestParam(defaultValue = "day")
+        @Pattern(regexp = "(?i)day|week|month|year", message = "Period must be day, week, month, or year")
+        String period
     ) {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var userId = UUID.fromString(subject);
@@ -208,13 +221,18 @@ public class SellerStatsController {
         description = "Danh sách sản phẩm có doanh thu và số lượng bán cao nhất."
     )
     @ApiResponse(responseCode = "200", description = "Danh sách sản phẩm bán chạy")
+    @ApiResponse(responseCode = "400", description = "Tham số không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
     @SecurityRequirement(name = "bearerAuth")
     public List<ProductStatsResponse> topSellingProducts(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "ID shop") @PathVariable UUID shopId,
-        @Parameter(description = "Số lượng giới hạn") @RequestParam(defaultValue = "10") int limit
+        @Parameter(description = "Số lượng giới hạn (1-100)")
+        @RequestParam(defaultValue = "10")
+        @Min(value = 1, message = "Limit must be at least 1")
+        @Max(value = 100, message = "Limit must not exceed 100")
+        int limit
     ) {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var userId = UUID.fromString(subject);
@@ -228,13 +246,18 @@ public class SellerStatsController {
         description = "Sản phẩm có lượt xem cao nhưng lượt mua thấp cần tối ưu nội dung/giá bán."
     )
     @ApiResponse(responseCode = "200", description = "Danh sách sản phẩm chuyển đổi thấp")
+    @ApiResponse(responseCode = "400", description = "Tham số không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
     @SecurityRequirement(name = "bearerAuth")
     public List<ProductStatsResponse> lowConversionProducts(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "ID shop") @PathVariable UUID shopId,
-        @Parameter(description = "Số lượng giới hạn") @RequestParam(defaultValue = "10") int limit
+        @Parameter(description = "Số lượng giới hạn (1-100)")
+        @RequestParam(defaultValue = "10")
+        @Min(value = 1, message = "Limit must be at least 1")
+        @Max(value = 100, message = "Limit must not exceed 100")
+        int limit
     ) {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var userId = UUID.fromString(subject);
@@ -267,13 +290,18 @@ public class SellerStatsController {
         description = "Sản phẩm còn tồn kho nhưng không phát sinh đơn hàng trong hơn 30 ngày."
     )
     @ApiResponse(responseCode = "200", description = "Danh sách sản phẩm tồn kho lâu")
+    @ApiResponse(responseCode = "400", description = "Tham số không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
     @SecurityRequirement(name = "bearerAuth")
     public List<ProductStatsResponse> slowMovingProducts(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "ID shop") @PathVariable UUID shopId,
-        @Parameter(description = "Số lượng giới hạn") @RequestParam(defaultValue = "10") int limit
+        @Parameter(description = "Số lượng giới hạn (1-100)")
+        @RequestParam(defaultValue = "10")
+        @Min(value = 1, message = "Limit must be at least 1")
+        @Max(value = 100, message = "Limit must not exceed 100")
+        int limit
     ) {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var userId = UUID.fromString(subject);
@@ -306,13 +334,18 @@ public class SellerStatsController {
         description = "Danh sách khách hàng có tổng chi tiêu và số lượng đơn cao nhất."
     )
     @ApiResponse(responseCode = "200", description = "Danh sách top khách hàng")
+    @ApiResponse(responseCode = "400", description = "Tham số không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
     @SecurityRequirement(name = "bearerAuth")
     public List<TopCustomerResponse> topCustomers(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "ID shop") @PathVariable UUID shopId,
-        @Parameter(description = "Số lượng giới hạn") @RequestParam(defaultValue = "10") int limit
+        @Parameter(description = "Số lượng giới hạn (1-100)")
+        @RequestParam(defaultValue = "10")
+        @Min(value = 1, message = "Limit must be at least 1")
+        @Max(value = 100, message = "Limit must not exceed 100")
+        int limit
     ) {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var userId = UUID.fromString(subject);
@@ -345,13 +378,17 @@ public class SellerStatsController {
         description = "Tải về báo cáo doanh thu dưới định dạng CSV/Excel theo khoảng thời gian."
     )
     @ApiResponse(responseCode = "200", description = "File báo cáo doanh thu")
+    @ApiResponse(responseCode = "400", description = "Tham số không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<byte[]> exportRevenue(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "ID shop") @PathVariable UUID shopId,
-        @Parameter(description = "Định dạng file (csv, xlsx)") @RequestParam(defaultValue = "csv") String format,
+        @Parameter(description = "Định dạng file (csv, xlsx)")
+        @RequestParam(defaultValue = "csv")
+        @Pattern(regexp = "(?i)csv|xlsx", message = "Format must be csv or xlsx")
+        String format,
         @Parameter(description = "Từ ngày (YYYY-MM-DD)") @RequestParam(required = false) LocalDate from,
         @Parameter(description = "Đến ngày (YYYY-MM-DD)") @RequestParam(required = false) LocalDate to
     ) {
