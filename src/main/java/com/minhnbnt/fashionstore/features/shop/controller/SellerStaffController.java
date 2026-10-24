@@ -8,6 +8,7 @@ import com.minhnbnt.fashionstore.dto.shop.ShopMemberAuditResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopMemberDetailResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopRoleResponse;
 import com.minhnbnt.fashionstore.dto.shop.StaffInvitationResponse;
+import com.minhnbnt.fashionstore.dto.shop.UpdateMemberStatusRequest;
 import com.minhnbnt.fashionstore.features.shop.ShopStaffService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -222,14 +223,45 @@ public class SellerStaffController {
         staffService.changeMemberRole(userId, shopId, memberId, request);
     }
 
+    @PatchMapping("/members/{memberId}/status")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(
+        operationId = "updateMemberStatus",
+        summary = "Kích hoạt hoặc vô hiệu hóa nhân viên",
+        description = "Chủ shop đổi trạng thái hoạt động của nhân viên. Nhân viên bị vô hiệu hóa mất quyền "
+            + "truy cập shop ngay ở request kế tiếp, không cần đăng xuất."
+    )
+    @ApiResponse(responseCode = "204", description = "Cập nhật trạng thái thành công")
+    @ApiResponse(responseCode = "400", description = "Trạng thái không hợp lệ")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Chỉ chủ shop mới được đổi trạng thái nhân viên")
+    @ApiResponse(responseCode = "404", description = "Không tìm thấy thành viên")
+    @ApiResponse(responseCode = "409", description = "Không thể đổi trạng thái chủ shop (OWNER)")
+    @SecurityRequirement(name = "bearerAuth")
+    public void updateMemberStatus(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @PathVariable UUID shopId,
+        @Parameter(description = "Id thành viên") @PathVariable UUID memberId,
+        @Valid @RequestBody UpdateMemberStatusRequest request
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        staffService.updateMemberStatus(userId, shopId, memberId, request.status());
+    }
+
     @DeleteMapping("/members/{memberId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Xóa nhân viên khỏi shop", description = "Chủ shop thu hồi quyền và xóa nhân viên ra khỏi danh sách quản lý shop.")
-    @ApiResponse(responseCode = "204", description = "Đã xóa nhân viên")
+    @Operation(
+        summary = "Vô hiệu hóa nhân viên khỏi shop",
+        description = "Chủ shop vô hiệu hóa nhân viên: nhân viên mất quyền truy cập shop ngay lập tức "
+            + "nhưng vẫn còn trong danh sách thành viên để có thể kích hoạt lại."
+    )
+    @ApiResponse(responseCode = "204", description = "Đã vô hiệu hóa nhân viên")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Chỉ chủ shop mới được xóa nhân viên")
+    @ApiResponse(responseCode = "403", description = "Chỉ chủ shop mới được vô hiệu hóa nhân viên")
     @ApiResponse(responseCode = "404", description = "Không tìm thấy thành viên")
-    @ApiResponse(responseCode = "409", description = "Không thể xóa chủ shop (OWNER)")
+    @ApiResponse(responseCode = "409", description = "Không thể vô hiệu hóa chủ shop (OWNER)")
     @SecurityRequirement(name = "bearerAuth")
     public void removeMember(
         @AuthenticationPrincipal Jwt jwt,

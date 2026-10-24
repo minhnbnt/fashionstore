@@ -7,6 +7,8 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -80,54 +82,26 @@ public class ShopMemberRepository {
         return jdbc.sql("SELECT * FROM shop_member WHERE shop_id = :shop AND user_id = :user")
             .param("shop", shopId)
             .param("user", userId)
-            .query((rs, rowNum) -> {
-                var invitedTs = rs.getTimestamp("invited_at");
-                Instant invitedAt = null;
-                if (invitedTs != null) {
-                    invitedAt = invitedTs.toInstant();
-                }
-                var statusStr = rs.getString("status");
-                if (statusStr == null) {
-                    statusStr = "ACTIVE";
-                }
-                return new ShopMember(
-                    (UUID) rs.getObject("shop_id"),
-                    (UUID) rs.getObject("user_id"),
-                    MemberRole.valueOf(rs.getString("role")),
-                    (UUID) rs.getObject("role_id"),
-                    (UUID) rs.getObject("invited_by"),
-                    invitedAt,
-                    statusStr,
-                    rs.getTimestamp("joined_at").toInstant()
-                );
-            })
+            .query((rs, rowNum) -> toMember(rs))
             .optional();
     }
 
-    public List<ShopMember> findMembersByShop(UUID shopId) {
-        return jdbc.sql("SELECT * FROM shop_member WHERE shop_id = :shop ORDER BY joined_at ASC")
+    public record ShopMemberView(ShopMember member, String email, String displayName) {
+    }
+
+    public List<ShopMemberView> findMemberViews(UUID shopId) {
+        return jdbc.sql("""
+            SELECT m.*, p.email, p.display_name
+            FROM shop_member m
+            JOIN user_profile p ON p.id = m.user_id
+            WHERE m.shop_id = :shop
+            ORDER BY m.joined_at ASC
+            """)
             .param("shop", shopId)
-            .query((rs, rowNum) -> {
-                var invitedTs = rs.getTimestamp("invited_at");
-                Instant invitedAt = null;
-                if (invitedTs != null) {
-                    invitedAt = invitedTs.toInstant();
-                }
-                var statusStr = rs.getString("status");
-                if (statusStr == null) {
-                    statusStr = "ACTIVE";
-                }
-                return new ShopMember(
-                    (UUID) rs.getObject("shop_id"),
-                    (UUID) rs.getObject("user_id"),
-                    MemberRole.valueOf(rs.getString("role")),
-                    (UUID) rs.getObject("role_id"),
-                    (UUID) rs.getObject("invited_by"),
-                    invitedAt,
-                    statusStr,
-                    rs.getTimestamp("joined_at").toInstant()
-                );
-            })
+            .query((rs, rowNum) -> new ShopMemberView(
+                toMember(rs),
+                rs.getString("email"),
+                rs.getString("display_name")))
             .list();
     }
 
@@ -162,10 +136,25 @@ public class ShopMemberRepository {
             .update();
     }
 
-    public void remove(UUID shopId, UUID userId) {
-        jdbc.sql("DELETE FROM shop_member WHERE shop_id = :shop AND user_id = :user")
-            .param("shop", shopId)
-            .param("user", userId)
-            .update();
+    private static ShopMember toMember(ResultSet rs) throws SQLException {
+        var invitedTs = rs.getTimestamp("invited_at");
+        Instant invitedAt = null;
+        if (invitedTs != null) {
+            invitedAt = invitedTs.toInstant();
+        }
+        var statusStr = rs.getString("status");
+        if (statusStr == null) {
+            statusStr = "ACTIVE";
+        }
+        return new ShopMember(
+            (UUID) rs.getObject("shop_id"),
+            (UUID) rs.getObject("user_id"),
+            MemberRole.valueOf(rs.getString("role")),
+            (UUID) rs.getObject("role_id"),
+            (UUID) rs.getObject("invited_by"),
+            invitedAt,
+            statusStr,
+            rs.getTimestamp("joined_at").toInstant()
+        );
     }
 }

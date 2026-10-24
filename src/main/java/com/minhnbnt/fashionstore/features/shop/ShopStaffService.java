@@ -144,10 +144,11 @@ public class ShopStaffService {
     public List<ShopMemberDetailResponse> listMembers(@NonNull UUID userId, @NonNull UUID shopId) {
         access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
 
-        var memberList = members.findMembersByShop(shopId);
+        var memberViews = members.findMemberViews(shopId);
         var result = new ArrayList<ShopMemberDetailResponse>();
 
-        for (var m : memberList) {
+        for (var view : memberViews) {
+            var m = view.member();
             String roleName = m.getRole().name();
             if (m.getRoleId() != null) {
                 var r = roles.findById(m.getRoleId()).orElse(null);
@@ -158,6 +159,8 @@ public class ShopStaffService {
             result.add(new ShopMemberDetailResponse(
                 m.getShopId(),
                 m.getUserId(),
+                view.email(),
+                view.displayName(),
                 m.getRole().name(),
                 m.getRoleId(),
                 roleName,
@@ -393,30 +396,49 @@ public class ShopStaffService {
     }
 
     @Transactional
-    public void removeMember(
+    public void updateMemberStatus(
         @NonNull UUID userId,
         @NonNull UUID shopId,
-        @NonNull UUID targetMemberId
+        @NonNull UUID targetMemberId,
+        @NonNull String status
     ) {
         access.requireShopRole(userId, shopId, MemberRole.OWNER);
+
+        if (!"ACTIVE".equals(status) && !"DEACTIVATED".equals(status)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid member status");
+        }
 
         var target = members.findMember(shopId, targetMemberId).orElse(null);
         if (target == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found");
         }
         if (target.getRole() == MemberRole.OWNER) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot remove OWNER from shop");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot change status of OWNER");
         }
 
-        members.remove(shopId, targetMemberId);
+        members.updateStatus(shopId, targetMemberId, status);
+
+        var action = "DEACTIVATE_MEMBER";
+        if ("ACTIVE".equals(status)) {
+            action = "ACTIVATE_MEMBER";
+        }
         audits.save(ShopMemberAudit.record(
             shopId,
             userId,
-            "REMOVE_MEMBER",
+            action,
             "MEMBER",
             targetMemberId,
-            null
+            "Status: " + status
         ));
+    }
+
+    @Transactional
+    public void removeMember(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        @NonNull UUID targetMemberId
+    ) {
+        updateMemberStatus(userId, shopId, targetMemberId, "DEACTIVATED");
     }
 
     @Transactional(readOnly = true)

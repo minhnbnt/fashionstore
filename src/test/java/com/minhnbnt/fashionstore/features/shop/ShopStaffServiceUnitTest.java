@@ -8,12 +8,14 @@ import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.ShopInvitation;
 import com.minhnbnt.fashionstore.model.ShopMember;
+import com.minhnbnt.fashionstore.model.ShopMemberAudit;
 import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.model.ShopRole;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -554,6 +556,77 @@ class ShopStaffServiceUnitTest {
         verify(invitations, never()).save(any());
         verify(audits, never()).save(any());
         verify(notifications, never()).deleteByRefId(any());
+    }
+
+    @Test
+    void deactivateMemberSetsStatus() {
+        var ownerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var memberId = UUID.randomUUID();
+        var target = ShopMember.staff(shopId, memberId, null, ownerId);
+
+        when(members.findMember(shopId, memberId)).thenReturn(Optional.of(target));
+
+        staffService.removeMember(ownerId, shopId, memberId);
+
+        verify(members).updateStatus(shopId, memberId, "DEACTIVATED");
+        var captor = ArgumentCaptor.forClass(ShopMemberAudit.class);
+        verify(audits).save(captor.capture());
+        assertThat(captor.getValue().getAction()).isEqualTo("DEACTIVATE_MEMBER");
+    }
+
+    @Test
+    void activateMemberSetsStatus() {
+        var ownerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var memberId = UUID.randomUUID();
+        var target = ShopMember.staff(shopId, memberId, null, ownerId);
+
+        when(members.findMember(shopId, memberId)).thenReturn(Optional.of(target));
+
+        staffService.updateMemberStatus(ownerId, shopId, memberId, "ACTIVE");
+
+        verify(access).requireShopRole(ownerId, shopId, MemberRole.OWNER);
+        verify(members).updateStatus(shopId, memberId, "ACTIVE");
+        var captor = ArgumentCaptor.forClass(ShopMemberAudit.class);
+        verify(audits).save(captor.capture());
+        assertThat(captor.getValue().getAction()).isEqualTo("ACTIVATE_MEMBER");
+    }
+
+    @Test
+    void cannotDeactivateOwner() {
+        var ownerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var memberId = UUID.randomUUID();
+        var target = ShopMember.owner(shopId, memberId);
+
+        when(members.findMember(shopId, memberId)).thenReturn(Optional.of(target));
+
+        assertThatThrownBy(() -> staffService.updateMemberStatus(ownerId, shopId, memberId, "DEACTIVATED"))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus(
+                (ResponseStatusException) e,
+                HttpStatus.CONFLICT,
+                "Cannot change status of OWNER"
+            ));
+        verify(members, never()).updateStatus(any(), any(), any());
+        verify(audits, never()).save(any());
+    }
+
+    @Test
+    void updateMemberStatusRejectsUnknownStatus() {
+        var ownerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var memberId = UUID.randomUUID();
+
+        assertThatThrownBy(() -> staffService.updateMemberStatus(ownerId, shopId, memberId, "BANNED"))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus(
+                (ResponseStatusException) e,
+                HttpStatus.BAD_REQUEST,
+                "Invalid member status"
+            ));
+        verify(members, never()).updateStatus(any(), any(), any());
     }
 
     private static ShopInvitation expiredInvitation(UUID shopId, UUID roleId, UUID ownerId) {
