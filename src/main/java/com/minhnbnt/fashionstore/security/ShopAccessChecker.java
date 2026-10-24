@@ -62,10 +62,7 @@ public class ShopAccessChecker {
 
         var granted = EnumSet.noneOf(ShopPermission.class);
         for (var raw : memberAccess.permissions()) {
-            var permission = ShopPermission.parse(raw);
-            if (permission != null) {
-                granted.add(permission);
-            }
+            ShopPermission.parse(raw).ifPresent(granted::add);
         }
 
         return granted;

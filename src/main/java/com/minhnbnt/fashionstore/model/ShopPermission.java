@@ -1,6 +1,6 @@
 package com.minhnbnt.fashionstore.model;
 
-import org.jspecify.annotations.Nullable;
+import java.util.Optional;
 
 public enum ShopPermission {
     PRODUCT_READ,
@@ -18,13 +18,14 @@ public enum ShopPermission {
     CHAT_ACCESS,
     DECORATION_WRITE;
 
-    public static @Nullable ShopPermission parse(String raw) {
+    public static Optional<ShopPermission> parse(String raw) {
         for (var permission : values()) {
             if (permission.name().equals(raw)) {
-                return permission;
+                return Optional.of(permission);
             }
         }
 
-        return null;
+        return Optional.empty();
     }
 }
+
