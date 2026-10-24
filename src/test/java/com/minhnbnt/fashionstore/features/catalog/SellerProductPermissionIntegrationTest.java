@@ -22,6 +22,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -67,14 +68,10 @@ class SellerProductPermissionIntegrationTest {
         return shop.id();
     }
 
-    private UUID productReadOnlyStaff(UUID ownerId, UUID shopId) {
+    private UUID staffWithPermissions(UUID ownerId, UUID shopId, ShopPermission... permissions) {
         var staffId = mirroredUser();
-        var role = ShopRole.create(
-            shopId,
-            "Product Reader " + UUID.randomUUID(),
-            new String[]{ShopPermission.PRODUCT_READ.name()},
-            false
-        );
+        var granted = Arrays.stream(permissions).map(Enum::name).toArray(String[]::new);
+        var role = ShopRole.create(shopId, "Staff " + UUID.randomUUID(), granted, false);
         roles.save(role);
         members.add(ShopMember.staff(shopId, staffId, role.getId(), ownerId));
 
@@ -100,26 +97,56 @@ class SellerProductPermissionIntegrationTest {
         );
     }
 
-    private static void assertForbidden(ResponseStatusException e) {
+    private static void assertPermissionDenied(ResponseStatusException e) {
         assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(e.getReason()).isEqualTo("Insufficient shop permission");
     }
 
     @Test
     void staffWithReadCannotCreateProduct() {
         var ownerId = mirroredUser();
         var shopId = approvedShop(ownerId, "perm-create-" + UUID.randomUUID());
-        var staffId = productReadOnlyStaff(ownerId, shopId);
+        var staffId = staffWithPermissions(ownerId, shopId, ShopPermission.PRODUCT_READ);
 
         assertThatThrownBy(() -> catalog.createProduct(staffId, shopId, productRequest("perm-create-denied")))
             .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertForbidden((ResponseStatusException) e));
+            .satisfies(e -> assertPermissionDenied((ResponseStatusException) e));
+
+        assertThatThrownBy(() -> catalog.listInventory(staffId, shopId, false))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertPermissionDenied((ResponseStatusException) e));
+    }
+
+    @Test
+    void staffWithoutProductReadCannotListProducts() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "perm-no-read-" + UUID.randomUUID());
+        var staffId = staffWithPermissions(ownerId, shopId, ShopPermission.INVENTORY_READ);
+        catalog.createProduct(ownerId, shopId, productRequest("perm-no-read"));
+
+        assertThatThrownBy(() -> catalog.listSellerProducts(
+            staffId, shopId, "ALL", null, "ALL", 0L, 0L, "", "createdAt", "desc", 0, 10
+        ))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertPermissionDenied((ResponseStatusException) e));
+    }
+
+    @Test
+    void staffWithProductWriteCanCreateProduct() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "perm-write-" + UUID.randomUUID());
+        var staffId = staffWithPermissions(ownerId, shopId, ShopPermission.PRODUCT_WRITE);
+
+        var created = catalog.createProduct(staffId, shopId, productRequest("perm-write"));
+
+        assertThat(created.slug()).isEqualTo("perm-write");
     }
 
     @Test
     void staffWithReadCanListProducts() {
         var ownerId = mirroredUser();
         var shopId = approvedShop(ownerId, "perm-list-" + UUID.randomUUID());
-        var staffId = productReadOnlyStaff(ownerId, shopId);
+        var staffId = staffWithPermissions(ownerId, shopId, ShopPermission.PRODUCT_READ);
         catalog.createProduct(ownerId, shopId, productRequest("perm-list"));
 
         var listed = catalog.listSellerProducts(staffId, shopId, null, null, 0, 10);
@@ -131,7 +158,7 @@ class SellerProductPermissionIntegrationTest {
     void staffWithoutInventoryWriteCannotAdjustStock() {
         var ownerId = mirroredUser();
         var shopId = approvedShop(ownerId, "perm-stock-" + UUID.randomUUID());
-        var staffId = productReadOnlyStaff(ownerId, shopId);
+        var staffId = staffWithPermissions(ownerId, shopId, ShopPermission.PRODUCT_READ);
         var created = catalog.createProduct(ownerId, shopId, productRequest("perm-stock"));
         var variantId = created.variants().getFirst().id();
 
@@ -142,7 +169,7 @@ class SellerProductPermissionIntegrationTest {
             new AdjustStockRequest(5, "RESTOCK")
         ))
             .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertForbidden((ResponseStatusException) e));
+            .satisfies(e -> assertPermissionDenied((ResponseStatusException) e));
     }
 
     @Test
