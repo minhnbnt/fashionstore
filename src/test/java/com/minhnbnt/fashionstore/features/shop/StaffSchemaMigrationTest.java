@@ -57,7 +57,8 @@ class StaffSchemaMigrationTest {
     }
 
     @Test
-    void managerRoleHasAllPermissions() {
+    void seededManagerRoleHasAllPermissions() {
+        // V28's UPDATE shop_role is a no-op on an empty DB; the same list is asserted here via initDefaultRoles.
         var ownerId = owner();
         var shop = shops.register(ownerId, ShopTestFixtures.createRequest(
             "Schema Shop",

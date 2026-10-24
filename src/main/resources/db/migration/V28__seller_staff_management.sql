@@ -5,6 +5,22 @@
 ALTER TABLE shop_invitation ADD COLUMN invitee_id UUID REFERENCES user_profile(id) ON DELETE CASCADE;
 ALTER TABLE shop_invitation ADD COLUMN revoked_at TIMESTAMPTZ;
 
+-- Dữ liệu cũ có thể có nhiều lời mời pending trùng email/shop (inviteStaff chưa chặn trùng):
+-- thu hồi tất cả trừ bản mới nhất để unique index bên dưới tạo được.
+UPDATE shop_invitation i
+SET revoked_at = now()
+WHERE i.accepted_at IS NULL
+  AND i.revoked_at IS NULL
+  AND EXISTS (
+      SELECT 1
+      FROM shop_invitation j
+      WHERE j.shop_id = i.shop_id
+        AND lower(j.email) = lower(i.email)
+        AND j.accepted_at IS NULL
+        AND j.revoked_at IS NULL
+        AND (j.created_at, j.id) > (i.created_at, i.id)
+  );
+
 CREATE UNIQUE INDEX uq_shop_invitation_pending
     ON shop_invitation (shop_id, lower(email))
     WHERE accepted_at IS NULL AND revoked_at IS NULL;
