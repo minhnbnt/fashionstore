@@ -64,13 +64,13 @@ File: `com.minhnbnt.fashionstore.dto.shop.SellerShopMembershipResponse`
 @Schema(description = "Thông tin gian hàng và vai trò thành viên của người dùng hiện tại")
 public record SellerShopMembershipResponse(
     @Schema(description = "Id gian hàng", example = "e3a6a4f4-aca9-4612-88f7-097896db6aef")
-    @NonNull UUID shopId,
+    UUID shopId,
 
     @Schema(description = "Tên gian hàng", example = "Nét Boutique")
-    @NonNull String shopName,
+    String shopName,
 
     @Schema(description = "Slug gian hàng", example = "net-boutique")
-    @NonNull String shopSlug,
+    String shopSlug,
 
     @Schema(description = "S3 key logo gian hàng")
     @Nullable String logoKey,
@@ -79,25 +79,25 @@ public record SellerShopMembershipResponse(
     @Nullable String bannerKey,
 
     @Schema(description = "Trạng thái phê duyệt gian hàng", example = "APPROVED")
-    @NonNull ShopStatus shopStatus,
+    ShopStatus shopStatus,
 
     @Schema(description = "Vai trò trong shop: OWNER hoặc STAFF", example = "STAFF")
-    @NonNull MemberRole role,
+    MemberRole role,
 
     @Schema(description = "Id vai trò tùy chỉnh (nếu là STAFF)")
     @Nullable UUID roleId,
 
     @Schema(description = "Tên vai trò hiển thị", example = "Kho vận (Warehouse)")
-    @NonNull String roleName,
+    String roleName,
 
     @Schema(description = "Trạng thái thành viên: ACTIVE hoặc DEACTIVATED", example = "ACTIVE")
-    @NonNull String memberStatus,
+    String memberStatus,
 
     @Schema(description = "Thời điểm gia nhập shop")
-    @NonNull Instant joinedAt,
+    Instant joinedAt,
 
     @Schema(description = "Danh sách quyền thao tác trong shop")
-    @NonNull List<String> permissions
+    List<String> permissions
 ) {}
 ```
 
