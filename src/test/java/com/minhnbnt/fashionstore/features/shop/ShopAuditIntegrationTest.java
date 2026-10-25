@@ -4,6 +4,7 @@ import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ImageItemRequest;
+import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.dto.order.CreateWithdrawalRequest;
 import com.minhnbnt.fashionstore.dto.shop.ChangeMemberRoleRequest;
@@ -137,6 +138,47 @@ class ShopAuditIntegrationTest {
         assertThat(row.actorEmail()).isEqualTo(users.getById(ownerId).email());
         assertThat(row.targetType()).isEqualTo("PRODUCT");
         assertThat(row.targetId()).isEqualTo(product.id());
+        assertThat(row.detail())
+            .contains("Tạo sản phẩm:")
+            .contains("Áo Thun audit-product")
+            .contains("phân loại");
+    }
+
+    @Test
+    void productUpdateAndStatusAreRecordedWithDetails() {
+        var ownerId = user("owner", "Audit Owner");
+        var shopId = approvedShop(ownerId, "audit-prod-upd");
+        var product = catalog.createProduct(ownerId, shopId, productRequest("audit-prod-upd"));
+
+        catalog.updateProduct(ownerId, shopId, product.id(), new UpdateProductRequest(
+            "Áo Thun Cập Nhật",
+            "Mô tả mới",
+            null,
+            null,
+            null,
+            null,
+            null, null, null, null, null, null, null, null, null, null, null
+        ));
+
+        catalog.toggleProductStatus(ownerId, shopId, product.id());
+
+        var page = staff.listAuditLogs(ownerId, shopId, null, 0, 50);
+
+        var updateRow = page.items().stream()
+            .filter(item -> "PRODUCT_UPDATE".equals(item.action()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(updateRow.detail())
+            .contains("Cập nhật sản phẩm:")
+            .contains("Đổi tên:");
+
+        var statusRow = page.items().stream()
+            .filter(item -> "PRODUCT_STATUS".equals(item.action()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(statusRow.detail())
+            .contains("Đổi trạng thái sản phẩm")
+            .contains("[ACTIVE] -> [HIDDEN]");
     }
 
     @Test

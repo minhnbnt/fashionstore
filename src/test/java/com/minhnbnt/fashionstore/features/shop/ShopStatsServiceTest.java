@@ -162,4 +162,14 @@ class ShopStatsServiceTest {
         assertThat(bytes).isEqualTo(expectedBytes);
         verify(access).requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
     }
+
+    @Test
+    void exportRevenueReportThrowsNotFoundWhenShopDoesNotExist() {
+        when(shopRepository.findById(shopId)).thenReturn(java.util.Optional.empty());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            service.exportRevenueReport(userId, shopId, "xlsx", null, null)
+        ).isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+         .hasMessageContaining("Shop not found");
+    }
 }

@@ -383,6 +383,7 @@ public class SellerStatsController {
     @ApiResponse(responseCode = "400", description = "Tham số không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
+    @ApiResponse(responseCode = "404", description = "Không tìm thấy gian hàng")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<byte[]> exportRevenue(
         @AuthenticationPrincipal Jwt jwt,

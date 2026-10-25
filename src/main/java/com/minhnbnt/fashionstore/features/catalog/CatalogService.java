@@ -272,7 +272,31 @@ public class CatalogService {
 
         keywordScanner.scan(product.getId(), product.getName(), product.getDescription());
 
-        audit.record(product.getShopId(), userId, "PRODUCT_CREATE", "PRODUCT", product.getId(), product.getName());
+        var totalStock = 0;
+        var minPrice = Long.MAX_VALUE;
+        for (var reqVar : request.variants()) {
+            totalStock = totalStock + reqVar.stockQuantity();
+            if (reqVar.price() < minPrice) {
+                minPrice = reqVar.price();
+            }
+        }
+        if (minPrice == Long.MAX_VALUE) {
+            minPrice = 0L;
+        }
+
+        var catName = "Không phân loại";
+        if (request.categoryId() != null) {
+            var cat = categories.findById(request.categoryId()).orElse(null);
+            if (cat != null) {
+                catName = cat.getName();
+            }
+        }
+
+        var createDetail = "Tạo sản phẩm: \"" + product.getName() + "\" | Danh mục: " + catName
+            + " | Giá từ: " + minPrice + "₫ | Tồn kho ban đầu: " + totalStock
+            + " (" + request.variants().size() + " phân loại)";
+
+        audit.record(product.getShopId(), userId, "PRODUCT_CREATE", "PRODUCT", product.getId(), createDetail);
 
         return toResponse(product);
     }
@@ -404,7 +428,8 @@ public class CatalogService {
             toJson(newValues)
         ));
 
-        audit.record(saved.getShopId(), userId, "PRODUCT_UPDATE", "PRODUCT", saved.getId(), saved.getName());
+        var updateDetail = "Cập nhật sản phẩm: \"" + saved.getName() + "\" | Thay đổi: " + summary;
+        audit.record(saved.getShopId(), userId, "PRODUCT_UPDATE", "PRODUCT", saved.getId(), updateDetail);
 
         return toResponse(saved);
     }
@@ -838,7 +863,8 @@ public class CatalogService {
             toJson(Map.of("status", newStatus))
         ));
 
-        audit.record(product.getShopId(), userId, "PRODUCT_STATUS", "PRODUCT", productId, product.getName());
+        var statusDetail = "Đổi trạng thái sản phẩm \"" + product.getName() + "\": [" + oldStatus + "] -> [" + newStatus + "]";
+        audit.record(product.getShopId(), userId, "PRODUCT_STATUS", "PRODUCT", productId, statusDetail);
 
         return toResponse(saved);
     }
@@ -990,7 +1016,8 @@ public class CatalogService {
         }
         variants.saveAll(variantList);
 
-        audit.record(product.getShopId(), userId, "PRODUCT_DELETE", "PRODUCT", productId, product.getName());
+        var deleteDetail = "Xóa sản phẩm: \"" + product.getName() + "\" (Mã ID: " + productId + ")";
+        audit.record(product.getShopId(), userId, "PRODUCT_DELETE", "PRODUCT", productId, deleteDetail);
     }
 
     @Transactional
@@ -1011,7 +1038,8 @@ public class CatalogService {
         }
         images.delete(image);
 
-        audit.record(product.getShopId(), userId, "PRODUCT_IMAGE_DELETE", "PRODUCT", productId, product.getName());
+        var imageDetail = "Xóa ảnh của sản phẩm: \"" + product.getName() + "\" (Thứ tự: " + image.getSortOrder() + ")";
+        audit.record(product.getShopId(), userId, "PRODUCT_IMAGE_DELETE", "PRODUCT", productId, imageDetail);
     }
 
     @Transactional(readOnly = true)
@@ -1224,13 +1252,14 @@ public class CatalogService {
                 "{\"status\":\"" + oldStatus + "\"}",
                 "{\"status\":\"" + targetStatus.name() + "\"}"
             ));
+            var bulkStatusDetail = "Đổi trạng thái sản phẩm \"" + product.getName() + "\": [" + oldStatus + "] -> [" + targetStatus.name() + "] (Hàng loạt)";
             audit.record(
                 product.getShopId(),
                 userId,
                 "PRODUCT_STATUS_BULK",
                 "PRODUCT",
                 product.getId(),
-                product.getName()
+                bulkStatusDetail
             );
             successCount++;
         }
@@ -1285,13 +1314,14 @@ public class CatalogService {
                 null,
                 null
             ));
+            var bulkDeleteDetail = "Xóa sản phẩm: \"" + product.getName() + "\" (Xóa hàng loạt)";
             audit.record(
                 product.getShopId(),
                 userId,
                 "PRODUCT_DELETE_BULK",
                 "PRODUCT",
                 productId,
-                product.getName()
+                bulkDeleteDetail
             );
             successCount++;
         }
@@ -1362,13 +1392,14 @@ public class CatalogService {
                 null,
                 null
             ));
+            var bulkPriceDetail = "Cập nhật giá sản phẩm \"" + product.getName() + "\": " + summary;
             audit.record(
                 product.getShopId(),
                 userId,
                 "PRODUCT_PRICE_BULK",
                 "PRODUCT",
                 productId,
-                product.getName()
+                bulkPriceDetail
             );
             successCount++;
         }
@@ -1435,13 +1466,14 @@ public class CatalogService {
                 null,
                 null
             ));
+            var bulkStockDetail = "Cập nhật tồn kho sản phẩm \"" + product.getName() + "\": " + summary;
             audit.record(
                 product.getShopId(),
                 userId,
                 "INVENTORY_ADJUST_BULK",
                 "PRODUCT",
                 productId,
-                product.getName()
+                bulkStockDetail
             );
             successCount++;
         }
@@ -1518,13 +1550,21 @@ public class CatalogService {
         }
         var isLow = variant.getStockQuantity() <= variant.getLowStockThreshold();
 
+        var deltaStr = String.valueOf(delta);
+        if (delta > 0) {
+            deltaStr = "+" + delta;
+        }
+        var adjustDetail = "Điều chỉnh tồn kho sản phẩm \"" + prodName + "\" (Size: " + variant.getSize()
+            + ", Màu: " + variant.getColor() + ", SKU: " + variant.getSku() + "): "
+            + oldStock + " -> " + request.newStock() + " (" + deltaStr + "). Lý do: " + reason;
+
         audit.record(
             variant.getShopId(),
             userId,
             "INVENTORY_ADJUST",
             "PRODUCT",
             variant.getProductId(),
-            prodName
+            adjustDetail
         );
 
         return new InventoryItemResponse(
@@ -1623,7 +1663,7 @@ public class CatalogService {
                 "PRODUCT_IMPORT",
                 "PRODUCT",
                 null,
-                "Imported " + success + " products"
+                "Nhập khẩu thành công " + success + " sản phẩm từ file CSV"
             );
         }
 
