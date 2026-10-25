@@ -6,6 +6,7 @@ import com.minhnbnt.fashionstore.dto.shop.CreateShopRoleRequest;
 import com.minhnbnt.fashionstore.dto.shop.InvitationDetailResponse;
 import com.minhnbnt.fashionstore.dto.shop.InviteStaffRequest;
 import com.minhnbnt.fashionstore.dto.shop.MyPermissionsResponse;
+import com.minhnbnt.fashionstore.dto.shop.SellerShopMembershipResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopMemberDetailResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopRoleResponse;
 import com.minhnbnt.fashionstore.dto.shop.StaffInvitationResponse;
@@ -601,5 +602,42 @@ public class ShopStaffService {
             inv.getAcceptedAt(),
             inv.getCreatedAt()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<SellerShopMembershipResponse> getMyMemberships(@NonNull UUID userId) {
+        var rows = members.findMembershipsByUser(userId);
+        var result = new ArrayList<SellerShopMembershipResponse>();
+
+        for (var r : rows) {
+            List<String> perms;
+            if (r.role() == MemberRole.OWNER) {
+                perms = Arrays.stream(ShopPermission.values()).map(Enum::name).toList();
+            } else {
+                perms = List.of(r.permissions());
+            }
+
+            var roleName = r.roleName();
+            if (roleName == null) {
+                roleName = "Nhân viên";
+            }
+
+            result.add(new SellerShopMembershipResponse(
+                r.shopId(),
+                r.shopName(),
+                r.shopSlug(),
+                r.logoKey(),
+                r.bannerKey(),
+                r.shopStatus(),
+                r.role(),
+                r.roleId(),
+                roleName,
+                r.memberStatus(),
+                r.joinedAt(),
+                perms
+            ));
+        }
+
+        return result;
     }
 }
