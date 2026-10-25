@@ -29,6 +29,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.StreamSupport;
@@ -291,6 +292,39 @@ public class ShopService {
             return false;
         }
         return shop.getStatus() == ShopStatus.APPROVED;
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Shop> findEntityById(@NonNull UUID id) {
+        return shops.findById(id);
+    }
+
+    @Transactional(readOnly = true)
+    public Shop requireShop(@NonNull UUID id) {
+        var shop = shops.findById(id).orElse(null);
+        if (shop == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found");
+        }
+        return shop;
+    }
+
+    @Transactional(readOnly = true)
+    public String getShopName(@NonNull UUID id) {
+        var shop = shops.findById(id).orElse(null);
+        if (shop == null) {
+            return "Cửa hàng";
+        }
+        return shop.getName();
+    }
+
+    @Transactional(readOnly = true)
+    public List<UUID> findShopIdsByUser(@NonNull UUID userId) {
+        return members.findShopIdsByUser(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UUID> findActiveUserIdsByShop(@NonNull UUID shopId) {
+        return members.findActiveUserIdsByShop(shopId);
     }
 
     /**

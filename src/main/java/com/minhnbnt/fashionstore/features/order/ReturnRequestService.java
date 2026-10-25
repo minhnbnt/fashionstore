@@ -7,7 +7,7 @@ import com.minhnbnt.fashionstore.dto.order.ReturnRequestResponse;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.ReturnRequestRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
-import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.OrderStatus;
 import com.minhnbnt.fashionstore.model.ReturnRequest;
 import com.minhnbnt.fashionstore.model.ReturnStatus;
@@ -35,7 +35,7 @@ public class ReturnRequestService {
 
     private final OrderRepository orders;
 
-    private final ShopMemberRepository members;
+    private final ShopService shops;
 
     private final ShopAccessChecker access;
 
@@ -214,7 +214,7 @@ public class ReturnRequestService {
      */
     private List<UUID> returnProcessShopIds(UUID userId) {
         var result = new ArrayList<UUID>();
-        for (var shopId : members.findShopIdsByUser(userId)) {
+        for (var shopId : shops.findShopIdsByUser(userId)) {
             if (access.permissionsOf(userId, shopId).contains(ShopPermission.RETURN_PROCESS)) {
                 result.add(shopId);
             }

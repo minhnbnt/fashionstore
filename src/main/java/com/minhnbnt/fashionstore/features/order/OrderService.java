@@ -11,15 +11,13 @@ import com.minhnbnt.fashionstore.dto.order.CancelOrderRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderItemResponse;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
-import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
-import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepository;
-import com.minhnbnt.fashionstore.features.catalog.repository.StockMovementRepository;import com.minhnbnt.fashionstore.features.order.repository.OrderAdminQueryRepository;
+import com.minhnbnt.fashionstore.features.catalog.CatalogService;
+import com.minhnbnt.fashionstore.features.order.repository.OrderAdminQueryRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderMonitoringQueryRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderStatusHistoryRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
-import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.AdminCancelReason;
 import com.minhnbnt.fashionstore.model.Order;
@@ -28,11 +26,11 @@ import com.minhnbnt.fashionstore.model.OrderStatus;
 import com.minhnbnt.fashionstore.model.OrderStatusHistory;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.model.ShopPermission;
-import com.minhnbnt.fashionstore.model.StockMovement;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,15 +56,10 @@ public class OrderService {
 
     private final OrderStatusHistoryRepository histories;
 
-    private final ProductRepository products;
-
-    private final ProductVariantRepository variants;
-
-    private final StockMovementRepository movements;
+    @Lazy
+    private final CatalogService catalog;
 
     private final ShopService shops;
-
-    private final ShopMemberRepository members;
 
     private final RevenueService revenue;
 
@@ -94,7 +87,10 @@ public class OrderService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order must have at least one item");
         }
 
-        var shippingFee = request.shippingFee() == null ? 0L : request.shippingFee();
+        var shippingFee = 0L;
+        if (request.shippingFee() != null) {
+            shippingFee = request.shippingFee();
+        }
         if (shippingFee < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Shipping fee must not be negative");
         }
@@ -103,7 +99,7 @@ public class OrderService {
         var subtotal = 0L;
 
         for (var item : request.items()) {
-            var variant = variants.findById(item.variantId()).orElse(null);
+            var variant = catalog.findVariantById(item.variantId()).orElse(null);
             if (variant == null) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found");
             }
@@ -111,7 +107,7 @@ public class OrderService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "All items must belong to one shop");
             }
 
-            var product = products.findById(variant.getProductId()).orElse(null);
+            var product = catalog.findProductById(variant.getProductId()).orElse(null);
             if (product == null) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
             }
@@ -400,7 +396,7 @@ public class OrderService {
             if (item.getVariantId() == null) {
                 continue;
             }
-            if (!variants.decrementStock(item.getVariantId(), item.getQuantity())) {
+            if (!catalog.decrementVariantStock(item.getVariantId(), item.getQuantity())) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Insufficient stock");
             }
         }
@@ -460,12 +456,30 @@ public class OrderService {
         return items.countSoldQuantityByProductId(productId);
     }
 
+    @Transactional(readOnly = true)
+    public boolean hasDeliveredAndReceivedProduct(@NonNull UUID buyerId, @NonNull UUID productId) {
+        for (var order : orders.findByBuyerIdOrderByCreatedAtDesc(buyerId)) {
+            if (order.getStatus() != OrderStatus.DELIVERED) {
+                continue;
+            }
+            if (order.getReceivedAt() == null) {
+                continue;
+            }
+            for (var item : items.findByOrderId(order.getId())) {
+                if (productId.equals(item.getProductId())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     /**
      * Danh sách shop mà user được xem đơn: chỉ shop đã cấp ORDER_READ.
      */
     private List<UUID> orderReadableShopIds(UUID userId) {
         var result = new ArrayList<UUID>();
-        for (var shopId : members.findShopIdsByUser(userId)) {
+        for (var shopId : shops.findShopIdsByUser(userId)) {
             if (access.permissionsOf(userId, shopId).contains(ShopPermission.ORDER_READ)) {
                 result.add(shopId);
             }
@@ -527,14 +541,14 @@ public class OrderService {
             if (item.getVariantId() == null) {
                 continue;
             }
-            variants.incrementStock(item.getVariantId(), item.getQuantity());
-            movements.save(StockMovement.record(
+            catalog.incrementVariantStock(item.getVariantId(), item.getQuantity());
+            catalog.recordStockMovement(
                 item.getVariantId(),
                 order.getShopId(),
                 item.getQuantity(),
                 "ORDER_CANCEL",
                 order.getId()
-            ));
+            );
         }
     }
 

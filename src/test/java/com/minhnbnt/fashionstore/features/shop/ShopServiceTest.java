@@ -323,5 +323,30 @@ class ShopServiceTest {
         assertThat(page.items().get(0).taxCode()).isNull();
         assertThat(page.items().get(0).businessCertKey()).isNull();
     }
+
+    @Test
+    void helperMethodsReturnCorrectData() {
+        var ownerId = mirroredUser();
+        var created = shops.register(
+            ownerId,
+            ShopTestFixtures.createRequest("Shop Helper", "shop-helper-1", "Mo ta")
+        );
+
+        var entity = shops.findEntityById(created.id());
+        assertThat(entity).isPresent();
+        assertThat(entity.get().getName()).isEqualTo("Shop Helper");
+
+        var required = shops.requireShop(created.id());
+        assertThat(required.getName()).isEqualTo("Shop Helper");
+
+        assertThat(shops.getShopName(created.id())).isEqualTo("Shop Helper");
+        assertThat(shops.getShopName(UUID.randomUUID())).isEqualTo("Cửa hàng");
+
+        var userShopIds = shops.findShopIdsByUser(ownerId);
+        assertThat(userShopIds).contains(created.id());
+
+        var activeUsers = shops.findActiveUserIdsByShop(created.id());
+        assertThat(activeUsers).contains(ownerId);
+    }
 }
 

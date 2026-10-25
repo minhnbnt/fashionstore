@@ -25,6 +25,7 @@ import com.minhnbnt.fashionstore.dto.catalog.BulkUpdateStockRequest;
 import com.minhnbnt.fashionstore.dto.catalog.InventoryItemResponse;
 import com.minhnbnt.fashionstore.dto.catalog.SellerProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.StockMovementResponse;
+import com.minhnbnt.fashionstore.dto.catalog.WishlistProductCard;
 import com.minhnbnt.fashionstore.dto.common.PageResponse;
 import com.minhnbnt.fashionstore.features.catalog.repository.CategoryRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductAdminQueryRepository;
@@ -39,7 +40,6 @@ import com.minhnbnt.fashionstore.features.catalog.repository.StockMovementReposi
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.review.ReviewService;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
-import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.infrastructure.media.VideoMetadataService;
 import com.minhnbnt.fashionstore.model.Product;
@@ -56,6 +56,7 @@ import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -74,6 +75,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.StreamSupport;
 
@@ -101,12 +103,12 @@ public class CatalogService {
 
     private final KeywordScanner keywordScanner;
 
+    @Lazy
     private final OrderService orderService;
 
     private final ShopService shops;
 
-    private final ShopRepository shopRepository;
-
+    @Lazy
     private final ReviewService reviews;
 
     private final ShopAccessChecker access;
@@ -161,8 +163,7 @@ public class CatalogService {
 
         videoMetadataService.validateVideoDuration(request.videoKey());
 
-        var shop = shopRepository.findById(shopId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found"));
+        var shop = shops.requireShop(shopId);
 
         ProductStatus initialStatus;
         if (shop.isTrusted()) {
@@ -1868,5 +1869,121 @@ public class CatalogService {
             return null;
         }
         return violationType.name();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<ProductVariant> findVariantById(@NonNull UUID variantId) {
+        return variants.findById(variantId);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Product> findProductById(@NonNull UUID productId) {
+        return products.findById(productId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductImage> findImagesByProductId(@NonNull UUID productId) {
+        return images.findByProductIdOrderBySortOrderAsc(productId);
+    }
+
+    @Transactional(readOnly = true)
+    public Product requireActiveProduct(@NonNull UUID productId) {
+        var product = products.findById(productId).orElse(null);
+        if (product == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        if (product.getStatus() != ProductStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        if (!shops.isShopApproved(product.getShopId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        return product;
+    }
+
+    @Transactional(readOnly = true)
+    public ProductVariant requireVariant(@NonNull UUID variantId) {
+        var variant = variants.findById(variantId).orElse(null);
+        if (variant == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found");
+        }
+        return variant;
+    }
+
+    @Transactional
+    public boolean decrementVariantStock(@NonNull UUID variantId, int quantity) {
+        return variants.decrementStock(variantId, quantity);
+    }
+
+    @Transactional
+    public void incrementVariantStock(@NonNull UUID variantId, int quantity) {
+        variants.incrementStock(variantId, quantity);
+    }
+
+    @Transactional
+    public void recordStockMovement(
+        @NonNull UUID variantId,
+        @NonNull UUID shopId,
+        int quantity,
+        @NonNull String type,
+        @NonNull UUID referenceId
+    ) {
+        movements.save(StockMovement.record(
+            variantId,
+            shopId,
+            quantity,
+            type,
+            referenceId
+        ));
+    }
+
+    @Transactional(readOnly = true)
+    public WishlistProductCard getWishlistProductCard(@NonNull UUID productId) {
+        var product = products.findById(productId).orElse(null);
+        if (product == null) {
+            return new WishlistProductCard(productId, null, null, null, null, false, "Product no longer exists");
+        }
+
+        String reason = null;
+        if (product.getStatus() != ProductStatus.ACTIVE) {
+            reason = "Product is hidden";
+        } else if (!shops.isShopApproved(product.getShopId())) {
+            reason = "Shop is not approved for selling";
+        }
+
+        if (reason != null) {
+            return new WishlistProductCard(
+                productId,
+                product.getName(),
+                product.getSlug(),
+                null,
+                null,
+                false,
+                reason
+            );
+        }
+
+        Long minPrice = null;
+        for (var variant : variants.findByProductIdOrderByCreatedAtAsc(productId)) {
+            if (minPrice == null || variant.getPrice() < minPrice) {
+                minPrice = variant.getPrice();
+            }
+        }
+
+        String defaultImageKey = null;
+        var productImages = images.findByProductIdOrderBySortOrderAsc(productId);
+        if (!productImages.isEmpty()) {
+            defaultImageKey = productImages.get(0).getS3Key();
+        }
+
+        return new WishlistProductCard(
+            productId,
+            product.getName(),
+            product.getSlug(),
+            minPrice,
+            defaultImageKey,
+            true,
+            null
+        );
     }
 }

@@ -11,7 +11,7 @@ import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.SellerSettlementRepository;
 import com.minhnbnt.fashionstore.features.order.repository.SellerWithdrawalRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
-import com.minhnbnt.fashionstore.features.shop.ShopRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.SellerSettlement;
 import com.minhnbnt.fashionstore.model.SellerWithdrawal;
 import com.minhnbnt.fashionstore.model.SettlementStatus;
@@ -41,7 +41,7 @@ public class RevenueService {
 
     private final OrderItemRepository items;
 
-    private final ShopRepository shops;
+    private final ShopService shops;
 
     private final ShopAccessChecker access;
 
@@ -152,7 +152,7 @@ public class RevenueService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient available balance");
         }
 
-        var shop = shops.findById(request.shopId()).orElse(null);
+        var shop = shops.findEntityById(request.shopId()).orElse(null);
         if (shop == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found");
         }
