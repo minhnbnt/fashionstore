@@ -117,19 +117,19 @@
 - Test: `fashionstore/src/test/java/com/minhnbnt/fashionstore/features/shop/controller/SellerShopMembershipControllerTest.java`
 - Test: `fashionstore/src/test/java/com/minhnbnt/fashionstore/OpenApiExportTest.java`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
   Viết test controller `SellerShopMembershipControllerTest.java` kiểu slice (`@WebMvcTest`):
   Kiểm tra `GET /api/seller/my-shops` với JWT trả về `200 OK` cùng danh sách shop memberships của user.
-- [ ] **Step 2: Run test to confirm it fails**
+- [x] **Step 2: Run test to confirm it fails**
   Chạy test và xác nhận lỗi 404 do chưa có endpoint.
-- [ ] **Step 3: Implement minimal code**
+- [x] **Step 3: Implement minimal code**
   - Thêm method `getMyMemberships(userId)` trong `ShopStaffService.java`.
   - Tạo `SellerShopMembershipController.java` với annotation Springdoc đầy đủ (`operationId = "getMyShops"`, `@Tag`, `@SecurityRequirement(name = "bearerAuth")`).
-- [ ] **Step 4: Run test to confirm it passes**
+- [x] **Step 4: Run test to confirm it passes**
   Chạy `SellerShopMembershipControllerTest` và xác nhận PASS.
-- [ ] **Step 5: Export OpenAPI spec sang frontend**
+- [x] **Step 5: Export OpenAPI spec sang frontend**
   Chạy `./gradlew test --tests com.minhnbnt.fashionstore.OpenApiExportTest --rerun` để ghi lại `fashionstore-ui/docs/openapi.json`.
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
   `git commit -m "feat(api): expose GET /api/seller/my-shops and export openapi spec"`
 
 ---
@@ -141,23 +141,23 @@
 - Modify: `fashionstore-ui/src/lib/sellerPermissions.ts`
 - Test: `fashionstore-ui/src/lib/__tests__/sellerPermissions.test.ts`
 
-- [ ] **Step 1: Chạy codegen frontend**
+- [x] **Step 1: Chạy codegen frontend**
   Chạy `pnpm api:gen` tại `fashionstore-ui`. Xác nhận file `@generated/endpoints/seller-staff-roles/seller-staff-roles.ts` sinh ra hook `useGetMyShops`.
-- [ ] **Step 2: Write failing test cho permissions & filters**
+- [x] **Step 2: Write failing test cho permissions & filters**
   Tạo test trong `sellerPermissions.test.ts`:
   - Test 1: `permissionLabel('CHANGE_MEMBER_ROLE')` phải trả về `'Đổi vai trò nhân viên'`.
   - Test 2: `canSeeTab('PROFILE', [], false)` phải trả về `false`.
   - Test 3: `canSeeTab('OVERVIEW', [], false)` phải trả về `false`.
   - Test 4: `canSeeTab('OVERVIEW', ['REVENUE_READ'], false)` phải trả về `true`.
   - Test 5: `canSeeTab('PROFILE', ['REVENUE_READ', 'PRODUCT_WRITE'], false)` phải trả về `false` (chỉ OWNER).
-- [ ] **Step 3: Run test to confirm it fails**
+- [x] **Step 3: Run test to confirm it fails**
   Chạy `pnpm test sellerPermissions` và xác nhận các test trên fail theo đúng kỳ vọng.
-- [ ] **Step 4: Implement minimal code**
+- [x] **Step 4: Implement minimal code**
   - Trong `SellerStaffTab.tsx`: Đổi `'CHANGE_ROLE'` thành `'CHANGE_MEMBER_ROLE'` trong `AUDIT_ACTIONS`.
   - Trong `lib/sellerPermissions.ts`: Cập nhật `PERMISSION_LABELS` (thêm `CHANGE_MEMBER_ROLE`), sửa hàm `canSeeTab` thắt chặt `PROFILE` (chỉ `isOwner`) và `OVERVIEW` (cần `REVENUE_READ`).
-- [ ] **Step 5: Run test to confirm it passes**
+- [x] **Step 5: Run test to confirm it passes**
   Chạy `pnpm test sellerPermissions` và xác nhận 100% tests PASS.
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
   `git commit -m "fix(permissions): sync CHANGE_MEMBER_ROLE audit action and tighten tab access"`
 
 ---
@@ -169,20 +169,20 @@
 - Modify: `fashionstore-ui/src/pages/Account.tsx`
 - Test: `fashionstore-ui/src/components/account/__tests__/MyShopsTab.test.tsx`
 
-- [ ] **Step 1: Write component test**
+- [x] **Step 1: Write component test**
   Tạo test trong `MyShopsTab.test.tsx`:
   Render danh sách 2 shop (1 shop là OWNER, 1 shop là STAFF). Kiểm tra hiển thị đúng tên shop, badge vai trò "Chủ gian hàng" và "Kho vận (Warehouse)", nút "Vào Kênh Người Bán" trỏ đúng URL `/shop?shopId=...`.
-- [ ] **Step 2: Run test to confirm it fails**
+- [x] **Step 2: Run test to confirm it fails**
   Chạy `pnpm test MyShopsTab` và xác nhận test fail do chưa có component.
-- [ ] **Step 3: Implement `MyShopsTab.tsx`**
+- [x] **Step 3: Implement `MyShopsTab.tsx`**
   - Tạo `MyShopsTab.tsx` gọi `useGetMyShops()`.
   - Thiết kế danh sách thẻ shop theo phong cách sang trọng, bo góc tròn, glassmorphism chuẩn Design System của shop.
   - Hiển thị badge trạng thái shop (`APPROVED`, `PENDING`, `REJECTED`), badge trạng thái thành viên (`ACTIVE`, `DEACTIVATED`).
   - Nút chuyển hướng Kênh Người Bán dẫn đến `/shop?shopId={shopId}` (với shop đã duyệt và thành viên ACTIVE).
   - Tích hợp tab chọn vào `Account.tsx`: Phân tách rõ ràng giữa thông tin cá nhân, danh sách gian hàng và sổ địa chỉ.
-- [ ] **Step 4: Run test to confirm it passes**
+- [x] **Step 4: Run test to confirm it passes**
   Chạy `pnpm test MyShopsTab` và kiểm tra `pnpm lint` 0 lỗi, 0 warning.
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
   `git commit -m "feat(account): add MyShopsTab allowing users to manage multiple shops"`
 
 ---
@@ -195,22 +195,22 @@
 - Modify: `fashionstore-ui/src/components/seller-dashboard-tab/SellerLayout.tsx`
 - Test: `fashionstore-ui/src/pages/__tests__/ShopDashboardNavigation.test.tsx`
 
-- [ ] **Step 1: Write test cho Auto-Navigation**
+- [x] **Step 1: Write test cho Auto-Navigation**
   Tạo test trong `ShopDashboardNavigation.test.tsx`:
   - Giả lập nhân viên chỉ có quyền `CHAT_ACCESS` vào gian hàng: Hệ thống tự động chuyển hướng sang `tab=chat`, không render `SellerOverviewTab`.
   - Giả lập URL có param `shopId`: Dashboard tải đúng thông tin gian hàng theo `shopId`.
-- [ ] **Step 2: Run test to confirm it fails**
+- [x] **Step 2: Run test to confirm it fails**
   Chạy test và xác nhận fail.
-- [ ] **Step 3: Implement `ShopSwitcher.tsx` & Auto-Navigation**
+- [x] **Step 3: Implement `ShopSwitcher.tsx` & Auto-Navigation**
   - Tạo `ShopSwitcher.tsx`: Dropdown chọn gian hàng đặt trên Header của `SellerLayout.tsx`. Cho phép chuyển đổi linh hoạt giữa các gian hàng người dùng tham gia.
   - Cập nhật `ShopDashboard.tsx`:
     - Đọc `shopId` từ search params.
     - Tìm shop tương ứng trong danh sách `useGetMyShops()`.
     - Kiểm tra `canSeeTab(activeTab, permissions, isOwner)`: Nếu `false`, tự động tìm tab được phép đầu tiên và điều hướng sang tab đó.
     - Nếu nhân viên không có bất kỳ quyền nào trong shop, hiển thị thông báo thân thiện "Bạn chưa được cấp quyền thao tác tại gian hàng này".
-- [ ] **Step 4: Run test to confirm it passes**
+- [x] **Step 4: Run test to confirm it passes**
   Chạy lại test và xác nhận PASS.
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
   `git commit -m "feat(seller): add ShopSwitcher and smart auto-navigation based on permissions"`
 
 ---
@@ -220,11 +220,11 @@
 **Files:**
 - Verify All
 
-- [ ] **Step 1: Full Backend Test Suite**
+- [x] **Step 1: Full Backend Test Suite**
   Chạy `./gradlew test` trên backend. Xác nhận 100% tests pass qua Testcontainers PostgreSQL.
-- [ ] **Step 2: Full Frontend Quality Gate**
+- [x] **Step 2: Full Frontend Quality Gate**
   Chạy `pnpm format && pnpm lint && pnpm test && pnpm build` trên `fashionstore-ui`. Xác nhận 0 error, 0 warning, build thành công bundle.
-- [ ] **Step 3: Trình duyệt thực tế (Browser Subagent)**
+- [x] **Step 3: Trình duyệt thực tế (Browser Subagent)**
   Khởi chạy subagent kiểm thử:
   - Đăng nhập tài khoản tham gia 2 shop.
   - Vào `/account`, kiểm tra tab "Gian hàng của tôi".
@@ -232,5 +232,5 @@
   - Dùng Shop Switcher chuyển sang shop 2 -> Kiểm tra đổi shop thành công.
   - Đăng nhập nhân viên không có `REVENUE_READ` -> Xác nhận không vào được Tổng quan và Hồ sơ shop, tự động điều hướng sang Đơn hàng/Chat.
   - Vào tab Nhật ký hoạt động -> Lọc theo `CHANGE_MEMBER_ROLE` -> Xác nhận hiển thị đúng bản ghi đổi vai trò với thông tin chi tiết.
-- [ ] **Step 4: Commit & Hoàn tất branch**
+- [x] **Step 4: Commit & Hoàn tất branch**
   Kiểm tra git working tree sạch sẽ trên cả hai repo.
