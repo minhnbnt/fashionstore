@@ -213,9 +213,7 @@ public class CartService {
             ));
         }
 
-        for (var item : checked) {
-            items.delete(item);
-        }
+        items.deleteAll(checked);
 
         return placed;
     }
@@ -255,16 +253,24 @@ public class CartService {
                 images.findByProductIdOrderBySortOrderAsc(id)
             );
 
-            String imageKey = productImages.stream()
-                .filter(img -> variant.getId().equals(img.getVariantId()))
-                .map(ProductImage::getS3Key)
-                .findFirst()
-                .orElseGet(() -> productImages.isEmpty() ? null : productImages.getFirst().getS3Key());
+            String imageKey = null;
+            for (var img : productImages) {
+                if (variant.getId().equals(img.getVariantId())) {
+                    imageKey = img.getS3Key();
+                    break;
+                }
+            }
+            if (imageKey == null && !productImages.isEmpty()) {
+                imageKey = productImages.getFirst().getS3Key();
+            }
 
             itemCount += item.getQuantity();
             subtotal += variant.getPrice() * item.getQuantity();
 
-            long priceAtAdded = item.getPriceAtAdded() > 0 ? item.getPriceAtAdded() : variant.getPrice();
+            long priceAtAdded = item.getPriceAtAdded();
+            if (priceAtAdded <= 0) {
+                priceAtAdded = variant.getPrice();
+            }
             boolean priceChanged = priceAtAdded != variant.getPrice();
 
             responses.add(new CartItemResponse(

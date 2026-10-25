@@ -2,12 +2,15 @@ package com.minhnbnt.fashionstore.features.chat;
 
 import com.minhnbnt.fashionstore.dto.chat.ChatConversationResponse;
 import com.minhnbnt.fashionstore.dto.chat.ChatMessageResponse;
+import com.minhnbnt.fashionstore.dto.chat.ChatReadEvent;
+import com.minhnbnt.fashionstore.dto.chat.ConversationEvent;
 import com.minhnbnt.fashionstore.dto.chat.SendMessageRequest;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatConversationRepository;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatMessageRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
+import com.minhnbnt.fashionstore.infrastructure.realtime.ChatRealtimePublisher;
 import com.minhnbnt.fashionstore.model.ChatConversation;
 import com.minhnbnt.fashionstore.model.ChatMessage;
 import com.minhnbnt.fashionstore.model.Shop;
@@ -18,9 +21,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -38,6 +45,8 @@ public class ChatService {
     private final ShopAccessChecker access;
 
     private final ShopAuditService audit;
+
+    private final ChatRealtimePublisher realtime;
 
     @Transactional
     public ChatConversationResponse startConversation(@NonNull UUID buyerId, @NonNull UUID shopId) {
@@ -116,6 +125,8 @@ public class ChatService {
             senderType = "BUYER";
         }
 
+        var recipients = realtimeRecipients(conv);
+
         var msg = ChatMessage.of(
             conversationId,
             userId,
@@ -140,24 +151,15 @@ public class ChatService {
             audit.record(conv.getShopId(), userId, "CHAT_REPLY", "CONVERSATION", conv.getId(), chatDetail);
         }
 
+        realtime.publishChatMessage(recipients, toMessageResponse(msg));
+        realtime.publishConversationEvent(
+            recipients,
+            new ConversationEvent(conversationId, ConversationEvent.Type.NEW_MESSAGE)
+        );
+
         // Auto reply if buyer sent message and shop has auto reply text
         if (!isSeller) {
-            var shop = shops.findById(conv.getShopId()).orElse(null);
-            if (shop != null && shop.getAutoReplyText() != null && !shop.getAutoReplyText().isBlank()) {
-                var ownerId = members.findOwner(conv.getShopId()).orElse(null);
-                if (ownerId != null) {
-                    var autoMsg = ChatMessage.of(
-                        conversationId,
-                        ownerId,
-                        "SELLER",
-                        shop.getAutoReplyText(),
-                        null
-                    );
-                    messages.save(autoMsg);
-                    conv.recordNewMessage(shop.getAutoReplyText(), false);
-                    conversations.save(conv);
-                }
-            }
+            broadcastAutoReply(conv, recipients);
         }
 
         return toMessageResponse(msg);
@@ -175,13 +177,72 @@ public class ChatService {
             access.requireShopPermission(userId, conv.getShopId(), ShopPermission.CHAT_ACCESS);
             conv.markReadBySeller();
             conversations.save(conv);
+
+            var event = new ChatReadEvent(conversationId, userId, Instant.now());
+            realtime.publishReadReceipt(
+                Set.copyOf(members.findActiveUserIdsByShop(conv.getShopId())),
+                event
+            );
             return;
         }
 
         if (conv.getBuyerId().equals(userId)) {
             conv.markReadByBuyer();
             conversations.save(conv);
+
+            var event = new ChatReadEvent(conversationId, userId, Instant.now());
+            realtime.publishReadReceipt(Set.of(conv.getBuyerId()), event);
         }
+    }
+
+    /**
+     * Tập người nhận push realtime của một hội thoại: buyer + mọi thành viên ACTIVE của shop.
+     * Người gửi cũng nằm trong tập (nhận echo để cập nhật UI không cần refetch).
+     */
+    private Set<UUID> realtimeRecipients(ChatConversation conv) {
+        var recipientIds = new HashSet<UUID>();
+        recipientIds.add(conv.getBuyerId());
+        recipientIds.addAll(members.findActiveUserIdsByShop(conv.getShopId()));
+        return recipientIds;
+    }
+
+    /**
+     * Auto reply của shop khi buyer nhắn tin: lưu tin nhắn của owner rồi broadcast như
+     * một tin nhắn SELLER bình thường. Không cấu hình auto reply / không tìm thấy owner
+     * thì bỏ qua lặng lẽ.
+     */
+    private void broadcastAutoReply(ChatConversation conv, Set<UUID> recipients) {
+        var shop = shops.findById(conv.getShopId()).orElse(null);
+        if (shop == null) {
+            return;
+        }
+
+        var autoReplyText = shop.getAutoReplyText();
+        if (!StringUtils.hasText(autoReplyText)) {
+            return;
+        }
+
+        var ownerId = members.findOwner(conv.getShopId()).orElse(null);
+        if (ownerId == null) {
+            return;
+        }
+
+        var autoMsg = ChatMessage.of(
+            conv.getId(),
+            ownerId,
+            "SELLER",
+            autoReplyText,
+            null
+        );
+        messages.save(autoMsg);
+        conv.recordNewMessage(autoReplyText, false);
+        conversations.save(conv);
+
+        realtime.publishChatMessage(recipients, toMessageResponse(autoMsg));
+        realtime.publishConversationEvent(
+            recipients,
+            new ConversationEvent(conv.getId(), ConversationEvent.Type.NEW_MESSAGE)
+        );
     }
 
     private void verifyParticipant(UUID userId, ChatConversation conv) {

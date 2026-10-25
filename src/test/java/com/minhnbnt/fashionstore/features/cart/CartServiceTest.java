@@ -104,13 +104,17 @@ class CartServiceTest {
                 List.of(new CreateVariantRequest(sku, "M", "Den", 100000L, null, 10, true))
             )
         );
-        catalog.updateProduct(ownerId, shopId, created.id(), new UpdateProductRequest(null, null, null, "HIDDEN", null));
+        catalog.updateProduct(
+            ownerId, shopId, created.id(), new UpdateProductRequest(null, null, null, "HIDDEN", null)
+        );
         return variants.findByProductIdOrderByCreatedAtAsc(created.id()).get(0).getId();
     }
 
     private UUID variantInPendingShop(UUID ownerId, UUID shopId, String slug, String sku) {
         var product = products.save(Product.create(shopId, null, "Ao " + slug, slug, "", ownerId));
-        var variant = variants.save(ProductVariant.create(shopId, product.getId(), sku, "M", "Den", 100000L, null, 10, true));
+        var variant = variants.save(
+            ProductVariant.create(shopId, product.getId(), sku, "M", "Den", 100000L, null, 10, true)
+        );
         return variant.getId();
     }
 
@@ -295,6 +299,43 @@ class CartServiceTest {
 
         assertThat(orders.getMine(buyerId)).isEmpty();
         assertThat(carts.getCart(buyerId).items()).hasSize(3);
+    }
+
+    @Test
+    void checkoutWithEmptySelectionChecksEverything() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopA = approvedShop(ownerId, "shop-cart-k1");
+        var shopB = approvedShop(ownerId, "shop-cart-k2");
+        var variantA = variantInShop(ownerId, shopA, "ao-cart-k1", "SKU-CART-K1", 10);
+        var variantB = variantInShop(ownerId, shopB, "ao-cart-k2", "SKU-CART-K2", 10);
+        carts.addItem(buyerId, new CartItemRequest(variantA, 1));
+        carts.addItem(buyerId, new CartItemRequest(variantB, 2));
+
+        var placed = carts.checkout(buyerId, shipping(List.of()));
+
+        assertThat(placed).hasSize(2);
+        assertThat(placed).extracting(order -> order.shopId()).containsExactlyInAnyOrder(shopA, shopB);
+        assertThat(carts.getCart(buyerId).items()).isEmpty();
+    }
+
+    @Test
+    void checkoutWithDuplicateSelectionChecksItemOnce() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-cart-l");
+        var variantA = variantInShop(ownerId, shopId, "ao-cart-l1", "SKU-CART-L1", 10);
+        var variantB = variantInShop(ownerId, shopId, "ao-cart-l2", "SKU-CART-L2", 10);
+        carts.addItem(buyerId, new CartItemRequest(variantA, 1));
+        carts.addItem(buyerId, new CartItemRequest(variantB, 2));
+
+        var placed = carts.checkout(buyerId, shipping(List.of(variantA, variantA)));
+
+        assertThat(placed).hasSize(1);
+        assertThat(carts.getCart(buyerId).items())
+            .extracting(CartItemResponse::variantId)
+            .containsExactly(variantB);
+        assertThat(carts.getCart(buyerId).subtotal()).isEqualTo(200000L);
     }
 
     @Test

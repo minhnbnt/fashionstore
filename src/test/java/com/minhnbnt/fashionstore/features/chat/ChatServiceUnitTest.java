@@ -1,10 +1,15 @@
 package com.minhnbnt.fashionstore.features.chat;
 
+import com.minhnbnt.fashionstore.dto.chat.ChatMessageResponse;
+import com.minhnbnt.fashionstore.dto.chat.ChatReadEvent;
+import com.minhnbnt.fashionstore.dto.chat.ConversationEvent;
 import com.minhnbnt.fashionstore.dto.chat.SendMessageRequest;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatConversationRepository;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatMessageRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
+import com.minhnbnt.fashionstore.infrastructure.realtime.ChatRealtimePublisher;
 import com.minhnbnt.fashionstore.model.ChatConversation;
 import com.minhnbnt.fashionstore.model.ChatMessage;
 import com.minhnbnt.fashionstore.model.MemberRole;
@@ -13,12 +18,15 @@ import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,10 +54,28 @@ class ChatServiceUnitTest {
     @Mock
     private ShopAccessChecker access;
 
+    @Mock
+    private ShopAuditService audit;
+
+    @Mock
+    private ChatRealtimePublisher realtime;
+
     @InjectMocks
     private ChatService chatService;
 
     private final ArgumentCaptor<ChatMessage> captor = ArgumentCaptor.forClass(ChatMessage.class);
+
+    @Captor
+    private ArgumentCaptor<Set<UUID>> recipientsCaptor;
+
+    @Captor
+    private ArgumentCaptor<ChatMessageResponse> messageCaptor;
+
+    @Captor
+    private ArgumentCaptor<ConversationEvent> conversationEventCaptor;
+
+    @Captor
+    private ArgumentCaptor<ChatReadEvent> readEventCaptor;
 
     @Test
     void startConversationCreatesNewWhenNotFound() {
@@ -136,5 +162,121 @@ class ChatServiceUnitTest {
 
         assertThat(conv.getSellerUnreadCount()).isEqualTo(0);
         verify(conversations).save(conv);
+    }
+
+    @Test
+    void sendMessageFromBuyerBroadcastsMessageAndConversationEvent() {
+        var buyerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var ownerId = UUID.randomUUID();
+        var staffId = UUID.randomUUID();
+        var conv = ChatConversation.create(shopId, buyerId);
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(members.findActiveUserIdsByShop(shopId)).thenReturn(List.of(ownerId, staffId));
+
+        var req = new SendMessageRequest("Hello shop", null);
+        var resp = chatService.sendMessage(buyerId, convId, req);
+
+        verify(realtime).publishChatMessage(recipientsCaptor.capture(), messageCaptor.capture());
+        assertThat(recipientsCaptor.getValue()).containsExactlyInAnyOrder(buyerId, ownerId, staffId);
+        assertThat(messageCaptor.getValue().id()).isEqualTo(resp.id());
+        assertThat(messageCaptor.getValue().conversationId()).isEqualTo(convId);
+
+        verify(realtime).publishConversationEvent(recipientsCaptor.capture(), conversationEventCaptor.capture());
+        assertThat(recipientsCaptor.getValue()).containsExactlyInAnyOrder(buyerId, ownerId, staffId);
+        assertThat(conversationEventCaptor.getValue().conversationId()).isEqualTo(convId);
+        assertThat(conversationEventCaptor.getValue().type()).isEqualTo(ConversationEvent.Type.NEW_MESSAGE);
+    }
+
+    @Test
+    void sendMessageFromBuyerAlsoBroadcastsAutoReply() {
+        var buyerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var ownerId = UUID.randomUUID();
+        var conv = ChatConversation.create(shopId, buyerId);
+
+        var shop = ShopTestFixtures.shop("Fashion Hub", "fashion-hub", "Mo ta");
+        shop.updateProfile(
+            null, null, null, null, null, null, null,
+            "Xin chao, shop se phan hoi ban som nhat!",
+            null
+        );
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(shops.findById(shopId)).thenReturn(Optional.of(shop));
+        when(members.findOwner(shopId)).thenReturn(Optional.of(ownerId));
+        when(members.findActiveUserIdsByShop(shopId)).thenReturn(List.of(ownerId));
+
+        var req = new SendMessageRequest("Shop oi, mau xanh con size M khong?", null);
+        chatService.sendMessage(buyerId, convId, req);
+
+        verify(realtime, times(2)).publishChatMessage(recipientsCaptor.capture(), messageCaptor.capture());
+        var pushedMessages = messageCaptor.getAllValues();
+        assertThat(pushedMessages.get(0).senderType()).isEqualTo("BUYER");
+        assertThat(pushedMessages.get(1).senderType()).isEqualTo("SELLER");
+        assertThat(pushedMessages.get(1).content()).isEqualTo("Xin chao, shop se phan hoi ban som nhat!");
+        assertThat(recipientsCaptor.getAllValues().get(1)).containsExactlyInAnyOrder(buyerId, ownerId);
+    }
+
+    @Test
+    void sendMessageFromSellerBroadcastsToBuyerAndMembers() {
+        var buyerId = UUID.randomUUID();
+        var sellerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var conv = ChatConversation.create(shopId, buyerId);
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(members.findRole(shopId, sellerId)).thenReturn(Optional.of(MemberRole.OWNER));
+        when(members.findActiveUserIdsByShop(shopId)).thenReturn(List.of(sellerId));
+
+        var req = new SendMessageRequest("Van con hang ban nhe", null);
+        chatService.sendMessage(sellerId, convId, req);
+
+        verify(realtime).publishChatMessage(recipientsCaptor.capture(), messageCaptor.capture());
+        assertThat(recipientsCaptor.getValue()).containsExactlyInAnyOrder(buyerId, sellerId);
+        assertThat(messageCaptor.getValue().senderType()).isEqualTo("SELLER");
+    }
+
+    @Test
+    void markReadByBuyerSendsReadReceiptToShop() {
+        var buyerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var ownerId = UUID.randomUUID();
+        var conv = ChatConversation.create(shopId, buyerId);
+        conv.recordNewMessage("Hello", true);
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(members.findActiveUserIdsByShop(shopId)).thenReturn(List.of(ownerId));
+
+        chatService.markRead(buyerId, convId);
+
+        verify(realtime).publishReadReceipt(recipientsCaptor.capture(), readEventCaptor.capture());
+        assertThat(recipientsCaptor.getValue()).containsExactly(ownerId);
+        assertThat(readEventCaptor.getValue().conversationId()).isEqualTo(convId);
+        assertThat(readEventCaptor.getValue().readerId()).isEqualTo(buyerId);
+    }
+
+    @Test
+    void markReadBySellerSendsReadReceiptToBuyer() {
+        var buyerId = UUID.randomUUID();
+        var sellerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var conv = ChatConversation.create(shopId, buyerId);
+        conv.recordNewMessage("Hello", true);
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(members.findRole(shopId, sellerId)).thenReturn(Optional.of(MemberRole.OWNER));
+
+        chatService.markRead(sellerId, convId);
+
+        verify(realtime).publishReadReceipt(recipientsCaptor.capture(), readEventCaptor.capture());
+        assertThat(recipientsCaptor.getValue()).containsExactly(buyerId);
+        assertThat(readEventCaptor.getValue().readerId()).isEqualTo(sellerId);
     }
 }

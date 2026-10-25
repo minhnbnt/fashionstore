@@ -27,6 +27,8 @@ public class SecurityConfig {
 
     private static final List<String> PUBLIC_PATHS = List.of(
         "/api/public/**",
+        // Handshake WebSocket: xác thực JWT diễn ra ở STOMP CONNECT (WebSocketAuthInterceptor)
+        "/ws/**",
         "/v3/api-docs/**",
         "/swagger-ui/**",
         "/swagger-ui.html"
