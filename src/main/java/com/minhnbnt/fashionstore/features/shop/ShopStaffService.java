@@ -32,6 +32,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -90,7 +91,9 @@ public class ShopStaffService {
         var role = ShopRole.create(shopId, request.name(), perms, false);
         roles.save(role);
 
-        audit.record(shopId, userId, "CREATE_ROLE", "ROLE", role.getId(), "Tạo vai trò: " + role.getName() + " (" + request.permissions().size() + " quyền)");
+        var permsJoined = String.join(", ", request.permissions());
+        var createDetail = "Tạo vai trò: \"" + role.getName() + "\" gồm " + request.permissions().size() + " quyền: [" + permsJoined + "]";
+        audit.record(shopId, userId, "CREATE_ROLE", "ROLE", role.getId(), createDetail);
 
         return toRoleResponse(role);
     }
@@ -112,11 +115,47 @@ public class ShopStaffService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot edit system roles");
         }
 
+        var oldPerms = new HashSet<>(Arrays.asList(role.getPermissions()));
+        var newPerms = new HashSet<>(request.permissions());
+        var oldName = role.getName();
+
+        var changes = new ArrayList<String>();
+        if (!oldName.equals(request.name())) {
+            changes.add("Đổi tên: [" + oldName + "] -> [" + request.name() + "]");
+        }
+
+        var added = new ArrayList<String>();
+        for (var p : request.permissions()) {
+            if (!oldPerms.contains(p)) {
+                added.add("+" + p);
+            }
+        }
+        if (!added.isEmpty()) {
+            changes.add("Thêm quyền: " + String.join(", ", added));
+        }
+
+        var removed = new ArrayList<String>();
+        for (var p : role.getPermissions()) {
+            if (!newPerms.contains(p)) {
+                removed.add("-" + p);
+            }
+        }
+        if (!removed.isEmpty()) {
+            changes.add("Gỡ quyền: " + String.join(", ", removed));
+        }
+
+        if (changes.isEmpty()) {
+            changes.add("Không thay đổi quyền");
+        }
+
+        var diffStr = String.join(" | ", changes);
+
         var perms = request.permissions().toArray(new String[0]);
         role.update(request.name(), perms);
         roles.save(role);
 
-        audit.record(shopId, userId, "UPDATE_ROLE", "ROLE", role.getId(), "Cập nhật vai trò: " + role.getName() + " (" + request.permissions().size() + " quyền)");
+        var updateDetail = "Cập nhật vai trò: \"" + role.getName() + "\" | Thay đổi: " + diffStr;
+        audit.record(shopId, userId, "UPDATE_ROLE", "ROLE", role.getId(), updateDetail);
 
         return toRoleResponse(role);
     }
@@ -141,7 +180,7 @@ public class ShopStaffService {
         }
 
         roles.delete(role);
-        audit.record(shopId, userId, "DELETE_ROLE", "ROLE", role.getId(), "Xóa vai trò: " + role.getName());
+        audit.record(shopId, userId, "DELETE_ROLE", "ROLE", role.getId(), "Xóa vai trò: \"" + role.getName() + "\"");
     }
 
     @Transactional(readOnly = true)

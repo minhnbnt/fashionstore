@@ -6,6 +6,7 @@ import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ImageItemRequest;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
+import com.minhnbnt.fashionstore.dto.order.CancelOrderRequest;
 import com.minhnbnt.fashionstore.dto.order.CreateWithdrawalRequest;
 import com.minhnbnt.fashionstore.dto.shop.ChangeMemberRoleRequest;
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRoleRequest;
@@ -352,4 +353,52 @@ class ShopAuditIntegrationTest {
         assertThat(page.items()).hasSize(1);
         assertThat(page.items().getFirst().detail()).isEqualTo("Vô hiệu hóa thành viên " + staffEmail);
     }
+
+    @Test
+    void roleUpdateAndOrderCancelRecordDetailedChanges() {
+        var ownerId = user("owner", "Audit Owner");
+        var shopId = approvedShop(ownerId, "audit-role-order");
+
+        var createdRole = staff.createRole(ownerId, shopId, new CreateShopRoleRequest(
+            "Quan ly kho",
+            List.of("ORDER_READ", "PRODUCT_READ")
+        ));
+
+        staff.updateRole(ownerId, shopId, createdRole.id(), new CreateShopRoleRequest(
+            "Truong phong kho",
+            List.of("ORDER_READ", "INVENTORY_WRITE")
+        ));
+
+        var buyerId = user("buyer", "Buyer User");
+        var orderId = pendingOrder(shopId, buyerId);
+        orders.sellerCancel(ownerId, orderId, new CancelOrderRequest("Hết hàng", "Kho tạm hết size"));
+
+        var page = staff.listAuditLogs(ownerId, shopId, null, 0, 50);
+
+        var roleCreateRow = page.items().stream()
+            .filter(item -> "CREATE_ROLE".equals(item.action()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(roleCreateRow.detail())
+            .contains("Quan ly kho")
+            .contains("ORDER_READ");
+
+        var roleUpdateRow = page.items().stream()
+            .filter(item -> "UPDATE_ROLE".equals(item.action()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(roleUpdateRow.detail())
+            .contains("Truong phong kho")
+            .contains("+INVENTORY_WRITE")
+            .contains("-PRODUCT_READ");
+
+        var cancelRow = page.items().stream()
+            .filter(item -> "ORDER_CANCEL".equals(item.action()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(cancelRow.detail())
+            .contains("Hết hàng")
+            .contains("Kho tạm hết size");
+    }
 }
+

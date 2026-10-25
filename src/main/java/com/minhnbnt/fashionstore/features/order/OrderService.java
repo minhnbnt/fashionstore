@@ -263,7 +263,12 @@ public class OrderService {
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CANCELLED, userId));
 
         var saved = orders.save(order);
-        audit.record(saved.getShopId(), userId, "ORDER_CANCEL", "ORDER", saved.getId(), saved.getCode());
+        var cancelDetail = "Hủy đơn hàng #" + saved.getCode() + " | Lý do: " + request.reason();
+        if (request.note() != null && !request.note().isBlank()) {
+            cancelDetail = cancelDetail + " (" + request.note() + ")";
+        }
+        cancelDetail = cancelDetail + " | Khôi phục tồn kho cho " + orderItems.size() + " mặt hàng";
+        audit.record(saved.getShopId(), userId, "ORDER_CANCEL", "ORDER", saved.getId(), cancelDetail);
 
         return toResponse(saved, orderItems);
     }
@@ -404,7 +409,8 @@ public class OrderService {
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CONFIRMED, userId));
 
         var saved = orders.save(order);
-        audit.record(saved.getShopId(), userId, "ORDER_CONFIRM", "ORDER", saved.getId(), saved.getCode());
+        var confirmDetail = "Xác nhận đơn hàng #" + saved.getCode() + " | Tổng tiền: " + saved.getTotal() + "₫ (" + orderItems.size() + " món)";
+        audit.record(saved.getShopId(), userId, "ORDER_CONFIRM", "ORDER", saved.getId(), confirmDetail);
 
         return toResponse(saved, orderItems);
     }
@@ -420,7 +426,8 @@ public class OrderService {
 
         var orderItems = items.findByOrderId(order.getId());
         var saved = orders.save(order);
-        audit.record(saved.getShopId(), userId, "ORDER_SHIP", "ORDER", saved.getId(), saved.getCode());
+        var shipDetail = "Giao đơn hàng #" + saved.getCode() + " (" + orderItems.size() + " món) cho đơn vị vận chuyển";
+        audit.record(saved.getShopId(), userId, "ORDER_SHIP", "ORDER", saved.getId(), shipDetail);
 
         return toResponse(saved, orderItems);
     }
@@ -437,7 +444,8 @@ public class OrderService {
 
         var orderItems = items.findByOrderId(order.getId());
         var saved = orders.save(order);
-        audit.record(saved.getShopId(), userId, "ORDER_DELIVER", "ORDER", saved.getId(), saved.getCode());
+        var deliverDetail = "Đánh dấu đơn hàng #" + saved.getCode() + " giao thành công | Doanh thu thanh toán: " + saved.getSubtotal() + "₫";
+        audit.record(saved.getShopId(), userId, "ORDER_DELIVER", "ORDER", saved.getId(), deliverDetail);
 
         return toResponse(saved, orderItems);
     }

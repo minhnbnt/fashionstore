@@ -129,7 +129,15 @@ public class ChatService {
         conversations.save(conv);
 
         if (isSeller) {
-            audit.record(conv.getShopId(), userId, "CHAT_REPLY", "CONVERSATION", conv.getId(), null);
+            var chatDetail = "Phản hồi tin nhắn trong hội thoại #" + conv.getId();
+            if (request.content() != null && !request.content().isBlank()) {
+                var preview = request.content().trim();
+                if (preview.length() > 50) {
+                    preview = preview.substring(0, 50) + "...";
+                }
+                chatDetail = chatDetail + ": \"" + preview + "\"";
+            }
+            audit.record(conv.getShopId(), userId, "CHAT_REPLY", "CONVERSATION", conv.getId(), chatDetail);
         }
 
         // Auto reply if buyer sent message and shop has auto reply text
