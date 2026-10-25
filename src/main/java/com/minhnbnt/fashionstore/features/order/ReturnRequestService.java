@@ -135,7 +135,7 @@ public class ReturnRequestService {
 
         req.approve(request.resolution(), request.refundAmount(), request.sellerNote());
         var saved = returns.save(req);
-        audit.record(saved.getShopId(), userId, "RETURN_APPROVE", "RETURN", saved.getId(), null);
+        audit.record(saved.getShopId(), userId, "RETURN_APPROVE", "RETURN", saved.getId(), "Chấp thuận yêu cầu trả hàng (" + request.resolution() + ")");
 
         return toResponse(saved);
     }
@@ -154,7 +154,12 @@ public class ReturnRequestService {
 
         req.reject(request.sellerNote());
         var saved = returns.save(req);
-        audit.record(saved.getShopId(), userId, "RETURN_REJECT", "RETURN", saved.getId(), null);
+        var detail = "Từ chối yêu cầu trả hàng";
+        var sellerNote = request.sellerNote();
+        if (sellerNote != null && !sellerNote.isBlank()) {
+            detail = "Từ chối yêu cầu trả hàng, lý do: " + sellerNote;
+        }
+        audit.record(saved.getShopId(), userId, "RETURN_REJECT", "RETURN", saved.getId(), detail);
 
         return toResponse(saved);
     }
@@ -173,7 +178,7 @@ public class ReturnRequestService {
 
         req.complete(note);
         var saved = returns.save(req);
-        audit.record(saved.getShopId(), userId, "RETURN_COMPLETE", "RETURN", saved.getId(), null);
+        audit.record(saved.getShopId(), userId, "RETURN_COMPLETE", "RETURN", saved.getId(), "Hoàn tất xử lý đổi trả");
 
         return toResponse(saved);
     }

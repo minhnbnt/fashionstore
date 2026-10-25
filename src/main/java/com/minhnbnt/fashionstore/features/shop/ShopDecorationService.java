@@ -56,7 +56,7 @@ public class ShopDecorationService {
 
         deco.saveDraft(draftJson);
         var saved = decorations.save(deco);
-        audit.record(saved.getShopId(), userId, "DECORATION_SAVE", "DECORATION", saved.getId(), null);
+        audit.record(saved.getShopId(), userId, "DECORATION_SAVE", "DECORATION", saved.getId(), "Lưu bản nháp giao diện gian hàng");
 
         return toResponse(saved);
     }
@@ -70,7 +70,7 @@ public class ShopDecorationService {
 
         deco.publish();
         var saved = decorations.save(deco);
-        audit.record(saved.getShopId(), userId, "DECORATION_PUBLISH", "DECORATION", saved.getId(), null);
+        audit.record(saved.getShopId(), userId, "DECORATION_PUBLISH", "DECORATION", saved.getId(), "Xuất bản giao diện gian hàng");
 
         return toResponse(saved);
     }
@@ -84,7 +84,7 @@ public class ShopDecorationService {
 
         deco.discardDraft();
         var saved = decorations.save(deco);
-        audit.record(saved.getShopId(), userId, "DECORATION_DISCARD", "DECORATION", saved.getId(), null);
+        audit.record(saved.getShopId(), userId, "DECORATION_DISCARD", "DECORATION", saved.getId(), "Hủy bỏ bản nháp giao diện gian hàng");
 
         return toResponse(saved);
     }

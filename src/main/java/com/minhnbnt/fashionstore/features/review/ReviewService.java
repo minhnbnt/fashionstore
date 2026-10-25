@@ -146,7 +146,7 @@ public class ReviewService {
         found.review().reply(request.reply());
 
         var saved = reviews.save(found.review());
-        audit.record(found.shopId(), userId, "REVIEW_REPLY", "REVIEW", saved.getId(), null);
+        audit.record(found.shopId(), userId, "REVIEW_REPLY", "REVIEW", saved.getId(), "Phản hồi đánh giá: " + request.reply());
 
         return toSellerResponse(saved);
     }
@@ -161,7 +161,7 @@ public class ReviewService {
         found.review().report(request.reason());
 
         var saved = reviews.save(found.review());
-        audit.record(found.shopId(), userId, "REVIEW_REPORT", "REVIEW", saved.getId(), null);
+        audit.record(found.shopId(), userId, "REVIEW_REPORT", "REVIEW", saved.getId(), "Báo cáo đánh giá: " + request.reason());
 
         return toSellerResponse(saved);
     }

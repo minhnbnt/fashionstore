@@ -6,6 +6,9 @@ import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ImageItemRequest;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.dto.order.CreateWithdrawalRequest;
+import com.minhnbnt.fashionstore.dto.shop.ChangeMemberRoleRequest;
+import com.minhnbnt.fashionstore.dto.shop.CreateShopRoleRequest;
+import com.minhnbnt.fashionstore.dto.shop.InviteStaffRequest;
 import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.catalog.repository.CategoryRepository;
 import com.minhnbnt.fashionstore.features.identity.UserService;
@@ -262,5 +265,49 @@ class ShopAuditIntegrationTest {
             ),
             null, null, null, null, null, null, null, null, null, null, null, "ACTIVE"
         );
+    }
+
+    @Test
+    void auditInviteStaffRecordsDetailedContext() {
+        var ownerId = user("owner", "Audit Owner");
+        var shopId = approvedShop(ownerId, "audit-invite");
+        var inviteeId = user("invitee", "Invitee User");
+        var inviteeEmail = users.getById(inviteeId).email();
+        var role = roles.save(ShopRole.create(shopId, "Ke toan", new String[]{"REVENUE_READ"}, false));
+
+        staff.inviteStaff(ownerId, shopId, new InviteStaffRequest(inviteeEmail, role.getId()));
+
+        var page = staff.listAuditLogs(ownerId, shopId, "INVITE_STAFF", 0, 10);
+        assertThat(page.items()).hasSize(1);
+        assertThat(page.items().getFirst().detail()).isEqualTo("Mời " + inviteeEmail + " vào vai trò Ke toan");
+    }
+
+    @Test
+    void auditChangeMemberRoleRecordsStaffEmailAndNewRole() {
+        var ownerId = user("owner", "Audit Owner");
+        var shopId = approvedShop(ownerId, "audit-change-role");
+        var staffId = staffWith(ownerId, shopId, "PRODUCT_WRITE");
+        var staffEmail = users.getById(staffId).email();
+        var newRole = roles.save(ShopRole.create(shopId, "Truong kho", new String[]{"ORDER_READ"}, false));
+
+        staff.changeMemberRole(ownerId, shopId, staffId, new ChangeMemberRoleRequest(newRole.getId()));
+
+        var page = staff.listAuditLogs(ownerId, shopId, "CHANGE_MEMBER_ROLE", 0, 10);
+        assertThat(page.items()).hasSize(1);
+        assertThat(page.items().getFirst().detail()).isEqualTo("Đổi vai trò của " + staffEmail + " thành Truong kho");
+    }
+
+    @Test
+    void auditDeactivateMemberRecordsStaffEmail() {
+        var ownerId = user("owner", "Audit Owner");
+        var shopId = approvedShop(ownerId, "audit-deactivate");
+        var staffId = staffWith(ownerId, shopId, "PRODUCT_WRITE");
+        var staffEmail = users.getById(staffId).email();
+
+        staff.updateMemberStatus(ownerId, shopId, staffId, "DEACTIVATED");
+
+        var page = staff.listAuditLogs(ownerId, shopId, "DEACTIVATE_MEMBER", 0, 10);
+        assertThat(page.items()).hasSize(1);
+        assertThat(page.items().getFirst().detail()).isEqualTo("Vô hiệu hóa thành viên " + staffEmail);
     }
 }

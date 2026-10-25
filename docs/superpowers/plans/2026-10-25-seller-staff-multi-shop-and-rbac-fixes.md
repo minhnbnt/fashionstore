@@ -90,21 +90,21 @@
 - Modify: `fashionstore/src/main/java/com/minhnbnt/fashionstore/features/order/ReturnRequestService.java`
 - Test: `fashionstore/src/test/java/com/minhnbnt/fashionstore/features/shop/ShopStaffAuditDetailTest.java`
 
-- [ ] **Step 1: Write failing test**
-  Tạo test trong `ShopStaffAuditDetailTest.java` kiểm tra nội dung cột `detail` trong `shop_member_audit`:
+- [x] **Step 1: Write failing test**
+  Tạo test trong `ShopAuditIntegrationTest.java` kiểm tra nội dung cột `detail` trong `shop_member_audit`:
   - Khi mời nhân viên: `detail` phải chứa cả email và tên vai trò mời (`"Mời " + email + " vào vai trò " + roleName`).
   - Khi đổi vai trò: `detail` phải chứa email nhân viên bị đổi vai trò và tên vai trò mới.
   - Khi vô hiệu hóa: `detail` phải chứa email nhân viên bị khóa.
-- [ ] **Step 2: Run test to confirm it fails**
+- [x] **Step 2: Run test to confirm it fails**
   Chạy test và xác nhận thất bại do nội dung hiện tại chỉ là `"New role: ..."` hoặc `"Status: DEACTIVATED"`.
-- [ ] **Step 3: Implement minimal code**
+- [x] **Step 3: Implement minimal code**
   - Trong `ShopStaffService.java`: Nâng cấp chi tiết cho `INVITE_STAFF`, `ACCEPT_INVITATION`, `REVOKE_INVITATION`, `CHANGE_MEMBER_ROLE`, `DEACTIVATE_MEMBER`, `ACTIVATE_MEMBER`, `CREATE_ROLE`, `UPDATE_ROLE`, `DELETE_ROLE`.
   - Trong `ShopDecorationService.java`: Bổ sung chi tiết cho `DECORATION_SAVE`, `DECORATION_PUBLISH`, `DECORATION_DISCARD`.
   - Trong `ReviewService.java`: Bổ sung chi tiết cho `REVIEW_REPLY`, `REVIEW_REPORT`.
   - Trong `ReturnRequestService.java`: Bổ sung chi tiết cho `RETURN_APPROVE`, `RETURN_REJECT`.
-- [ ] **Step 4: Run test to confirm it passes**
+- [x] **Step 4: Run test to confirm it passes**
   Chạy test và xác nhận các assert về audit detail PASS 100%.
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
   `git commit -m "feat(audit): enrich activity log details with context and user emails"`
 
 ---

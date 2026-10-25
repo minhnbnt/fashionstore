@@ -89,7 +89,7 @@ public class ShopStaffService {
         var role = ShopRole.create(shopId, request.name(), perms, false);
         roles.save(role);
 
-        audit.record(shopId, userId, "CREATE_ROLE", "ROLE", role.getId(), role.getName());
+        audit.record(shopId, userId, "CREATE_ROLE", "ROLE", role.getId(), "Tạo vai trò: " + role.getName() + " (" + request.permissions().size() + " quyền)");
 
         return toRoleResponse(role);
     }
@@ -115,7 +115,7 @@ public class ShopStaffService {
         role.update(request.name(), perms);
         roles.save(role);
 
-        audit.record(shopId, userId, "UPDATE_ROLE", "ROLE", role.getId(), role.getName());
+        audit.record(shopId, userId, "UPDATE_ROLE", "ROLE", role.getId(), "Cập nhật vai trò: " + role.getName() + " (" + request.permissions().size() + " quyền)");
 
         return toRoleResponse(role);
     }
@@ -140,7 +140,7 @@ public class ShopStaffService {
         }
 
         roles.delete(role);
-        audit.record(shopId, userId, "DELETE_ROLE", "ROLE", role.getId(), role.getName());
+        audit.record(shopId, userId, "DELETE_ROLE", "ROLE", role.getId(), "Xóa vai trò: " + role.getName());
     }
 
     @Transactional(readOnly = true)
@@ -240,7 +240,7 @@ public class ShopStaffService {
             "INVITE_STAFF",
             "INVITATION",
             inv.getId(),
-            "Email: " + email
+            "Mời " + email + " vào vai trò " + role.getName()
         );
 
         return toInvitationResponse(inv);
@@ -281,7 +281,7 @@ public class ShopStaffService {
             "REVOKE_INVITATION",
             "INVITATION",
             inv.getId(),
-            "Email: " + inv.getEmail()
+            "Thu hồi lời mời của " + inv.getEmail()
         );
     }
 
@@ -355,13 +355,19 @@ public class ShopStaffService {
 
         notifications.deleteByRefId(inv.getId());
 
+        var role = roles.findById(inv.getRoleId()).orElse(null);
+        var roleName = "Nhân viên";
+        if (role != null) {
+            roleName = role.getName();
+        }
+
         audit.record(
             inv.getShopId(),
             userId,
             "ACCEPT_INVITATION",
             "MEMBER",
             userId,
-            "Joined as staff"
+            "Chấp nhận lời mời tham gia với vai trò " + roleName
         );
     }
 
@@ -387,6 +393,7 @@ public class ShopStaffService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Role not found");
         }
 
+        var targetEmail = identity.findById(targetMemberId).map(AccountInfo::email).orElse("thành viên");
         members.updateRole(shopId, targetMemberId, MemberRole.STAFF, request.roleId());
         audit.record(
             shopId,
@@ -394,7 +401,7 @@ public class ShopStaffService {
             "CHANGE_MEMBER_ROLE",
             "MEMBER",
             targetMemberId,
-            "New role: " + role.getName()
+            "Đổi vai trò của " + targetEmail + " thành " + role.getName()
         );
     }
 
@@ -421,9 +428,12 @@ public class ShopStaffService {
 
         members.updateStatus(shopId, targetMemberId, status);
 
+        var targetEmail = identity.findById(targetMemberId).map(AccountInfo::email).orElse("thành viên");
         var action = "DEACTIVATE_MEMBER";
+        var detail = "Vô hiệu hóa thành viên " + targetEmail;
         if ("ACTIVE".equals(status)) {
             action = "ACTIVATE_MEMBER";
+            detail = "Kích hoạt lại thành viên " + targetEmail;
         }
         audit.record(
             shopId,
@@ -431,7 +441,7 @@ public class ShopStaffService {
             action,
             "MEMBER",
             targetMemberId,
-            "Status: " + status
+            detail
         );
     }
 
