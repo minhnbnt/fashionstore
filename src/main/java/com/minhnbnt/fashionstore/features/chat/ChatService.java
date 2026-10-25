@@ -179,10 +179,7 @@ public class ChatService {
             conversations.save(conv);
 
             var event = new ChatReadEvent(conversationId, userId, Instant.now());
-            realtime.publishReadReceipt(
-                Set.copyOf(members.findActiveUserIdsByShop(conv.getShopId())),
-                event
-            );
+            realtime.publishReadReceipt(Set.of(conv.getBuyerId()), event);
             return;
         }
 
@@ -191,7 +188,10 @@ public class ChatService {
             conversations.save(conv);
 
             var event = new ChatReadEvent(conversationId, userId, Instant.now());
-            realtime.publishReadReceipt(Set.of(conv.getBuyerId()), event);
+            realtime.publishReadReceipt(
+                Set.copyOf(members.findActiveUserIdsByShop(conv.getShopId())),
+                event
+            );
         }
     }
 
