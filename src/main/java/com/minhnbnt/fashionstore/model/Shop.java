@@ -357,6 +357,9 @@ public class Shop implements Persistable<UUID> {
             this.returnPolicy = returnPolicy;
         }
         if (processingDays != null) {
+            if (processingDays < 1 || processingDays > 3) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Processing days must be between 1 and 3 days");
+            }
             this.processingDays = processingDays;
         }
         if (bankName != null) {
