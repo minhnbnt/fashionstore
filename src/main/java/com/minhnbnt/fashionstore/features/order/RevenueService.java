@@ -186,13 +186,15 @@ public class RevenueService {
         );
 
         var saved = withdrawals.save(withdrawal);
+        var withdrawalDetail = "Yêu cầu rút " + saved.getAmount() + "₫ | Ngân hàng: " + bankName
+            + " | Số tài khoản: " + bankAccount + " | Chủ tài khoản: " + bankHolder;
         audit.record(
             saved.getShopId(),
             userId,
             "WITHDRAWAL_CREATE",
             "WITHDRAWAL",
             saved.getId(),
-            saved.getAmount() + " VND"
+            withdrawalDetail
         );
 
         return toWithdrawalResponse(saved);

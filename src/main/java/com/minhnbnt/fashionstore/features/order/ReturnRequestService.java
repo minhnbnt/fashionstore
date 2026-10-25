@@ -135,7 +135,12 @@ public class ReturnRequestService {
 
         req.approve(request.resolution(), request.refundAmount(), request.sellerNote());
         var saved = returns.save(req);
-        audit.record(saved.getShopId(), userId, "RETURN_APPROVE", "RETURN", saved.getId(), "Chấp thuận yêu cầu trả hàng (" + request.resolution() + ")");
+        var approveDetail = "Chấp thuận yêu cầu trả hàng | Phương án: " + request.resolution()
+            + " | Số tiền hoàn: " + request.refundAmount() + "₫";
+        if (request.sellerNote() != null && !request.sellerNote().isBlank()) {
+            approveDetail = approveDetail + " | Ghi chú người bán: " + request.sellerNote();
+        }
+        audit.record(saved.getShopId(), userId, "RETURN_APPROVE", "RETURN", saved.getId(), approveDetail);
 
         return toResponse(saved);
     }
@@ -157,7 +162,7 @@ public class ReturnRequestService {
         var detail = "Từ chối yêu cầu trả hàng";
         var sellerNote = request.sellerNote();
         if (sellerNote != null && !sellerNote.isBlank()) {
-            detail = "Từ chối yêu cầu trả hàng, lý do: " + sellerNote;
+            detail = "Từ chối yêu cầu trả hàng | Lý do: " + sellerNote;
         }
         audit.record(saved.getShopId(), userId, "RETURN_REJECT", "RETURN", saved.getId(), detail);
 
@@ -178,7 +183,11 @@ public class ReturnRequestService {
 
         req.complete(note);
         var saved = returns.save(req);
-        audit.record(saved.getShopId(), userId, "RETURN_COMPLETE", "RETURN", saved.getId(), "Hoàn tất xử lý đổi trả");
+        var completeDetail = "Hoàn tất xử lý đổi trả";
+        if (note != null && !note.isBlank()) {
+            completeDetail = completeDetail + " | Ghi chú: " + note;
+        }
+        audit.record(saved.getShopId(), userId, "RETURN_COMPLETE", "RETURN", saved.getId(), completeDetail);
 
         return toResponse(saved);
     }

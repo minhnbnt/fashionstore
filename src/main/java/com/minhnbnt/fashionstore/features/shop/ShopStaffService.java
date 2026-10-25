@@ -433,15 +433,29 @@ public class ShopStaffService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Role not found");
         }
 
+        var oldRoleName = "Chưa gán vai trò";
+        if (target.getRoleId() != null) {
+            var oldRole = roles.findByShopIdAndId(shopId, target.getRoleId()).orElse(null);
+            if (oldRole != null) {
+                oldRoleName = oldRole.getName();
+            }
+        }
+
+        var permCount = 0;
+        if (role.getPermissions() != null) {
+            permCount = role.getPermissions().length;
+        }
+
         var targetEmail = identity.findById(targetMemberId).map(AccountInfo::email).orElse("thành viên");
         members.updateRole(shopId, targetMemberId, MemberRole.STAFF, request.roleId());
+        var detail = "Đổi vai trò của " + targetEmail + " | Vai trò cũ: [" + oldRoleName + "] -> Vai trò mới: [" + role.getName() + "] (" + permCount + " quyền)";
         audit.record(
             shopId,
             userId,
             "CHANGE_MEMBER_ROLE",
             "MEMBER",
             targetMemberId,
-            "Đổi vai trò của " + targetEmail + " thành " + role.getName()
+            detail
         );
     }
 

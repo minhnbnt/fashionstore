@@ -337,7 +337,9 @@ class ShopAuditIntegrationTest {
 
         var page = staff.listAuditLogs(ownerId, shopId, "CHANGE_MEMBER_ROLE", 0, 10);
         assertThat(page.items()).hasSize(1);
-        assertThat(page.items().getFirst().detail()).isEqualTo("Đổi vai trò của " + staffEmail + " thành Truong kho");
+        assertThat(page.items().getFirst().detail())
+            .contains("Đổi vai trò của " + staffEmail)
+            .contains("-> Vai trò mới: [Truong kho]");
     }
 
     @Test

@@ -338,7 +338,19 @@ public class CatalogService {
             newValues.put("name", request.name());
         }
         if (request.categoryId() != null && !request.categoryId().equals(product.getCategoryId())) {
-            changes.add("Đổi danh mục ngành hàng");
+            var oldCatName = "Chưa phân loại";
+            if (product.getCategoryId() != null) {
+                var oldCat = categories.findById(product.getCategoryId()).orElse(null);
+                if (oldCat != null) {
+                    oldCatName = oldCat.getName();
+                }
+            }
+            var newCatName = "Chưa phân loại";
+            var newCat = categories.findById(request.categoryId()).orElse(null);
+            if (newCat != null) {
+                newCatName = newCat.getName();
+            }
+            changes.add("Đổi danh mục: [" + oldCatName + "] -> [" + newCatName + "]");
             oldValues.put("categoryId", product.getCategoryId());
             newValues.put("categoryId", request.categoryId());
         }
@@ -365,6 +377,62 @@ public class CatalogService {
             }
             oldValues.put("tryOnEnabled", product.isTryOnEnabled());
             newValues.put("tryOnEnabled", request.tryOnEnabled());
+        }
+        if (request.material() != null && !request.material().equals(product.getMaterial())) {
+            var oldMat = "Chưa có";
+            if (product.getMaterial() != null) {
+                oldMat = product.getMaterial();
+            }
+            changes.add("Chất liệu: " + oldMat + " -> " + request.material());
+            oldValues.put("material", product.getMaterial());
+            newValues.put("material", request.material());
+        }
+        if (request.origin() != null && !request.origin().equals(product.getOrigin())) {
+            var oldOri = "Chưa có";
+            if (product.getOrigin() != null) {
+                oldOri = product.getOrigin();
+            }
+            changes.add("Xuất xứ: " + oldOri + " -> " + request.origin());
+            oldValues.put("origin", product.getOrigin());
+            newValues.put("origin", request.origin());
+        }
+        if (request.weightGrams() != null && !request.weightGrams().equals(product.getWeightGrams())) {
+            var oldW = "Chưa có";
+            if (product.getWeightGrams() != null) {
+                oldW = product.getWeightGrams() + "g";
+            }
+            changes.add("Khối lượng: " + oldW + " -> " + request.weightGrams() + "g");
+            oldValues.put("weightGrams", product.getWeightGrams());
+            newValues.put("weightGrams", request.weightGrams());
+        }
+        var dimChanged = false;
+        if (request.lengthCm() != null && !request.lengthCm().equals(product.getLengthCm())) {
+            dimChanged = true;
+        }
+        if (request.widthCm() != null && !request.widthCm().equals(product.getWidthCm())) {
+            dimChanged = true;
+        }
+        if (request.heightCm() != null && !request.heightCm().equals(product.getHeightCm())) {
+            dimChanged = true;
+        }
+        if (dimChanged) {
+            var oldDim = product.getLengthCm() + "x" + product.getWidthCm() + "x" + product.getHeightCm() + "cm";
+            var newL = product.getLengthCm();
+            if (request.lengthCm() != null) {
+                newL = request.lengthCm();
+            }
+            var newW = product.getWidthCm();
+            if (request.widthCm() != null) {
+                newW = request.widthCm();
+            }
+            var newH = product.getHeightCm();
+            if (request.heightCm() != null) {
+                newH = request.heightCm();
+            }
+            var newDim = newL + "x" + newW + "x" + newH + "cm";
+            changes.add("Kích thước đóng gói: " + oldDim + " -> " + newDim);
+            oldValues.put("dimensions", oldDim);
+            newValues.put("dimensions", newDim);
         }
         if (request.status() != null && !request.status().equalsIgnoreCase(product.getStatus().name())) {
             changes.add("Đổi trạng thái: " + product.getStatus().name() + " -> " + request.status());
@@ -394,6 +462,7 @@ public class CatalogService {
         }
 
         if (request.images() != null) {
+            var oldCount = images.findByProductIdOrderBySortOrderAsc(product.getId()).size();
             images.deleteByProductId(product.getId());
             var newImages = request.images().stream()
                 .map(img -> ProductImage.create(
@@ -404,7 +473,9 @@ public class CatalogService {
                 ))
                 .toList();
             images.saveAll(newImages);
-            changes.add("Cập nhật lại " + newImages.size() + " ảnh sản phẩm");
+            changes.add("Cập nhật bộ ảnh: " + oldCount + " ảnh cũ -> " + newImages.size() + " ảnh mới");
+            oldValues.put("imageCount", oldCount);
+            newValues.put("imageCount", newImages.size());
         }
 
         if (request.variants() != null) {
@@ -414,7 +485,7 @@ public class CatalogService {
         var saved = products.save(product);
         keywordScanner.scan(saved.getId(), saved.getName(), saved.getDescription());
 
-        var summary = String.join("; ", changes);
+        var summary = String.join(" | ", changes);
         if (summary.isBlank()) {
             summary = "Cập nhật sản phẩm";
         }
@@ -428,7 +499,7 @@ public class CatalogService {
             toJson(newValues)
         ));
 
-        var updateDetail = "Cập nhật sản phẩm: \"" + saved.getName() + "\" | Thay đổi: " + summary;
+        var updateDetail = "Cập nhật sản phẩm: \"" + saved.getName() + "\" | " + summary;
         audit.record(saved.getShopId(), userId, "PRODUCT_UPDATE", "PRODUCT", saved.getId(), updateDetail);
 
         return toResponse(saved);
@@ -712,17 +783,51 @@ public class CatalogService {
                 }
 
                 if (update.stockQuantity() != null && update.stockQuantity() != variant.getStockQuantity()) {
-                    changes.add("Tồn kho " + variant.getSize() + "/" + variant.getColor() + ": "
-                        + variant.getStockQuantity() + " -> " + update.stockQuantity());
+                    var delta = update.stockQuantity() - variant.getStockQuantity();
+                    var deltaSign = "";
+                    if (delta > 0) {
+                        deltaSign = "+";
+                    }
+                    changes.add("Tồn kho " + variant.getSize() + "/" + variant.getColor() + " (SKU: " + variant.getSku() + "): "
+                        + variant.getStockQuantity() + " -> " + update.stockQuantity() + " (" + deltaSign + delta + ")");
                     oldValues.put("stock_" + variant.getId(), variant.getStockQuantity());
                     newValues.put("stock_" + variant.getId(), update.stockQuantity());
                 }
 
                 if (update.price() != null && !update.price().equals(variant.getPrice())) {
                     changes.add("Giá bán " + variant.getSize() + "/" + variant.getColor() + ": "
-                        + variant.getPrice() + " -> " + update.price());
+                        + variant.getPrice() + "₫ -> " + update.price() + "₫");
                     oldValues.put("price_" + variant.getId(), variant.getPrice());
                     newValues.put("price_" + variant.getId(), update.price());
+                }
+
+                if (update.compareAtPrice() != null && !update.compareAtPrice().equals(variant.getCompareAtPrice())) {
+                    var oldCap = "Chưa có";
+                    if (variant.getCompareAtPrice() != null) {
+                        oldCap = variant.getCompareAtPrice() + "₫";
+                    }
+                    changes.add("Giá niêm yết " + variant.getSize() + "/" + variant.getColor() + ": "
+                        + oldCap + " -> " + update.compareAtPrice() + "₫");
+                    oldValues.put("compareAtPrice_" + variant.getId(), variant.getCompareAtPrice());
+                    newValues.put("compareAtPrice_" + variant.getId(), update.compareAtPrice());
+                }
+
+                if (update.size() != null && !update.size().trim().equals(variant.getSize())) {
+                    changes.add("Đổi kích cỡ biến thể (SKU: " + variant.getSku() + "): " + variant.getSize() + " -> " + update.size().trim());
+                    oldValues.put("size_" + variant.getId(), variant.getSize());
+                    newValues.put("size_" + variant.getId(), update.size().trim());
+                }
+
+                if (update.color() != null && !update.color().trim().equals(variant.getColor())) {
+                    changes.add("Đổi màu sắc biến thể (SKU: " + variant.getSku() + "): " + variant.getColor() + " -> " + update.color().trim());
+                    oldValues.put("color_" + variant.getId(), variant.getColor());
+                    newValues.put("color_" + variant.getId(), update.color().trim());
+                }
+
+                if (update.sku() != null && !update.sku().trim().equals(variant.getSku())) {
+                    changes.add("Đổi mã SKU: " + variant.getSku() + " -> " + update.sku().trim());
+                    oldValues.put("sku_" + variant.getId(), variant.getSku());
+                    newValues.put("sku_" + variant.getId(), update.sku().trim());
                 }
 
                 variant.updateDetails(
@@ -769,7 +874,8 @@ public class CatalogService {
                     unsetCurrentDefault(product.getId(), newVar.getId());
                 }
                 variants.save(newVar);
-                changes.add("Thêm biến thể mới: " + newVar.getSize() + " - " + newVar.getColor() + " (SKU: " + newVar.getSku() + ")");
+                changes.add("Thêm phân loại mới: Size " + newVar.getSize() + ", Màu " + newVar.getColor()
+                    + " (SKU: " + newVar.getSku() + ", Giá: " + newVar.getPrice() + "₫, Tồn kho: " + stock + ")");
                 newValues.put("new_variant_" + newVar.getSku(), newVar.getSize() + "/" + newVar.getColor());
             }
         }
@@ -1554,9 +1660,9 @@ public class CatalogService {
         if (delta > 0) {
             deltaStr = "+" + delta;
         }
-        var adjustDetail = "Điều chỉnh tồn kho sản phẩm \"" + prodName + "\" (Size: " + variant.getSize()
-            + ", Màu: " + variant.getColor() + ", SKU: " + variant.getSku() + "): "
-            + oldStock + " -> " + request.newStock() + " (" + deltaStr + "). Lý do: " + reason;
+        var adjustDetail = "Điều chỉnh tồn kho sản phẩm: \"" + prodName + "\" | Phân loại: Size " + variant.getSize()
+            + ", Màu " + variant.getColor() + " (SKU: " + variant.getSku() + ") | Tồn kho: "
+            + oldStock + " -> " + request.newStock() + " (" + deltaStr + ") | Lý do: " + reason;
 
         audit.record(
             variant.getShopId(),
