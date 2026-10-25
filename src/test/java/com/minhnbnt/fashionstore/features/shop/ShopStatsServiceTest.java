@@ -1,6 +1,6 @@
 package com.minhnbnt.fashionstore.features.shop;
 
-import com.minhnbnt.fashionstore.model.MemberRole;
+import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,7 +57,7 @@ class ShopStatsServiceTest {
         assertThat(result.pendingOrders()).isEqualTo(2L);
         assertThat(result.shopVisits()).isEqualTo(50L);
 
-        verify(access).requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        verify(access).requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
     }
 
     @Test
