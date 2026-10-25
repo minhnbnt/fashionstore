@@ -117,6 +117,13 @@ public class ShopMemberRepository {
             .optional();
     }
 
+    public List<UUID> findActiveUserIdsByShop(UUID shopId) {
+        return jdbc.sql("SELECT user_id FROM shop_member WHERE shop_id = :shop AND status = 'ACTIVE' ORDER BY joined_at")
+            .param("shop", shopId)
+            .query((rs, rowNum) -> (UUID) rs.getObject("user_id"))
+            .list();
+    }
+
     public void updateRole(UUID shopId, UUID userId, MemberRole role, @Nullable UUID roleId) {
         jdbc.sql("UPDATE shop_member SET role = :role, role_id = :roleId WHERE shop_id = :shop AND user_id = :user")
             .param("role", role.name())
