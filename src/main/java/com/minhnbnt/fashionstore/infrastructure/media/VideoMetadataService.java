@@ -13,6 +13,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 import java.util.OptionalDouble;
 
@@ -21,10 +22,24 @@ import java.util.OptionalDouble;
 @RequiredArgsConstructor
 public class VideoMetadataService {
 
+    /**
+     * Giới hạn thời lượng video sản phẩm theo đặc tả 2.2.4 (giây).
+     */
+    public static final double MAX_VIDEO_DURATION_SECONDS = 60.0;
+
     private final S3Client s3Client;
 
     @Value("${s3.bucket}")
     private String bucket;
+
+    /**
+     * Kiểm tra thời lượng video theo giới hạn mặc định của đặc tả 2.2.4 (60 giây).
+     *
+     * @param videoKey S3 key của video
+     */
+    public void validateVideoDuration(@Nullable String videoKey) {
+        validateVideoDuration(videoKey, MAX_VIDEO_DURATION_SECONDS);
+    }
 
     /**
      * Xác thực file video trên S3 và kiểm tra thời lượng không vượt quá maxSeconds.
@@ -42,10 +57,8 @@ public class VideoMetadataService {
                 .bucket(bucket)
                 .key(videoKey)
                 .build());
-        } catch (NoSuchKeyException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Video file not found: " + videoKey);
-        } catch (software.amazon.awssdk.services.s3.model.S3Exception e) {
-            if (e.statusCode() == 404) {
+        } catch (S3Exception e) {
+            if (e.statusCode() == 404 || e instanceof NoSuchKeyException) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Video file not found: " + videoKey);
             }
             log.warn("Cannot verify video key {}: {}", videoKey, e.getMessage());
@@ -66,14 +79,18 @@ public class VideoMetadataService {
                 if (durationSeconds > maxSeconds + 0.5) {
                     throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
-                        String.format("Product video duration is %.1f seconds, exceeding maximum allowed of %.0f seconds", durationSeconds, maxSeconds)
+                        String.format(
+                            "Product video duration is %.1f seconds, exceeding maximum allowed of %.0f seconds",
+                            durationSeconds,
+                            maxSeconds
+                        )
                     );
                 }
             }
         } catch (ResponseStatusException e) {
             throw e;
         } catch (Exception e) {
-            log.warn("Không thể phân tích metadata video {}: {}", videoKey, e.getMessage());
+            log.warn("Cannot parse metadata for video {}: {}", videoKey, e.getMessage());
         }
     }
 }

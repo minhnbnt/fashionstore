@@ -156,7 +156,7 @@ public class CatalogService {
             );
         }
 
-        videoMetadataService.validateVideoDuration(request.videoKey(), 60.0);
+        videoMetadataService.validateVideoDuration(request.videoKey());
 
         var shop = shopRepository.findById(shopId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found"));
@@ -296,7 +296,7 @@ public class CatalogService {
 
         if (request.videoKey() != null && !request.videoKey().isBlank()
             && !request.videoKey().equals(product.getVideoKey())) {
-            videoMetadataService.validateVideoDuration(request.videoKey(), 60.0);
+            videoMetadataService.validateVideoDuration(request.videoKey());
         }
 
         var changes = new ArrayList<String>();
@@ -737,7 +737,10 @@ public class CatalogService {
                     unsetCurrentDefault(product.getId(), newVar.getId());
                 }
                 variants.save(newVar);
-                changes.add("Thêm biến thể mới: " + newVar.getSize() + " - " + newVar.getColor() + " (SKU: " + newVar.getSku() + ")");
+                changes.add(
+                    "Thêm biến thể mới: " + newVar.getSize() + " - " + newVar.getColor()
+                        + " (SKU: " + newVar.getSku() + ")"
+                );
                 newValues.put("new_variant_" + newVar.getSku(), newVar.getSize() + "/" + newVar.getColor());
             }
         }
@@ -958,7 +961,13 @@ public class CatalogService {
 
         var summary = reviews.ratingSummary(product.getId());
 
-        return CatalogMapper.toResponse(product, variantResponses, imageResponses, summary.averageRating(), summary.reviewCount());
+        return CatalogMapper.toResponse(
+            product,
+            variantResponses,
+            imageResponses,
+            summary.averageRating(),
+            summary.reviewCount()
+        );
     }
 
     @Transactional
@@ -971,6 +980,7 @@ public class CatalogService {
         if (orderService.hasActiveOrdersForProduct(productId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot delete product with active orders");
         }
+        var oldStatus = product.getStatus();
         product.delete();
         products.save(product);
 
@@ -980,6 +990,16 @@ public class CatalogService {
             v.archiveSku(delSuffix);
         }
         variants.saveAll(variantList);
+
+        auditLogs.save(ProductAuditLog.record(
+            productId,
+            shopId,
+            userId,
+            "DELETE",
+            "Xóa mềm sản phẩm",
+            toJson(Map.of("status", oldStatus)),
+            toJson(Map.of("status", "DELETED"))
+        ));
     }
 
     @Transactional

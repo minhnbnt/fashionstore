@@ -86,7 +86,7 @@ public final class Mp4DurationParser {
                 return parseMvhd(dis, payloadSize);
             } else {
                 // Bỏ qua payload của các box khác (ví dụ ftyp, mdat, free)
-                skipFully(dis, payloadSize);
+                dis.skipNBytes(payloadSize);
                 bytesRead += payloadSize;
             }
         }
@@ -95,13 +95,13 @@ public final class Mp4DurationParser {
 
     private static OptionalDouble parseMvhd(DataInputStream dis, long payloadSize) throws IOException {
         if (payloadSize < 20) {
-            skipFully(dis, payloadSize);
+            dis.skipNBytes(payloadSize);
             return OptionalDouble.empty();
         }
 
         int version = dis.readUnsignedByte();
         // Bỏ qua 3 bytes flags
-        skipFully(dis, 3);
+        dis.skipNBytes(3);
 
         long timescale;
         long duration;
@@ -109,17 +109,17 @@ public final class Mp4DurationParser {
         if (version == 1) {
             // Version 1: 64-bit timestamps
             // creation_time (8) + modification_time (8)
-            skipFully(dis, 16);
+            dis.skipNBytes(16);
             timescale = Integer.toUnsignedLong(dis.readInt());
             duration = dis.readLong();
-            skipFully(dis, payloadSize - 1 - 3 - 16 - 4 - 8);
+            dis.skipNBytes(payloadSize - 1 - 3 - 16 - 4 - 8);
         } else {
             // Version 0: 32-bit timestamps
             // creation_time (4) + modification_time (4)
-            skipFully(dis, 8);
+            dis.skipNBytes(8);
             timescale = Integer.toUnsignedLong(dis.readInt());
             duration = Integer.toUnsignedLong(dis.readInt());
-            skipFully(dis, payloadSize - 1 - 3 - 8 - 4 - 4);
+            dis.skipNBytes(payloadSize - 1 - 3 - 8 - 4 - 4);
         }
 
         if (timescale <= 0 || duration <= 0) {
@@ -128,21 +128,5 @@ public final class Mp4DurationParser {
 
         double durationSeconds = (double) duration / timescale;
         return OptionalDouble.of(durationSeconds);
-    }
-
-    private static void skipFully(DataInputStream dis, long n) throws IOException {
-        long remaining = n;
-        while (remaining > 0) {
-            long skipped = dis.skip(remaining);
-            if (skipped <= 0) {
-                // Đọc bỏ từng byte nếu skip không hiệu quả
-                if (dis.read() == -1) {
-                    throw new EOFException("Stream ended while skipping");
-                }
-                remaining--;
-            } else {
-                remaining -= skipped;
-            }
-        }
     }
 }

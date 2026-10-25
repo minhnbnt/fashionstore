@@ -92,7 +92,11 @@ public record CreateProductRequest(
     @Positive(message = "Package height must be positive")
     Integer heightCm,
 
-    @Schema(description = "Trạng thái mong muốn khi đăng bán: ACTIVE (Đang bán) hoặc HIDDEN (Tạm ẩn)", nullable = true, example = "ACTIVE")
+    @Schema(
+        description = "Trạng thái mong muốn khi đăng bán: ACTIVE (Đang bán) hoặc HIDDEN (Tạm ẩn)",
+        nullable = true,
+        example = "ACTIVE"
+    )
     @Nullable
     @Pattern(regexp = "ACTIVE|HIDDEN", message = "Status must be ACTIVE or HIDDEN")
     String status

@@ -155,4 +155,30 @@ class VideoMetadataServiceTest {
         assertThatCode(() -> videoMetadataService.validateVideoDuration("videos/good.mp4", 60.0))
             .doesNotThrowAnyException();
     }
+
+    @Test
+    void validateVideoDuration_s3OtherError_failsOpen() {
+        // Loi S3 khac 404 chi duoc warn, khong chan viec dang san pham
+        when(s3Client.headObject(any(HeadObjectRequest.class)))
+            .thenThrow(S3Exception.builder().statusCode(500).message("Internal Error").build());
+
+        assertThatCode(() -> videoMetadataService.validateVideoDuration("videos/flaky.mp4", 60.0))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void validateVideoDuration_unparseableStream_failsOpen() throws Exception {
+        // Stream khong parse duoc MP4 (vi du file cu hoac container khac) thi bo qua, khong chan
+        when(s3Client.headObject(any(HeadObjectRequest.class)))
+            .thenReturn(HeadObjectResponse.builder().contentLength(1024L).build());
+
+        var inputStream = new ResponseInputStream<>(
+            GetObjectResponse.builder().build(),
+            AbortableInputStream.create(new ByteArrayInputStream("not an mp4 file".getBytes()))
+        );
+        when(s3Client.getObject(any(GetObjectRequest.class))).thenReturn(inputStream);
+
+        assertThatCode(() -> videoMetadataService.validateVideoDuration("videos/legacy.mp4", 60.0))
+            .doesNotThrowAnyException();
+    }
 }

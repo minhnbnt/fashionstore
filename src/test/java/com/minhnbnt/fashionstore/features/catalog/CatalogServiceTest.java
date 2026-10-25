@@ -662,6 +662,52 @@ class CatalogServiceTest {
     }
 
     @Test
+    void deleteProductWritesAuditLog() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-del-audit");
+        var created = catalog.createProduct(ownerId, shopId, productRequest("ao-soft-delete-audit"));
+
+        catalog.deleteProduct(ownerId, shopId, created.id());
+
+        var auditLogs = catalog.getAuditLogs(ownerId, shopId, created.id());
+        assertThat(auditLogs).anySatisfy(log -> {
+            assertThat(log.action()).isEqualTo("DELETE");
+            assertThat(log.changesSummary()).contains("Xóa mềm");
+            assertThat(log.oldValues()).contains("status");
+        });
+    }
+
+    @Test
+    void updateProductRejectsDeletedProduct() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-upd-del");
+        var created = catalog.createProduct(ownerId, shopId, productRequest("ao-upd-deleted"));
+
+        catalog.deleteProduct(ownerId, shopId, created.id());
+
+        assertThatThrownBy(() -> catalog.updateProduct(
+            ownerId,
+            shopId,
+            created.id(),
+            new UpdateProductRequest("Ten moi", null, null, null, null)
+        )).isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void toggleProductStatusRejectsDeletedProduct() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-tgl-del");
+        var created = catalog.createProduct(ownerId, shopId, productRequest("ao-toggle-deleted"));
+
+        catalog.deleteProduct(ownerId, shopId, created.id());
+
+        assertThatThrownBy(() -> catalog.toggleProductStatus(ownerId, shopId, created.id()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+    }
+
+    @Test
     void toggleProductStatusHideAndActivate() {
         var ownerId = mirroredUser();
         var shopId = approvedShop(ownerId, "shop-hide-act");
