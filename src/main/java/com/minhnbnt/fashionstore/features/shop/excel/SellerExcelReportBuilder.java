@@ -68,7 +68,7 @@ public class SellerExcelReportBuilder {
                 return out.toByteArray();
             }
         } catch (IOException e) {
-            throw new IllegalStateException("Lỗi khi kết xuất file báo cáo Excel: " + e.getMessage(), e);
+            throw new IllegalStateException("Failed to generate Excel report: " + e.getMessage(), e);
         }
     }
 
@@ -146,7 +146,10 @@ public class SellerExcelReportBuilder {
         r = addKpiRow(sheet, r, "Tổng doanh thu bán hàng", summary.completedValue(), styles.currencyStyle, "VND", "Doanh thu các đơn giao thành công (DELIVERED)", styles);
         r = addKpiRow(sheet, r, "Tổng số đơn hoàn thành", summary.completedOrders(), styles.integerStyle, "Đơn", "Số đơn giao thành công tới người mua", styles);
 
-        long aov = summary.completedOrders() > 0 ? summary.completedValue() / summary.completedOrders() : 0;
+        long aov = 0;
+        if (summary.completedOrders() > 0) {
+            aov = summary.completedValue() / summary.completedOrders();
+        }
         r = addKpiRow(sheet, r, "Giá trị trung bình / đơn (AOV)", aov, styles.currencyStyle, "VND", "Tổng doanh thu / Số đơn thành công", styles);
         r = addKpiRow(sheet, r, "Tổng giá trị đơn đã hủy", summary.cancelledValue(), styles.currencyStyle, "VND", "Đơn hàng bị người mua hoặc shop hủy (CANCELLED)", styles);
         r = addKpiRow(sheet, r, "Số lượng đơn đã hủy", summary.cancelledOrders(), styles.integerStyle, "Đơn", "Số đơn hủy trong kỳ", styles);
@@ -179,7 +182,10 @@ public class SellerExcelReportBuilder {
             createCell(row, 0, p.paymentMethod(), styles.dataStyle);
             createNumericCell(row, 1, p.orderCount(), styles.integerStyle);
             createNumericCell(row, 2, p.revenue(), styles.currencyStyle);
-            double ratio = totalPayRevenue > 0 ? (double) p.revenue() / totalPayRevenue : 0.0;
+            double ratio = 0.0;
+            if (totalPayRevenue > 0) {
+                ratio = (double) p.revenue() / totalPayRevenue;
+            }
             createNumericCell(row, 3, ratio, styles.percentStyle);
         }
 
@@ -347,8 +353,11 @@ public class SellerExcelReportBuilder {
     }
 
     private String maskPhoneNumber(String phone) {
-        if (phone == null || phone.length() < 7) {
-            return phone == null ? "" : phone;
+        if (phone == null) {
+            return "";
+        }
+        if (phone.length() < 7) {
+            return phone;
         }
         var len = phone.length();
         return phone.substring(0, 3) + "****" + phone.substring(len - 3);
@@ -497,7 +506,11 @@ public class SellerExcelReportBuilder {
 
     private void createCell(Row row, int col, String value, CellStyle style) {
         var cell = row.createCell(col);
-        cell.setCellValue(value != null ? value : "");
+        if (value != null) {
+            cell.setCellValue(value);
+        } else {
+            cell.setCellValue("");
+        }
         cell.setCellStyle(style);
     }
 
