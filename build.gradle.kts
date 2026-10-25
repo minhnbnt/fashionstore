@@ -3,7 +3,6 @@ import net.ltgt.gradle.errorprone.errorprone
 plugins {
     java
     id("org.springframework.boot") version "4.1.1"
-    id("org.springframework.boot.aot") version "4.1.1"
     id("io.spring.dependency-management") version "1.1.7"
     id("net.ltgt.errorprone") version "5.1.1"
 }
@@ -71,12 +70,4 @@ tasks.withType<JavaCompile>().configureEach {
         option("NullAway:ExcludedClassAnnotations", "org.springframework.aot.generate.Generated")
         disable("StringConcatToTextBlock")
     }
-}
-
-tasks.named<JavaCompile>("compileAotJava") {
-    options.errorprone.enabled = false
-}
-
-tasks.named<JavaCompile>("compileAotTestJava") {
-    options.errorprone.enabled = false
 }
