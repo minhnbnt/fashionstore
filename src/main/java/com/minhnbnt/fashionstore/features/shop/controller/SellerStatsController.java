@@ -371,11 +371,13 @@ public class SellerStatsController {
         return stats.getFollowerTrend(userId, shopId);
     }
 
+    private static final java.time.ZoneId VN_ZONE = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+
     @GetMapping("/revenue/export")
     @Operation(
         operationId = "exportRevenueReport",
         summary = "Xuất file báo cáo doanh thu",
-        description = "Tải về báo cáo doanh thu dưới định dạng CSV/Excel theo khoảng thời gian."
+        description = "Tải về báo cáo doanh thu dưới định dạng Excel (.xlsx) đa sheet hoặc CSV theo khoảng thời gian."
     )
     @ApiResponse(responseCode = "200", description = "File báo cáo doanh thu")
     @ApiResponse(responseCode = "400", description = "Tham số không hợp lệ")
@@ -385,8 +387,8 @@ public class SellerStatsController {
     public ResponseEntity<byte[]> exportRevenue(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "ID shop") @PathVariable UUID shopId,
-        @Parameter(description = "Định dạng file (csv, xlsx)")
-        @RequestParam(defaultValue = "csv")
+        @Parameter(description = "Định dạng file (xlsx, csv)")
+        @RequestParam(defaultValue = "xlsx")
         @Pattern(regexp = "(?i)csv|xlsx", message = "Format must be csv or xlsx")
         String format,
         @Parameter(description = "Từ ngày (YYYY-MM-DD)") @RequestParam(required = false) LocalDate from,
@@ -396,10 +398,16 @@ public class SellerStatsController {
         var userId = UUID.fromString(subject);
         var bytes = stats.exportRevenueReport(userId, shopId, format, from, to);
 
-        var filename = "revenue-report-" + shopId + ".csv";
+        var extension = ".xlsx";
+        var mediaType = MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        if ("csv".equalsIgnoreCase(format)) {
+            extension = ".csv";
+            mediaType = MediaType.parseMediaType("text/csv; charset=UTF-8");
+        }
+        var filename = "bao-cao-doanh-thu-" + shopId + "-" + LocalDate.now(VN_ZONE) + extension;
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-            .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
+            .contentType(mediaType)
             .body(bytes);
     }
 }

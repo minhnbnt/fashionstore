@@ -106,7 +106,21 @@ class SellerStatsControllerTest {
                 .param("format", "csv")
                 .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
             .andExpect(status().isOk())
-            .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, org.hamcrest.Matchers.containsString("revenue-report-")))
+            .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, org.hamcrest.Matchers.containsString("bao-cao-doanh-thu-")))
             .andExpect(content().contentType("text/csv;charset=UTF-8"));
+    }
+
+    @Test
+    void exportRevenueReportReturnsXlsxContentTypeByDefault() throws Exception {
+        var xlsxData = new byte[]{0x50, 0x4B, 0x03, 0x04}; // PK zip header
+        when(stats.exportRevenueReport(eq(userId), eq(shopId), eq("xlsx"), any(), any()))
+            .thenReturn(xlsxData);
+
+        mockMvc.perform(get("/api/seller/shops/{shopId}/stats/revenue/export", shopId)
+                .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+            .andExpect(status().isOk())
+            .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, org.hamcrest.Matchers.containsString("bao-cao-doanh-thu-")))
+            .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, org.hamcrest.Matchers.containsString(".xlsx")))
+            .andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
     }
 }

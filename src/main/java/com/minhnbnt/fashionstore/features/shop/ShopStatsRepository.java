@@ -27,6 +27,30 @@ public class ShopStatsRepository {
 
     public record OrderStatusSummaryRow(long completedOrders, long completedValue, long cancelledOrders, long cancelledValue, long returnedOrders, long returnedValue) {}
 
+    public record OrderExportRow(
+        UUID orderId,
+        String code,
+        Instant createdAt,
+        String shippingName,
+        String shippingPhone,
+        String status,
+        String paymentMethod,
+        long subtotal,
+        long shippingFee,
+        long total
+    ) {}
+
+    public record ProductPerformanceRow(
+        UUID productId,
+        String productName,
+        String categoryName,
+        String sku,
+        long price,
+        long totalSold,
+        long totalRevenue,
+        int currentStock
+    ) {}
+
     public record ProductStatsRow(UUID productId, String productName, @Nullable String defaultImageKey, long totalSold, long totalRevenue, long viewCount, int currentStock) {}
 
     public record CustomerOverviewRow(long totalCustomers, long newCustomers, long returningCustomers, long avgOrderValue) {}
@@ -199,6 +223,109 @@ public class ShopStatsRepository {
                 rs.getString("payment_method"),
                 rs.getLong("revenue"),
                 rs.getLong("order_count")
+            ))
+            .list();
+    }
+
+    public List<RevenueByPaymentRow> revenueByPayment(UUID shopId, Instant from, Instant to) {
+        var sql = """
+            SELECT
+                o.payment_method AS payment_method,
+                COALESCE(SUM(o.total), 0) AS revenue,
+                COUNT(o.id) AS order_count
+            FROM orders o
+            WHERE o.shop_id = :shopId
+              AND o.status != 'CANCELLED'
+              AND o.created_at >= :from
+              AND o.created_at < :to
+            GROUP BY o.payment_method
+            ORDER BY revenue DESC
+            """;
+
+        return jdbc.sql(sql)
+            .param("shopId", shopId)
+            .param("from", java.sql.Timestamp.from(from))
+            .param("to", java.sql.Timestamp.from(to))
+            .query((rs, rowNum) -> new RevenueByPaymentRow(
+                rs.getString("payment_method"),
+                rs.getLong("revenue"),
+                rs.getLong("order_count")
+            ))
+            .list();
+    }
+
+    public List<OrderExportRow> ordersForExport(UUID shopId, Instant from, Instant to) {
+        var sql = """
+            SELECT
+                o.id AS order_id,
+                o.code AS order_code,
+                o.created_at AS created_at,
+                o.shipping_name AS shipping_name,
+                o.shipping_phone AS shipping_phone,
+                o.status AS status,
+                o.payment_method AS payment_method,
+                o.subtotal AS subtotal,
+                o.shipping_fee AS shipping_fee,
+                o.total AS total
+            FROM orders o
+            WHERE o.shop_id = :shopId
+              AND o.created_at >= :from
+              AND o.created_at < :to
+            ORDER BY o.created_at DESC
+            """;
+
+        return jdbc.sql(sql)
+            .param("shopId", shopId)
+            .param("from", java.sql.Timestamp.from(from))
+            .param("to", java.sql.Timestamp.from(to))
+            .query((rs, rowNum) -> new OrderExportRow(
+                rs.getObject("order_id", UUID.class),
+                rs.getString("order_code"),
+                rs.getTimestamp("created_at").toInstant(),
+                rs.getString("shipping_name"),
+                rs.getString("shipping_phone"),
+                rs.getString("status"),
+                rs.getString("payment_method"),
+                rs.getLong("subtotal"),
+                rs.getLong("shipping_fee"),
+                rs.getLong("total")
+            ))
+            .list();
+    }
+
+    public List<ProductPerformanceRow> productPerformanceForExport(UUID shopId, Instant from, Instant to) {
+        var sql = """
+            SELECT
+                p.id AS product_id,
+                p.name AS product_name,
+                c.name AS category_name,
+                COALESCE((SELECT pv.sku FROM product_variant pv WHERE pv.product_id = p.id ORDER BY pv.price ASC LIMIT 1), 'N/A') AS sku,
+                COALESCE((SELECT pv.price FROM product_variant pv WHERE pv.product_id = p.id ORDER BY pv.price ASC LIMIT 1), 0) AS price,
+                COALESCE(SUM(oi.quantity), 0) AS total_sold,
+                COALESCE(SUM(oi.line_total), 0) AS total_revenue,
+                COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variant pv WHERE pv.product_id = p.id), 0) AS current_stock
+            FROM product p
+            JOIN category c ON p.category_id = c.id
+            LEFT JOIN order_item oi ON oi.product_id = p.id
+            LEFT JOIN orders o ON oi.order_id = o.id AND o.status != 'CANCELLED' AND o.created_at >= :from AND o.created_at < :to
+            WHERE p.shop_id = :shopId
+            GROUP BY p.id, p.name, c.name
+            ORDER BY total_revenue DESC, total_sold DESC
+            """;
+
+        return jdbc.sql(sql)
+            .param("shopId", shopId)
+            .param("from", java.sql.Timestamp.from(from))
+            .param("to", java.sql.Timestamp.from(to))
+            .query((rs, rowNum) -> new ProductPerformanceRow(
+                rs.getObject("product_id", UUID.class),
+                rs.getString("product_name"),
+                rs.getString("category_name"),
+                rs.getString("sku"),
+                rs.getLong("price"),
+                rs.getLong("total_sold"),
+                rs.getLong("total_revenue"),
+                rs.getInt("current_stock")
             ))
             .list();
     }

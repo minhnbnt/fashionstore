@@ -23,6 +23,7 @@ dependencies {
 
     implementation("org.flywaydb:flyway-database-postgresql")
     implementation("software.amazon.awssdk:s3:2.55.7")
+    implementation("org.apache.poi:poi-ooxml:5.3.0")
 
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-flyway")

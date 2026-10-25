@@ -31,6 +31,12 @@ class ShopStatsServiceTest {
     @Mock
     private ShopAccessChecker access;
 
+    @Mock
+    private ShopRepository shopRepository;
+
+    @Mock
+    private com.minhnbnt.fashionstore.features.shop.excel.SellerExcelReportBuilder reportBuilder;
+
     private ShopStatsService service;
 
     private final UUID userId = UUID.randomUUID();
@@ -38,7 +44,7 @@ class ShopStatsServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ShopStatsService(repository, visitLog, access);
+        service = new ShopStatsService(repository, visitLog, access, shopRepository, reportBuilder);
     }
 
     @Test
@@ -89,7 +95,6 @@ class ShopStatsServiceTest {
 
     @Test
     void getPeriodComparisonCalculatesChangePercent() {
-        var now = Instant.now();
         when(repository.revenueByPeriod(eq(shopId), eq("day"), any(Instant.class), any(Instant.class)))
             .thenReturn(List.of(
                 new ShopStatsRepository.RevenuePeriodRow("2026-10-23", 100000L, 5L),
@@ -118,5 +123,43 @@ class ShopStatsServiceTest {
         assertThat(top.get(0).buyerName()).isEqualTo("Alice");
         assertThat(top.get(0).totalSpent()).isEqualTo(500000L);
         assertThat(top.get(0).orderCount()).isEqualTo(3);
+    }
+
+    @Test
+    void exportRevenueReportCsvCallsReportBuilder() {
+        var rows = List.of(new ShopStatsRepository.RevenuePeriodRow("2026-10-24", 100000L, 1L));
+        when(repository.revenueByPeriod(eq(shopId), eq("day"), any(), any())).thenReturn(rows);
+        when(reportBuilder.buildCsvReport(rows)).thenReturn("test-csv".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        var bytes = service.exportRevenueReport(userId, shopId, "csv", null, null);
+
+        assertThat(bytes).isEqualTo("test-csv".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        verify(access).requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
+        verify(reportBuilder).buildCsvReport(rows);
+    }
+
+    @Test
+    void exportRevenueReportXlsxGathersDataAndCallsReportBuilder() {
+        var rows = List.of(new ShopStatsRepository.RevenuePeriodRow("2026-10-24", 100000L, 1L));
+        var shop = org.mockito.Mockito.mock(com.minhnbnt.fashionstore.model.Shop.class);
+        when(shop.getName()).thenReturn("Test Shop");
+        when(shop.getSlug()).thenReturn("test-shop");
+        when(shopRepository.findById(shopId)).thenReturn(java.util.Optional.of(shop));
+
+        when(repository.revenueByPeriod(eq(shopId), eq("day"), any(), any())).thenReturn(rows);
+        var summary = new ShopStatsRepository.OrderStatusSummaryRow(1, 100000, 0, 0, 0, 0);
+        when(repository.orderStatusSummary(eq(shopId), any(), any())).thenReturn(summary);
+        when(repository.revenueByPayment(eq(shopId), any(), any())).thenReturn(List.of());
+        when(repository.productPerformanceForExport(eq(shopId), any(), any())).thenReturn(List.of());
+        when(repository.ordersForExport(eq(shopId), any(), any())).thenReturn(List.of());
+
+        var expectedBytes = new byte[]{1, 2, 3};
+        when(reportBuilder.buildExcelReport(eq("Test Shop"), eq("test-shop"), any(), any(), eq(summary), eq(rows), any(), any(), any(), eq(true)))
+            .thenReturn(expectedBytes);
+
+        var bytes = service.exportRevenueReport(userId, shopId, "xlsx", null, null);
+
+        assertThat(bytes).isEqualTo(expectedBytes);
+        verify(access).requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
     }
 }

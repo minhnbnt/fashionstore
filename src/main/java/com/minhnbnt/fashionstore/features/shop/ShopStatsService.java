@@ -14,6 +14,7 @@ import com.minhnbnt.fashionstore.dto.shop.ShopPerformanceResponse;
 import com.minhnbnt.fashionstore.dto.shop.TopCustomerResponse;
 import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
+import com.minhnbnt.fashionstore.features.shop.excel.SellerExcelReportBuilder;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -40,6 +41,10 @@ public class ShopStatsService {
     private final ShopVisitLogRepository visitLog;
 
     private final ShopAccessChecker access;
+
+    private final ShopRepository shopRepository;
+
+    private final SellerExcelReportBuilder reportBuilder;
 
     @Transactional(readOnly = true)
     public ShopDashboardResponse getDashboard(@NonNull UUID userId, @NonNull UUID shopId) {
@@ -313,18 +318,40 @@ public class ShopStatsService {
 
         var rows = repository.revenueByPeriod(shopId, "day", from, to);
 
-        var sb = new StringBuilder();
-        // UTF-8 BOM
-        sb.append('\ufeff');
-        sb.append("Ngày,Doanh thu (VND),Số đơn hàng\n");
-
-        for (var row : rows) {
-            sb.append(row.periodLabel()).append(',')
-              .append(row.revenue()).append(',')
-              .append(row.orders()).append('\n');
+        if ("csv".equalsIgnoreCase(format)) {
+            return reportBuilder.buildCsvReport(rows);
         }
 
-        return sb.toString().getBytes(StandardCharsets.UTF_8);
+        var shop = shopRepository.findById(shopId)
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy thông tin gian hàng"));
+
+        var summary = repository.orderStatusSummary(shopId, from, to);
+        var payments = repository.revenueByPayment(shopId, from, to);
+        var products = repository.productPerformanceForExport(shopId, from, to);
+        var orders = repository.ordersForExport(shopId, from, to);
+
+        var startLocalDate = LocalDate.now(VN_ZONE).minusDays(30);
+        if (fromDate != null) {
+            startLocalDate = fromDate;
+        }
+
+        var endLocalDate = LocalDate.now(VN_ZONE);
+        if (toDate != null) {
+            endLocalDate = toDate;
+        }
+
+        return reportBuilder.buildExcelReport(
+            shop.getName(),
+            shop.getSlug(),
+            startLocalDate,
+            endLocalDate,
+            summary,
+            rows,
+            payments,
+            products,
+            orders,
+            true
+        );
     }
 
     private ProductStatsResponse mapProductStats(ShopStatsRepository.ProductStatsRow row) {
