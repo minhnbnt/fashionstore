@@ -11,23 +11,21 @@ import com.minhnbnt.fashionstore.dto.order.CancelOrderRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderItemResponse;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
-import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
-import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepository;
-import com.minhnbnt.fashionstore.features.catalog.repository.StockMovementRepository;import com.minhnbnt.fashionstore.features.order.repository.OrderAdminQueryRepository;
+import com.minhnbnt.fashionstore.features.catalog.ProductStockService;
+import com.minhnbnt.fashionstore.features.order.repository.OrderAdminQueryRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderMonitoringQueryRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderStatusHistoryRepository;
-import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.AdminCancelReason;
-import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.Order;
 import com.minhnbnt.fashionstore.model.OrderItem;
 import com.minhnbnt.fashionstore.model.OrderStatus;
 import com.minhnbnt.fashionstore.model.OrderStatusHistory;
 import com.minhnbnt.fashionstore.model.ProductStatus;
-import com.minhnbnt.fashionstore.model.StockMovement;
+import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -57,19 +55,15 @@ public class OrderService {
 
     private final OrderStatusHistoryRepository histories;
 
-    private final ProductRepository products;
-
-    private final ProductVariantRepository variants;
-
-    private final StockMovementRepository movements;
+    private final ProductStockService productStock;
 
     private final ShopService shops;
-
-    private final ShopMemberRepository members;
 
     private final RevenueService revenue;
 
     private final ShopAccessChecker access;
+
+    private final ShopAuditService audit;
 
     private final OrderAdminQueryRepository adminQueries;
 
@@ -91,7 +85,10 @@ public class OrderService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order must have at least one item");
         }
 
-        var shippingFee = request.shippingFee() == null ? 0L : request.shippingFee();
+        var shippingFee = 0L;
+        if (request.shippingFee() != null) {
+            shippingFee = request.shippingFee();
+        }
         if (shippingFee < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Shipping fee must not be negative");
         }
@@ -100,7 +97,7 @@ public class OrderService {
         var subtotal = 0L;
 
         for (var item : request.items()) {
-            var variant = variants.findById(item.variantId()).orElse(null);
+            var variant = productStock.findVariantById(item.variantId()).orElse(null);
             if (variant == null) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found");
             }
@@ -108,7 +105,7 @@ public class OrderService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "All items must belong to one shop");
             }
 
-            var product = products.findById(variant.getProductId()).orElse(null);
+            var product = productStock.findProductById(variant.getProductId()).orElse(null);
             if (product == null) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
             }
@@ -231,7 +228,7 @@ public class OrderService {
     public List<OrderResponse> listSellerOrders(@NonNull UUID userId) {
         var result = new ArrayList<OrderResponse>();
 
-        for (var shopId : members.findShopIdsByUser(userId)) {
+        for (var shopId : orderReadableShopIds(userId)) {
             for (var order : orders.findByShopIdOrderByCreatedAtDesc(shopId)) {
                 var orderItems = items.findByOrderId(order.getId());
                 result.add(toResponse(order, orderItems));
@@ -250,7 +247,7 @@ public class OrderService {
         @NonNull CancelOrderRequest request
     ) {
         var order = requireOrder(orderId);
-        access.requireShopRole(userId, order.getShopId(), MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_CANCEL);
 
         var from = order.getStatus();
         var orderItems = items.findByOrderId(order.getId());
@@ -259,7 +256,15 @@ public class OrderService {
         restockIfConfirmed(order, from, orderItems);
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CANCELLED, userId));
 
-        return toResponse(orders.save(order), orderItems);
+        var saved = orders.save(order);
+        var cancelDetail = "Hủy đơn hàng #" + saved.getCode() + " | Lý do: " + request.reason();
+        if (request.note() != null && !request.note().isBlank()) {
+            cancelDetail = cancelDetail + " (" + request.note() + ")";
+        }
+        cancelDetail = cancelDetail + " | Khôi phục tồn kho cho " + orderItems.size() + " mặt hàng";
+        audit.record(saved.getShopId(), userId, "ORDER_CANCEL", "ORDER", saved.getId(), cancelDetail);
+
+        return toResponse(saved, orderItems);
     }
 
     @Transactional(readOnly = true)
@@ -340,10 +345,10 @@ public class OrderService {
     ) {
         List<UUID> shopIds;
         if (shopId != null) {
-            access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+            access.requireShopPermission(userId, shopId, ShopPermission.ORDER_READ);
             shopIds = List.of(shopId);
         } else {
-            shopIds = members.findShopIdsByUser(userId);
+            shopIds = orderReadableShopIds(userId);
         }
 
         var result = new ArrayList<OrderResponse>();
@@ -380,7 +385,7 @@ public class OrderService {
     @Transactional
     public OrderResponse confirm(@NonNull UUID userId, @NonNull UUID orderId) {
         var order = requireOrder(orderId);
-        access.requireShopRole(userId, order.getShopId(), MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_PROCESS);
 
         var from = order.getStatus();
 
@@ -389,7 +394,7 @@ public class OrderService {
             if (item.getVariantId() == null) {
                 continue;
             }
-            if (!variants.decrementStock(item.getVariantId(), item.getQuantity())) {
+            if (!productStock.decrementVariantStock(item.getVariantId(), item.getQuantity())) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Insufficient stock");
             }
         }
@@ -397,26 +402,36 @@ public class OrderService {
         order.confirm();
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CONFIRMED, userId));
 
-        return toResponse(orders.save(order), orderItems);
+        var saved = orders.save(order);
+        var confirmDetail = "Xác nhận đơn hàng #" + saved.getCode()
+            + " | Tổng tiền: " + saved.getTotal() + "₫ (" + orderItems.size() + " món)";
+        audit.record(saved.getShopId(), userId, "ORDER_CONFIRM", "ORDER", saved.getId(), confirmDetail);
+
+        return toResponse(saved, orderItems);
     }
 
     @Transactional
     public OrderResponse ship(@NonNull UUID userId, @NonNull UUID orderId) {
         var order = requireOrder(orderId);
-        access.requireShopRole(userId, order.getShopId(), MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_PROCESS);
 
         var from = order.getStatus();
         order.ship();
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.SHIPPING, userId));
 
         var orderItems = items.findByOrderId(order.getId());
-        return toResponse(orders.save(order), orderItems);
+        var saved = orders.save(order);
+        var shipDetail = "Giao đơn hàng #" + saved.getCode() + " (" + orderItems.size()
+                + " món) cho đơn vị vận chuyển";
+        audit.record(saved.getShopId(), userId, "ORDER_SHIP", "ORDER", saved.getId(), shipDetail);
+
+        return toResponse(saved, orderItems);
     }
 
     @Transactional
     public OrderResponse deliver(@NonNull UUID userId, @NonNull UUID orderId) {
         var order = requireOrder(orderId);
-        access.requireShopRole(userId, order.getShopId(), MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_PROCESS);
 
         var from = order.getStatus();
         order.deliver();
@@ -424,7 +439,12 @@ public class OrderService {
         revenue.createSettlementForOrder(order.getShopId(), order.getId(), order.getSubtotal());
 
         var orderItems = items.findByOrderId(order.getId());
-        return toResponse(orders.save(order), orderItems);
+        var saved = orders.save(order);
+        var deliverDetail = "Đánh dấu đơn hàng #" + saved.getCode()
+            + " giao thành công | Doanh thu thanh toán: " + saved.getSubtotal() + "₫";
+        audit.record(saved.getShopId(), userId, "ORDER_DELIVER", "ORDER", saved.getId(), deliverDetail);
+
+        return toResponse(saved, orderItems);
     }
 
     @Transactional(readOnly = true)
@@ -435,6 +455,38 @@ public class OrderService {
     @Transactional(readOnly = true)
     public int getSoldQuantityForProduct(@NonNull UUID productId) {
         return items.countSoldQuantityByProductId(productId);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasDeliveredAndReceivedProduct(@NonNull UUID buyerId, @NonNull UUID productId) {
+        for (var order : orders.findByBuyerIdOrderByCreatedAtDesc(buyerId)) {
+            if (order.getStatus() != OrderStatus.DELIVERED) {
+                continue;
+            }
+            if (order.getReceivedAt() == null) {
+                continue;
+            }
+            for (var item : items.findByOrderId(order.getId())) {
+                if (productId.equals(item.getProductId())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Danh sách shop mà user được xem đơn: chỉ shop đã cấp ORDER_READ.
+     */
+    private List<UUID> orderReadableShopIds(UUID userId) {
+        var result = new ArrayList<UUID>();
+        for (var shopId : shops.findShopIdsByUser(userId)) {
+            if (access.permissionsOf(userId, shopId).contains(ShopPermission.ORDER_READ)) {
+                result.add(shopId);
+            }
+        }
+
+        return result;
     }
 
     private Order requireBuyerOrder(UUID buyerId, UUID orderId) {
@@ -490,14 +542,14 @@ public class OrderService {
             if (item.getVariantId() == null) {
                 continue;
             }
-            variants.incrementStock(item.getVariantId(), item.getQuantity());
-            movements.save(StockMovement.record(
+            productStock.incrementVariantStock(item.getVariantId(), item.getQuantity());
+            productStock.recordStockMovement(
                 item.getVariantId(),
                 order.getShopId(),
                 item.getQuantity(),
                 "ORDER_CANCEL",
                 order.getId()
-            ));
+            );
         }
     }
 

@@ -20,7 +20,9 @@ public record UpdateShopProfileRequest(
     @Nullable
     String returnPolicy,
 
-    @Schema(description = "Số ngày chuẩn bị hàng (SLA)", nullable = true)
+    @Schema(description = "Số ngày chuẩn bị hàng (1-3 ngày)", nullable = true)
+    @jakarta.validation.constraints.Min(value = 1, message = "Processing days must be at least 1")
+    @jakarta.validation.constraints.Max(value = 3, message = "Processing days cannot exceed 3")
     @Nullable
     Integer processingDays,
 

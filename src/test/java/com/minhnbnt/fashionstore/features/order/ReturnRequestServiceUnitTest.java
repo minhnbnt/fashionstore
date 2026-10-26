@@ -5,10 +5,11 @@ import com.minhnbnt.fashionstore.dto.order.CreateReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.RejectReturnRequest;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.ReturnRequestRepository;
-import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
-import com.minhnbnt.fashionstore.model.MemberRole;
+import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
+import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.Order;
 import com.minhnbnt.fashionstore.model.ReturnRequest;
+import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,7 +38,13 @@ class ReturnRequestServiceUnitTest {
     private OrderRepository orders;
 
     @Mock
+    private ShopService shops;
+
+    @Mock
     private ShopAccessChecker access;
+
+    @Mock
+    private ShopAuditService audit;
 
     @InjectMocks
     private ReturnRequestService returnService;
@@ -129,7 +136,7 @@ class ReturnRequestServiceUnitTest {
         var req = new ApproveReturnRequest("REFUND", 100000L, "Approved full refund");
         var resp = returnService.approve(userId, returnId, req);
 
-        verify(access).requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        verify(access).requireShopPermission(userId, shopId, ShopPermission.RETURN_PROCESS);
         assertThat(resp.status()).isEqualTo("APPROVED");
         verify(returns).save(ret);
     }

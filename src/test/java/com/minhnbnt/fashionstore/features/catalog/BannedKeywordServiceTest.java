@@ -84,7 +84,8 @@ class BannedKeywordServiceTest {
     @Test
     void creatingProductWithBannedKeywordRaisesSystemFlag() {
         var word = uniqueWord("replica");
-        adminProducts.addKeyword(mirroredUser(), new CreateBannedKeywordRequest(word, ProductViolationType.COUNTERFEIT));
+        var req = new CreateBannedKeywordRequest(word, ProductViolationType.COUNTERFEIT);
+        adminProducts.addKeyword(mirroredUser(), req);
         var ownerId = mirroredUser();
         var shopId = approvedShop(ownerId, "kw-create");
 
@@ -108,7 +109,8 @@ class BannedKeywordServiceTest {
     @Test
     void editingDescriptionToIncludeKeywordRaisesFlagOnlyOnce() {
         var word = uniqueWord("fake");
-        adminProducts.addKeyword(mirroredUser(), new CreateBannedKeywordRequest(word, ProductViolationType.COUNTERFEIT));
+        var req = new CreateBannedKeywordRequest(word, ProductViolationType.COUNTERFEIT);
+        adminProducts.addKeyword(mirroredUser(), req);
         var ownerId = mirroredUser();
         var shopId = approvedShop(ownerId, "kw-edit");
         var product = product(ownerId, shopId, "kw-edit-ao", "Áo khoác", "Hàng đẹp");
@@ -135,7 +137,8 @@ class BannedKeywordServiceTest {
         adminProducts.ban(adminId, banned.id(), ProductViolationType.SPAM, "Đăng trùng lặp");
         product(ownerId, shopId, "kw-rescan-inside", "Túi " + word + "xyz", null);
 
-        var created = adminProducts.addKeyword(adminId, new CreateBannedKeywordRequest(word, ProductViolationType.COUNTERFEIT));
+        var req = new CreateBannedKeywordRequest(word, ProductViolationType.COUNTERFEIT);
+        var created = adminProducts.addKeyword(adminId, req);
 
         assertThat(created.flaggedProducts()).isEqualTo(2);
         assertThat(created.keyword().keyword()).isEqualTo(word);
@@ -157,7 +160,8 @@ class BannedKeywordServiceTest {
     @Test
     void keywordsCanBeListedAndDeleted() {
         var word = uniqueWord("del");
-        var created = adminProducts.addKeyword(mirroredUser(), new CreateBannedKeywordRequest(word, ProductViolationType.PROHIBITED));
+        var req = new CreateBannedKeywordRequest(word, ProductViolationType.PROHIBITED);
+        var created = adminProducts.addKeyword(mirroredUser(), req);
         var id = created.keyword().id();
 
         assertThat(adminProducts.listKeywords()).extracting(k -> k.keyword()).contains(word);

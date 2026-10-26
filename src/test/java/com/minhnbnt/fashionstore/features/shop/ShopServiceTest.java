@@ -275,7 +275,10 @@ class ShopServiceTest {
         );
         assertThatThrownBy(() -> shops.register(ownerId, req))
             .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+            .satisfies(e -> {
+                var code = ((ResponseStatusException) e).getStatusCode();
+                assertThat(code).isEqualTo(HttpStatus.BAD_REQUEST);
+            });
     }
 
     @Test
@@ -283,7 +286,8 @@ class ShopServiceTest {
         var ownerId = mirroredUser();
         shops.register(ownerId, ShopTestFixtures.createRequest("Shop Truoc", "slug-trung"));
 
-        assertThatThrownBy(() -> shops.register(mirroredUser(), ShopTestFixtures.createRequest("Shop Sau", "slug-trung")))
+        var duplicateReq = ShopTestFixtures.createRequest("Shop Sau", "slug-trung");
+        assertThatThrownBy(() -> shops.register(mirroredUser(), duplicateReq))
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
     }
@@ -322,6 +326,31 @@ class ShopServiceTest {
         var page = shops.searchForAdmin(null, "shop-blank-opt", 0, 20);
         assertThat(page.items().get(0).taxCode()).isNull();
         assertThat(page.items().get(0).businessCertKey()).isNull();
+    }
+
+    @Test
+    void helperMethodsReturnCorrectData() {
+        var ownerId = mirroredUser();
+        var created = shops.register(
+            ownerId,
+            ShopTestFixtures.createRequest("Shop Helper", "shop-helper-1", "Mo ta")
+        );
+
+        var entity = shops.findEntityById(created.id());
+        assertThat(entity).isPresent();
+        assertThat(entity.get().getName()).isEqualTo("Shop Helper");
+
+        var required = shops.requireShop(created.id());
+        assertThat(required.getName()).isEqualTo("Shop Helper");
+
+        assertThat(shops.getShopName(created.id())).isEqualTo("Shop Helper");
+        assertThat(shops.getShopName(UUID.randomUUID())).isEqualTo("Cửa hàng");
+
+        var userShopIds = shops.findShopIdsByUser(ownerId);
+        assertThat(userShopIds).contains(created.id());
+
+        var activeUsers = shops.findActiveUserIdsByShop(created.id());
+        assertThat(activeUsers).contains(ownerId);
     }
 }
 

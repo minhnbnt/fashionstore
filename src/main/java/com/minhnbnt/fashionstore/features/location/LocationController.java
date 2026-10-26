@@ -17,7 +17,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/public/locations")
 @RequiredArgsConstructor
-@Tag(name = "Locations", description = "Danh mục tỉnh/thành và xã/phường sau sáp nhập 2025. Công khai, không cần đăng nhập.")
+@Tag(
+    name = "Locations",
+    description = "Danh mục tỉnh/thành và xã/phường sau sáp nhập 2025. "
+            + "Công khai, không cần đăng nhập."
+)
 public class LocationController {
 
     private final LocationService locations;

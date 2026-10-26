@@ -13,6 +13,8 @@ import java.util.UUID;
 
 public interface UserProfileRepository extends CrudRepository<UserProfile, UUID> {
 
+    Optional<UserProfile> findByEmailIgnoreCase(String email);
+
     /**
      * SELECT ... FOR UPDATE cho khóa/mở khóa/nâng role, tránh 2 admin ghi đè nhau.
      */

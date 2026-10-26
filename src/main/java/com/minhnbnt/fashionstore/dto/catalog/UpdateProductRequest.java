@@ -26,7 +26,11 @@ public record UpdateProductRequest(
     @Nullable
     UUID categoryId,
 
-    @Schema(description = "ACTIVE, HIDDEN hoặc PENDING (giữ nguyên), null = giữ nguyên", example = "HIDDEN", nullable = true)
+    @Schema(
+        description = "ACTIVE, HIDDEN hoặc PENDING (giữ nguyên), null = giữ nguyên",
+        example = "HIDDEN",
+        nullable = true
+    )
     @Nullable
     @Pattern(regexp = "^(ACTIVE|HIDDEN|PENDING)$", message = "Status must be either ACTIVE, HIDDEN, or PENDING")
     String status,

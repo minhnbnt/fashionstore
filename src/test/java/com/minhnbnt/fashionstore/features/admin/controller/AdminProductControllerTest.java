@@ -128,7 +128,12 @@ class AdminProductControllerTest {
             "ACTIVE", "BANNED", "COUNTERFEIT", ADMIN_ID, "admin@t.local", "Hàng nhái", Instant.now()
         );
         when(adminProducts.getDetail(id)).thenReturn(new AdminProductDetailResponse(
-            product(id, "BANNED", "COUNTERFEIT", "Hàng nhái"), "Mo ta", List.of(), List.of(), List.of(history), List.of()
+            product(id, "BANNED", "COUNTERFEIT", "Hàng nhái"),
+            "Mo ta",
+            List.of(),
+            List.of(),
+            List.of(history),
+            List.of()
         ));
 
         mockMvc.perform(get("/api/admin/products/{id}", id).with(admin()))
@@ -242,7 +247,9 @@ class AdminProductControllerTest {
 
     @Test
     void addKeywordReturnsFlaggedCount() throws Exception {
-        var keyword = new BannedKeywordResponse(UUID.randomUUID(), "replica", "COUNTERFEIT", "admin@t.local", Instant.now());
+        var keyword = new BannedKeywordResponse(
+            UUID.randomUUID(), "replica", "COUNTERFEIT", "admin@t.local", Instant.now()
+        );
         when(adminProducts.addKeyword(eq(ADMIN_ID), any()))
             .thenReturn(new BannedKeywordCreatedResponse(keyword, 7));
 

@@ -7,13 +7,13 @@ import com.minhnbnt.fashionstore.dto.chat.ConversationEvent;
 import com.minhnbnt.fashionstore.dto.chat.SendMessageRequest;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatConversationRepository;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatMessageRepository;
-import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
-import com.minhnbnt.fashionstore.features.shop.ShopRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
+import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.infrastructure.realtime.ChatRealtimePublisher;
 import com.minhnbnt.fashionstore.model.ChatConversation;
 import com.minhnbnt.fashionstore.model.ChatMessage;
-import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.Shop;
+import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -37,17 +37,17 @@ public class ChatService {
 
     private final ChatMessageRepository messages;
 
-    private final ShopRepository shops;
-
-    private final ShopMemberRepository members;
+    private final ShopService shops;
 
     private final ShopAccessChecker access;
+
+    private final ShopAuditService audit;
 
     private final ChatRealtimePublisher realtime;
 
     @Transactional
     public ChatConversationResponse startConversation(@NonNull UUID buyerId, @NonNull UUID shopId) {
-        var shop = shops.findById(shopId).orElse(null);
+        var shop = shops.findEntityById(shopId).orElse(null);
         if (shop == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found");
         }
@@ -67,7 +67,7 @@ public class ChatService {
         @NonNull UUID shopId,
         boolean onlyUnread
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.CHAT_ACCESS);
 
         var list = conversations.findByShopIdOrderByLastMessageAtDesc(shopId);
         if (onlyUnread) {
@@ -110,15 +110,15 @@ public class ChatService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found");
         }
 
-        var isBuyer = conv.getBuyerId().equals(userId);
-        var isSeller = members.findRole(conv.getShopId(), userId).isPresent();
-
-        if (!isBuyer && !isSeller) {
+        var isSeller = shops.isMember(conv.getShopId(), userId);
+        if (isSeller) {
+            access.requireShopPermission(userId, conv.getShopId(), ShopPermission.CHAT_ACCESS);
+        } else if (!conv.getBuyerId().equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a participant in this conversation");
         }
 
         var senderType = "SELLER";
-        if (isBuyer) {
+        if (!isSeller) {
             senderType = "BUYER";
         }
 
@@ -133,8 +133,20 @@ public class ChatService {
         );
         messages.save(msg);
 
-        conv.recordNewMessage(request.content(), isBuyer);
+        conv.recordNewMessage(request.content(), !isSeller);
         conversations.save(conv);
+
+        if (isSeller) {
+            var chatDetail = "Phản hồi tin nhắn trong hội thoại #" + conv.getId();
+            if (request.content() != null && !request.content().isBlank()) {
+                var preview = request.content().trim();
+                if (preview.length() > 50) {
+                    preview = preview.substring(0, 50) + "...";
+                }
+                chatDetail = chatDetail + ": \"" + preview + "\"";
+            }
+            audit.record(conv.getShopId(), userId, "CHAT_REPLY", "CONVERSATION", conv.getId(), chatDetail);
+        }
 
         realtime.publishChatMessage(recipients, toMessageResponse(msg));
         realtime.publishConversationEvent(
@@ -143,7 +155,7 @@ public class ChatService {
         );
 
         // Auto reply if buyer sent message and shop has auto reply text
-        if (isBuyer) {
+        if (!isSeller) {
             broadcastAutoReply(conv, recipients);
         }
 
@@ -157,27 +169,26 @@ public class ChatService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found");
         }
 
-        var isBuyer = conv.getBuyerId().equals(userId);
-        var isSeller = members.findRole(conv.getShopId(), userId).isPresent();
-
-        if (isBuyer) {
-            conv.markReadByBuyer();
-            conversations.save(conv);
-
-            var event = new ChatReadEvent(conversationId, userId, Instant.now());
-            realtime.publishReadReceipt(
-                Set.copyOf(members.findActiveUserIdsByShop(conv.getShopId())),
-                event
-            );
-            return;
-        }
-
+        var isSeller = shops.isMember(conv.getShopId(), userId);
         if (isSeller) {
+            access.requireShopPermission(userId, conv.getShopId(), ShopPermission.CHAT_ACCESS);
             conv.markReadBySeller();
             conversations.save(conv);
 
             var event = new ChatReadEvent(conversationId, userId, Instant.now());
             realtime.publishReadReceipt(Set.of(conv.getBuyerId()), event);
+            return;
+        }
+
+        if (conv.getBuyerId().equals(userId)) {
+            conv.markReadByBuyer();
+            conversations.save(conv);
+
+            var event = new ChatReadEvent(conversationId, userId, Instant.now());
+            realtime.publishReadReceipt(
+                Set.copyOf(shops.findActiveUserIdsByShop(conv.getShopId())),
+                event
+            );
         }
     }
 
@@ -188,7 +199,7 @@ public class ChatService {
     private Set<UUID> realtimeRecipients(ChatConversation conv) {
         var recipientIds = new HashSet<UUID>();
         recipientIds.add(conv.getBuyerId());
-        recipientIds.addAll(members.findActiveUserIdsByShop(conv.getShopId()));
+        recipientIds.addAll(shops.findActiveUserIdsByShop(conv.getShopId()));
         return recipientIds;
     }
 
@@ -198,7 +209,7 @@ public class ChatService {
      * thì bỏ qua lặng lẽ.
      */
     private void broadcastAutoReply(ChatConversation conv, Set<UUID> recipients) {
-        var shop = shops.findById(conv.getShopId()).orElse(null);
+        var shop = shops.findEntityById(conv.getShopId()).orElse(null);
         if (shop == null) {
             return;
         }
@@ -208,7 +219,7 @@ public class ChatService {
             return;
         }
 
-        var ownerId = members.findOwner(conv.getShopId()).orElse(null);
+        var ownerId = shops.ownerOf(conv.getShopId());
         if (ownerId == null) {
             return;
         }
@@ -232,9 +243,13 @@ public class ChatService {
     }
 
     private void verifyParticipant(UUID userId, ChatConversation conv) {
-        var isBuyer = conv.getBuyerId().equals(userId);
-        var isSeller = members.findRole(conv.getShopId(), userId).isPresent();
-        if (!isBuyer && !isSeller) {
+        var isSeller = shops.isMember(conv.getShopId(), userId);
+        if (isSeller) {
+            access.requireShopPermission(userId, conv.getShopId(), ShopPermission.CHAT_ACCESS);
+            return;
+        }
+
+        if (!conv.getBuyerId().equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a participant in this conversation");
         }
     }
@@ -245,7 +260,7 @@ public class ChatService {
             unread = c.getSellerUnreadCount();
         }
 
-        var shopName = shops.findById(c.getShopId()).map(Shop::getName).orElse(null);
+        var shopName = shops.getShopName(c.getShopId());
 
         return new ChatConversationResponse(
             c.getId(),

@@ -65,10 +65,14 @@ public class ChatController {
     }
 
     @GetMapping("/api/seller/conversations")
-    @Operation(summary = "Danh sách hội thoại của shop (Seller)", description = "Lọc các hội thoại có tin nhắn chưa đọc (unread=true).")
+    @Operation(
+        summary = "Danh sách hội thoại của shop (Seller)",
+        description = "Lọc các hội thoại có tin nhắn chưa đọc (unread=true)."
+    )
     @ApiResponse(responseCode = "200", description = "Danh sách hội thoại")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
+    @ApiResponse(responseCode = "403",
+            description = "Không phải thành viên shop hoặc thiếu quyền CHAT_ACCESS")
     @SecurityRequirement(name = "bearerAuth")
     public List<ChatConversationResponse> sellerConversations(
         @AuthenticationPrincipal Jwt jwt,
@@ -82,10 +86,14 @@ public class ChatController {
     }
 
     @GetMapping("/api/conversations/{id}/messages")
-    @Operation(summary = "Xem tin nhắn trong hội thoại", description = "Người tham gia hội thoại (Buyer hoặc nhân viên shop) xem lịch sử chat.")
+    @Operation(
+        summary = "Xem tin nhắn trong hội thoại",
+        description = "Người tham gia hội thoại (Buyer hoặc nhân viên shop) xem lịch sử chat."
+    )
     @ApiResponse(responseCode = "200", description = "Danh sách tin nhắn theo thứ tự thời gian")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải người tham gia hội thoại")
+    @ApiResponse(responseCode = "403",
+            description = "Không phải người tham gia hội thoại hoặc thiếu quyền CHAT_ACCESS")
     @ApiResponse(responseCode = "404", description = "Hội thoại không tồn tại")
     @SecurityRequirement(name = "bearerAuth")
     public List<ChatMessageResponse> messages(
@@ -100,11 +108,16 @@ public class ChatController {
 
     @PostMapping("/api/conversations/{id}/messages")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Gửi tin nhắn", description = "Gửi tin nhắn văn bản kèm ảnh tùy chọn. Tự động kích hoạt phản hồi tự động nếu shop cài đặt.")
+    @Operation(
+        summary = "Gửi tin nhắn",
+        description = "Gửi tin nhắn văn bản kèm ảnh tùy chọn. Tự động kích hoạt phản "
+                + "hồi tự động nếu shop cài đặt."
+    )
     @ApiResponse(responseCode = "201", description = "Tin nhắn vừa gửi")
     @ApiResponse(responseCode = "400", description = "Body không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải người tham gia hội thoại")
+    @ApiResponse(responseCode = "403",
+            description = "Không phải người tham gia hội thoại hoặc thiếu quyền CHAT_ACCESS")
     @ApiResponse(responseCode = "404", description = "Hội thoại không tồn tại")
     @SecurityRequirement(name = "bearerAuth")
     public ChatMessageResponse sendMessage(

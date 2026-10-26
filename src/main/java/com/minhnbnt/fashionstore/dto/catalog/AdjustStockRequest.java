@@ -9,7 +9,11 @@ public record AdjustStockRequest(
     @NotNull
     Integer newStock,
 
-    @Schema(description = "Lý do điều chỉnh (MANUAL_ADJUST, RESTOCK, DAMAGE, v.v.)", example = "RESTOCK", nullable = true)
+    @Schema(
+        description = "Lý do điều chỉnh (MANUAL_ADJUST, RESTOCK, DAMAGE, v.v.)",
+        example = "RESTOCK",
+        nullable = true
+    )
     @Nullable
     String reason
 ) {

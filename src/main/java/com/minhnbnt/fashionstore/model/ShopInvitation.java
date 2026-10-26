@@ -33,6 +33,10 @@ public class ShopInvitation implements Persistable<UUID> {
 
     private @Nullable Instant acceptedAt;
 
+    private @Nullable UUID inviteeId;
+
+    private @Nullable Instant revokedAt;
+
     private UUID createdBy;
 
     private Instant createdAt;
@@ -40,7 +44,13 @@ public class ShopInvitation implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    public static ShopInvitation create(UUID shopId, String email, UUID roleId, UUID createdBy) {
+    public static ShopInvitation create(
+        UUID shopId,
+        String email,
+        UUID roleId,
+        UUID createdBy,
+        @Nullable UUID inviteeId
+    ) {
         var now = Instant.now();
         return new ShopInvitation(
             UUID.randomUUID(),
@@ -50,6 +60,8 @@ public class ShopInvitation implements Persistable<UUID> {
             UUID.randomUUID().toString(),
             now.plus(48, ChronoUnit.HOURS),
             null,
+            inviteeId,
+            null,
             createdBy,
             now,
             true);
@@ -57,6 +69,27 @@ public class ShopInvitation implements Persistable<UUID> {
 
     public void accept() {
         this.acceptedAt = Instant.now();
+    }
+
+    public void revoke() {
+        this.revokedAt = Instant.now();
+    }
+
+    public boolean isRevoked() {
+        if (revokedAt == null) {
+            return false;
+        }
+        return true;
+    }
+
+    public boolean isPending() {
+        if (acceptedAt != null) {
+            return false;
+        }
+        if (revokedAt != null) {
+            return false;
+        }
+        return !isExpired();
     }
 
     public boolean isExpired() {

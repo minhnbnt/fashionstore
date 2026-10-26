@@ -23,7 +23,11 @@ public class ShopDecorationController {
     private final ShopDecorationService decorations;
 
     @GetMapping
-    @Operation(summary = "Xem giao diện gian hàng (Public)", description = "Lấy layout các block đã được shop xuất bản để hiển thị ở trang chủ shop.")
+    @Operation(
+        operationId = "getPublishedLayout",
+        summary = "Xem giao diện gian hàng (Public)",
+        description = "Lấy layout các block đã được shop xuất bản để hiển thị ở trang chủ shop."
+    )
     @ApiResponse(responseCode = "200", description = "Layout gian hàng đã xuất bản")
     public DecorationResponse getPublishedLayout(
         @Parameter(description = "Id shop") @PathVariable UUID shopId

@@ -75,14 +75,32 @@ Hệ thống Kênh Người Bán (Seller Center) của **FashionStore Marketplac
 - **Cơ chế Draft - Publish**: Người bán có thể lưu nháp (`draft`) tùy ý chỉnh sửa, xem trước giao diện và chỉ xuất bản (`publish`) khi hài lòng. Cho phép hủy bản nháp (`discard`) để quay về giao diện hiện tại.
 
 ### 2.7. Quản lý Nhân sự Shop & Phân quyền (RBAC)
-- **4 Vai trò Hệ thống mặc định**:
-  - `Quản lý (Manager)`: Toàn quyền sản phẩm, đơn hàng, kho và doanh thu.
-  - `Chăm sóc khách hàng (CSKH)`: Đọc đơn hàng, xem và trả lời đánh giá, nhắn tin chat.
-  - `Kho vận (Warehouse)`: Đọc/xử lý đơn hàng, điều chỉnh và kiểm kê tồn kho.
-  - `Marketing`: Xem sản phẩm, trang trí gian hàng, xem doanh thu.
-- **Vai trò tùy chỉnh**: Chủ shop có thể tạo thêm vai trò mới và chọn danh sách quyền hạn chi tiết.
-- **Mời nhân viên**: Gửi thư mời qua email với token có hạn sử dụng 7 ngày. Khi nhân viên chấp nhận qua `/api/invitations/{token}/accept`, tài khoản được liên kết làm `STAFF` của shop.
-- **Audit Log**: Toàn bộ thao tác thêm, sửa quyền, xóa nhân sự được lưu vào bảng `shop_member_audit`.
+- **5 Nhóm quyền hạn nghiệp vụ (Permissions)**:
+  - **Sản phẩm & Tồn kho**: `PRODUCT_READ`, `PRODUCT_WRITE`, `INVENTORY_READ`, `INVENTORY_WRITE`.
+  - **Đơn hàng & Vận chuyển**: `ORDER_READ`, `ORDER_PROCESS`, `ORDER_CANCEL`, `RETURN_READ`, `RETURN_PROCESS`.
+  - **Tài chính & Doanh thu**: `REVENUE_READ`, `REVENUE_WITHDRAW`.
+  - **Chăm sóc khách hàng**: `CHAT_ACCESS`, `REVIEW_READ`, `REVIEW_REPLY`.
+  - **Trang trí & Thiết lập**: `DECORATION_READ`, `DECORATION_WRITE`.
+- **Vai trò mặc định & Tùy chỉnh (Roles)**:
+  - `Chủ shop (Owner)`: Toàn bộ quyền hạn, không thể bị xóa hoặc vô hiệu hóa.
+  - `Quản lý (Manager)`: Toàn quyền vận hành (sản phẩm, tồn kho, đơn hàng, doanh thu, CSKH, trang trí).
+  - `Chăm sóc khách hàng (CSKH)`: `ORDER_READ`, `CHAT_ACCESS`, `REVIEW_READ`, `REVIEW_REPLY`.
+  - `Kho vận (Warehouse)`: `ORDER_READ`, `ORDER_PROCESS`, `INVENTORY_READ`, `INVENTORY_WRITE`.
+  - `Marketing`: `PRODUCT_READ`, `DECORATION_READ`, `DECORATION_WRITE`, `REVENUE_READ`.
+  - **Vai trò tùy chỉnh**: Chủ shop có thể tạo thêm vai trò mới với tổ hợp quyền hạn tùy biến.
+- **Quy trình Mời Nhân viên qua Tài khoản & Thông báo trong Website**:
+  - Chủ shop nhập email tài khoản của nhân viên và chọn vai trò.
+  - Hệ thống kiểm tra tài khoản tồn tại trong hệ thống, chưa là thành viên của shop, và chưa có lời mời đang chờ chấp thuận.
+  - Sinh token bảo mật 64 hex với thời hạn 7 ngày, lưu vào `shop_invitations`.
+  - Tự động phát thông báo in-app (Website Notification) tới tài khoản người được mời kèm đường dẫn `/invitations/{token}`.
+  - Khi người được mời chấp nhận: tạo bản ghi `shop_member` với vai trò đã gán, đánh dấu `accepted_at` cho lời mời.
+  - Chủ shop có thể thu hồi (`revoke`) các lời mời đang chờ xử lý bất kỳ lúc nào.
+- **Kích hoạt & Vô hiệu hóa Nhân sự (`ACTIVE` / `DEACTIVATED`)**:
+  - Chủ shop có thể chuyển trạng thái nhân viên giữa `ACTIVE` và `DEACTIVATED` mà không cần xóa tài khoản.
+  - Khi bị vô hiệu hóa (`DEACTIVATED`), nhân viên lập tức bị chặn truy cập (403 Forbidden) đối với mọi API của shop.
+- **Nhật ký Hoạt động Shop (Operational Audit Log)**:
+  - Lưu vết toàn bộ các thao tác quản lý nhân sự (mời, đổi vai trò, đổi trạng thái, xóa nhân viên) và các hoạt động nghiệp vụ quan trọng của shop (cập nhật đơn hàng, hủy đơn, hoàn hàng, điều chỉnh tồn kho, rút tiền, trả lời đánh giá, lưu/xuất bản trang trí).
+  - Hỗ trợ lọc theo hành động (`action`) và phân trang linh hoạt qua API `GET /api/seller/shops/{shopId}/audit-logs`.
 
 ---
 

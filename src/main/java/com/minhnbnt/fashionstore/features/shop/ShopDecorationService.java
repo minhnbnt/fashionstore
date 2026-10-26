@@ -3,6 +3,7 @@ package com.minhnbnt.fashionstore.features.shop;
 import com.minhnbnt.fashionstore.dto.shop.DecorationResponse;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.ShopDecoration;
+import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,8 @@ public class ShopDecorationService {
     private final ShopDecorationRepository decorations;
 
     private final ShopAccessChecker access;
+
+    private final ShopAuditService audit;
 
     @Transactional(readOnly = true)
     public DecorationResponse getPublishedLayout(@NonNull UUID shopId) {
@@ -46,35 +49,65 @@ public class ShopDecorationService {
 
     @Transactional
     public DecorationResponse saveDraft(@NonNull UUID userId, @NonNull UUID shopId, @NonNull String draftJson) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.DECORATION_WRITE);
 
         var deco = decorations.findByShopId(shopId)
             .orElseGet(() -> ShopDecoration.createDefault(shopId));
 
         deco.saveDraft(draftJson);
-        return toResponse(decorations.save(deco));
+        var saved = decorations.save(deco);
+        audit.record(
+            saved.getShopId(),
+            userId,
+            "DECORATION_SAVE",
+            "DECORATION",
+            saved.getId(),
+            "Lưu bản nháp giao diện gian hàng"
+        );
+
+        return toResponse(saved);
     }
 
     @Transactional
     public DecorationResponse publish(@NonNull UUID userId, @NonNull UUID shopId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.DECORATION_WRITE);
 
         var deco = decorations.findByShopId(shopId)
             .orElseGet(() -> ShopDecoration.createDefault(shopId));
 
         deco.publish();
-        return toResponse(decorations.save(deco));
+        var saved = decorations.save(deco);
+        audit.record(
+            saved.getShopId(),
+            userId,
+            "DECORATION_PUBLISH",
+            "DECORATION",
+            saved.getId(),
+            "Xuất bản giao diện gian hàng"
+        );
+
+        return toResponse(saved);
     }
 
     @Transactional
     public DecorationResponse discardDraft(@NonNull UUID userId, @NonNull UUID shopId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.DECORATION_WRITE);
 
         var deco = decorations.findByShopId(shopId)
             .orElseGet(() -> ShopDecoration.createDefault(shopId));
 
         deco.discardDraft();
-        return toResponse(decorations.save(deco));
+        var saved = decorations.save(deco);
+        audit.record(
+            saved.getShopId(),
+            userId,
+            "DECORATION_DISCARD",
+            "DECORATION",
+            saved.getId(),
+            "Hủy bỏ bản nháp giao diện gian hàng"
+        );
+
+        return toResponse(saved);
     }
 
     private static DecorationResponse toResponse(ShopDecoration d) {

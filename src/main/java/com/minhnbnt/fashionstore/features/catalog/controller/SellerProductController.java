@@ -42,7 +42,10 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/seller/shops/{shopId}")
 @RequiredArgsConstructor
-@Tag(name = "Seller - Products & Inventory", description = "Seller quản lý danh sách sản phẩm, tồn kho và xuất nhập dữ liệu")
+@Tag(
+    name = "Seller - Products & Inventory",
+    description = "Seller quản lý danh sách sản phẩm, tồn kho và xuất nhập dữ liệu"
+)
 public class SellerProductController {
 
     private final CatalogService catalog;
@@ -166,7 +169,11 @@ public class SellerProductController {
     }
 
     @GetMapping("/inventory")
-    @Operation(summary = "Quản lý kho hàng", description = "Liệt kê các biến thể, có thể lọc các biến thể sắp hết hàng (lowStock=true).")
+    @Operation(
+        summary = "Quản lý kho hàng",
+        description = "Liệt kê các biến thể, có thể lọc các biến thể "
+                + "sắp hết hàng (lowStock=true)."
+    )
     @ApiResponse(responseCode = "200", description = "Danh sách tồn kho")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
@@ -183,7 +190,10 @@ public class SellerProductController {
     }
 
     @PatchMapping("/variants/{variantId}/stock")
-    @Operation(summary = "Điều chỉnh tồn kho biến thể", description = "Cập nhật số lượng tồn kho và ghi nhật ký biến động (stock movement).")
+    @Operation(
+        summary = "Điều chỉnh tồn kho biến thể",
+        description = "Cập nhật số lượng tồn kho và ghi nhật ký biến động (stock movement)."
+    )
     @ApiResponse(responseCode = "200", description = "Biến thể sau khi cập nhật kho")
     @ApiResponse(responseCode = "400", description = "Số lượng tồn không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
@@ -221,7 +231,10 @@ public class SellerProductController {
     }
 
     @PostMapping(value = "/products/bulk-import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Nhập sản phẩm hàng loạt bằng file CSV", description = "File CSV định dạng: name,slug,description,sku,size,color,price,stockQuantity")
+    @Operation(
+        summary = "Nhập sản phẩm hàng loạt bằng file CSV",
+        description = "File CSV định dạng: name,slug,description,sku,size,color,price,stockQuantity"
+    )
     @ApiResponse(responseCode = "200", description = "Kết quả nhập hàng loạt")
     @ApiResponse(responseCode = "400", description = "File không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
@@ -239,7 +252,10 @@ public class SellerProductController {
     }
 
     @GetMapping(value = "/products/export", produces = "text/csv")
-    @Operation(summary = "Xuất danh sách sản phẩm ra CSV", description = "Tải về file CSV danh sách tất cả sản phẩm và biến thể của shop.")
+    @Operation(
+        summary = "Xuất danh sách sản phẩm ra CSV",
+        description = "Tải về file CSV danh sách tất cả sản phẩm và biến thể của shop."
+    )
     @ApiResponse(responseCode = "200", description = "File CSV tải về")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")

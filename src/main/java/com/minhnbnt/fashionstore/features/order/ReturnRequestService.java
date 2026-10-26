@@ -6,11 +6,12 @@ import com.minhnbnt.fashionstore.dto.order.RejectReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.ReturnRequestResponse;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.ReturnRequestRepository;
-import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
-import com.minhnbnt.fashionstore.model.MemberRole;
+import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
+import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.OrderStatus;
 import com.minhnbnt.fashionstore.model.ReturnRequest;
 import com.minhnbnt.fashionstore.model.ReturnStatus;
+import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -34,9 +35,11 @@ public class ReturnRequestService {
 
     private final OrderRepository orders;
 
-    private final ShopMemberRepository members;
+    private final ShopService shops;
 
     private final ShopAccessChecker access;
+
+    private final ShopAuditService audit;
 
     @Transactional
     public ReturnRequestResponse create(
@@ -83,10 +86,10 @@ public class ReturnRequestService {
     ) {
         List<UUID> shopIds;
         if (shopId != null) {
-            access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+            access.requireShopPermission(userId, shopId, ShopPermission.RETURN_PROCESS);
             shopIds = List.of(shopId);
         } else {
-            shopIds = members.findShopIdsByUser(userId);
+            shopIds = returnProcessShopIds(userId);
         }
 
         var result = new ArrayList<ReturnRequestResponse>();
@@ -114,7 +117,7 @@ public class ReturnRequestService {
         if (req == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Return request not found");
         }
-        access.requireShopRole(userId, req.getShopId(), MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, req.getShopId(), ShopPermission.RETURN_PROCESS);
         return toResponse(req);
     }
 
@@ -128,10 +131,18 @@ public class ReturnRequestService {
         if (req == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Return request not found");
         }
-        access.requireShopRole(userId, req.getShopId(), MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, req.getShopId(), ShopPermission.RETURN_PROCESS);
 
         req.approve(request.resolution(), request.refundAmount(), request.sellerNote());
-        return toResponse(returns.save(req));
+        var saved = returns.save(req);
+        var approveDetail = "Chấp thuận yêu cầu trả hàng | Phương án: " + request.resolution()
+            + " | Số tiền hoàn: " + request.refundAmount() + "₫";
+        if (request.sellerNote() != null && !request.sellerNote().isBlank()) {
+            approveDetail = approveDetail + " | Ghi chú người bán: " + request.sellerNote();
+        }
+        audit.record(saved.getShopId(), userId, "RETURN_APPROVE", "RETURN", saved.getId(), approveDetail);
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -144,10 +155,18 @@ public class ReturnRequestService {
         if (req == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Return request not found");
         }
-        access.requireShopRole(userId, req.getShopId(), MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, req.getShopId(), ShopPermission.RETURN_PROCESS);
 
         req.reject(request.sellerNote());
-        return toResponse(returns.save(req));
+        var saved = returns.save(req);
+        var detail = "Từ chối yêu cầu trả hàng";
+        var sellerNote = request.sellerNote();
+        if (sellerNote != null && !sellerNote.isBlank()) {
+            detail = "Từ chối yêu cầu trả hàng | Lý do: " + sellerNote;
+        }
+        audit.record(saved.getShopId(), userId, "RETURN_REJECT", "RETURN", saved.getId(), detail);
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -160,10 +179,17 @@ public class ReturnRequestService {
         if (req == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Return request not found");
         }
-        access.requireShopRole(userId, req.getShopId(), MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, req.getShopId(), ShopPermission.RETURN_PROCESS);
 
         req.complete(note);
-        return toResponse(returns.save(req));
+        var saved = returns.save(req);
+        var completeDetail = "Hoàn tất xử lý đổi trả";
+        if (note != null && !note.isBlank()) {
+            completeDetail = completeDetail + " | Ghi chú: " + note;
+        }
+        audit.record(saved.getShopId(), userId, "RETURN_COMPLETE", "RETURN", saved.getId(), completeDetail);
+
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -181,6 +207,20 @@ public class ReturnRequestService {
         return returns.findByOrderIdOrderByCreatedAtDesc(orderId).stream()
             .map(ReturnRequestService::toResponse)
             .toList();
+    }
+
+    /**
+     * Danh sách shop mà user được xử lý trả hàng: chỉ shop đã cấp RETURN_PROCESS.
+     */
+    private List<UUID> returnProcessShopIds(UUID userId) {
+        var result = new ArrayList<UUID>();
+        for (var shopId : shops.findShopIdsByUser(userId)) {
+            if (access.permissionsOf(userId, shopId).contains(ShopPermission.RETURN_PROCESS)) {
+                result.add(shopId);
+            }
+        }
+
+        return result;
     }
 
     private static ReturnRequestResponse toResponse(ReturnRequest req) {

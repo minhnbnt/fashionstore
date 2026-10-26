@@ -176,7 +176,10 @@ public class ShopProductController {
 
     @org.springframework.web.bind.annotation.DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Xóa mềm sản phẩm", description = "Chuyển trạng thái sang DELETED. Không thể xóa nếu có đơn đang xử lý.")
+    @Operation(
+        summary = "Xóa mềm sản phẩm",
+        description = "Chuyển trạng thái sang DELETED. Không thể xóa nếu có đơn đang xử lý."
+    )
     @ApiResponse(responseCode = "204", description = "Đã xóa sản phẩm")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")

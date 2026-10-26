@@ -136,7 +136,8 @@ class CatalogServiceTest {
         var ownerId = mirroredUser();
         var shopId = approvedShop(ownerId, "shop-hide-p");
         var created = catalog.createProduct(ownerId, shopId, productRequest("ao-hide"));
-        catalog.updateProduct(ownerId, shopId, created.id(), new UpdateProductRequest(null, null, null, "HIDDEN", null));
+        var hideReq = new UpdateProductRequest(null, null, null, "HIDDEN", null);
+        catalog.updateProduct(ownerId, shopId, created.id(), hideReq);
 
         assertThatThrownBy(() -> catalog.getDetail(created.id()))
             .isInstanceOf(ResponseStatusException.class)
@@ -164,7 +165,8 @@ class CatalogServiceTest {
         var ownerId = mirroredUser();
         var shopId = approvedShop(ownerId, "shop-search-h");
         var created = catalog.createProduct(ownerId, shopId, productRequest("ao-search-hide-xyz"));
-        catalog.updateProduct(ownerId, shopId, created.id(), new UpdateProductRequest(null, null, null, "HIDDEN", null));
+        var hideReq = new UpdateProductRequest(null, null, null, "HIDDEN", null);
+        catalog.updateProduct(ownerId, shopId, created.id(), hideReq);
 
         var hits = catalog.search(keyword("ao-search-hide-xyz"));
 
@@ -403,7 +405,8 @@ class CatalogServiceTest {
     void productCreationStatusDependsOnShopTrust() {
         var ownerId = mirroredUser();
         var adminId = mirroredUser();
-        var shop = shops.register(ownerId, com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop Trust", "shop-trust-test"));
+        var req = com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop Trust", "shop-trust-test");
+        var shop = shops.register(ownerId, req);
         shops.approve(adminId, shop.id());
 
         // Approved shop has kycStatus = VERIFIED, so it's trusted. Default status is ACTIVE
@@ -513,7 +516,10 @@ class CatalogServiceTest {
     void adminCanApproveAndRejectPendingProduct() {
         var ownerId = mirroredUser();
         var adminId = mirroredUser();
-        var shop = shops.register(ownerId, com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop Moderation", "shop-moderation"));
+        var req = com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest(
+            "Shop Moderation", "shop-moderation"
+        );
+        var shop = shops.register(ownerId, req);
         shops.approve(adminId, shop.id());
 
         // Make shop untrusted so products start as PENDING
@@ -714,7 +720,8 @@ class CatalogServiceTest {
         var created = catalog.createProduct(ownerId, shopId, productRequest("ao-toggle-hide"));
 
         // Hide product
-        var hidden = catalog.updateProduct(ownerId, shopId, created.id(), new UpdateProductRequest(null, null, null, "HIDDEN", null));
+        var hideReq = new UpdateProductRequest(null, null, null, "HIDDEN", null);
+        var hidden = catalog.updateProduct(ownerId, shopId, created.id(), hideReq);
         assertThat(hidden.status()).isEqualTo("HIDDEN");
 
         // Buyer cannot see hidden product
@@ -723,7 +730,8 @@ class CatalogServiceTest {
             .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
 
         // Reactivate product
-        var reactivated = catalog.updateProduct(ownerId, shopId, created.id(), new UpdateProductRequest(null, null, null, "ACTIVE", null));
+        var activeReq = new UpdateProductRequest(null, null, null, "ACTIVE", null);
+        var reactivated = catalog.updateProduct(ownerId, shopId, created.id(), activeReq);
         assertThat(reactivated.status()).isEqualTo("ACTIVE");
 
         // Buyer can see active product again
@@ -999,8 +1007,12 @@ class CatalogServiceTest {
         assertThat(onlyExpensive).extracting(SellerProductResponse::id).contains(p1.id());
         assertThat(onlyExpensive).extracting(SellerProductResponse::id).doesNotContain(p2.id());
 
-        var page0 = catalog.listSellerProducts(ownerId, shopId, "ALL", null, "ALL", 0L, 0L, "", "createdAt", "desc", 0, 1);
-        var page1 = catalog.listSellerProducts(ownerId, shopId, "ALL", null, "ALL", 0L, 0L, "", "createdAt", "desc", 1, 1);
+        var page0 = catalog.listSellerProducts(
+            ownerId, shopId, "ALL", null, "ALL", 0L, 0L, "", "createdAt", "desc", 0, 1
+        );
+        var page1 = catalog.listSellerProducts(
+            ownerId, shopId, "ALL", null, "ALL", 0L, 0L, "", "createdAt", "desc", 1, 1
+        );
         assertThat(page0).hasSize(1);
         assertThat(page1).hasSize(1);
         assertThat(page0.getFirst().id()).isNotEqualTo(page1.getFirst().id());
