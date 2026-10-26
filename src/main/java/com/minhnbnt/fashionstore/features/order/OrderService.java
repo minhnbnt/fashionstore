@@ -168,7 +168,7 @@ public class OrderService {
             "ORDER_PLACED",
             "Có đơn hàng mới #" + order.getCode(),
             "Khách hàng vừa đặt đơn #" + order.getCode() + " tại shop của bạn.",
-            "/shop?tab=orders",
+            "/shop?shopId=" + order.getShopId() + "&tab=orders&orderId=" + order.getId(),
             order.getId()
         );
 
@@ -232,7 +232,7 @@ public class OrderService {
             "ORDER_CANCELLED",
             "Đơn #" + order.getCode() + " đã bị hủy",
             "Khách hàng đã hủy đơn #" + order.getCode() + ".",
-            "/shop?tab=orders",
+            "/shop?shopId=" + order.getShopId() + "&tab=orders&orderId=" + order.getId(),
             order.getId()
         );
 
@@ -406,9 +406,10 @@ public class OrderService {
                 }
                 if (q != null && !q.isBlank()) {
                     var lower = q.toLowerCase(Locale.ROOT);
+                    var matchId = order.getId().toString().equalsIgnoreCase(lower);
                     var matchCode = order.getCode().toLowerCase(Locale.ROOT).contains(lower);
                     var matchBuyer = order.getShippingName().toLowerCase(Locale.ROOT).contains(lower);
-                    if (!matchCode && !matchBuyer) {
+                    if (!matchId && !matchCode && !matchBuyer) {
                         continue;
                     }
                 }

@@ -282,7 +282,7 @@ class OrderServiceTest {
         assertThat(notif.type()).isEqualTo("ORDER_PLACED");
         assertThat(notif.title()).isEqualTo("Có đơn hàng mới #" + created.code());
         assertThat(notif.body()).isEqualTo("Khách hàng vừa đặt đơn #" + created.code() + " tại shop của bạn.");
-        assertThat(notif.link()).isEqualTo("/shop?tab=orders");
+        assertThat(notif.link()).isEqualTo("/shop?shopId=" + shopId + "&tab=orders&orderId=" + created.id());
 
         var buyerPage = notifications.findPage(buyerId, null, 0, 10);
         assertThat(buyerPage).isEmpty();
@@ -349,7 +349,7 @@ class OrderServiceTest {
         assertThat(cancelNotif.type()).isEqualTo("ORDER_CANCELLED");
         assertThat(cancelNotif.title()).isEqualTo("Đơn #" + created.code() + " đã bị hủy");
         assertThat(cancelNotif.body()).isEqualTo("Khách hàng đã hủy đơn #" + created.code() + ".");
-        assertThat(cancelNotif.link()).isEqualTo("/shop?tab=orders");
+        assertThat(cancelNotif.link()).isEqualTo("/shop?shopId=" + shopId + "&tab=orders&orderId=" + created.id());
     }
 
     @Test
