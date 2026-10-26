@@ -49,6 +49,9 @@ class ReviewServiceTest {
     @Autowired
     private UserService users;
 
+    @Autowired
+    private com.minhnbnt.fashionstore.features.notification.NotificationRepository notifications;
+
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
         users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U", null));
@@ -279,5 +282,27 @@ class ReviewServiceTest {
 
         assertThat(detail.reviewCount()).isEqualTo(2L);
         assertThat(detail.averageRating()).isEqualTo(4.0);
+    }
+
+    @Test
+    void sellerReplyNotifiesReviewBuyer() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-rev-notif-1");
+        var productId = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-notif-1", "SKU-REV-NOTIF-1");
+        var review = reviews.createReview(buyerId, productId, new CreateReviewRequest(5, "Tuyet voi"));
+
+        reviews.reply(
+            ownerId, review.id(), new com.minhnbnt.fashionstore.dto.review.ReplyReviewRequest("Cam on ban da ung ho")
+        );
+
+        var buyerPage = notifications.findPage(buyerId, List.of("ACTIVITY"), 0, 10);
+        assertThat(buyerPage).hasSize(1);
+        var notif = buyerPage.getFirst();
+        assertThat(notif.category()).isEqualTo("ACTIVITY");
+        assertThat(notif.type()).isEqualTo("REVIEW_REPLIED");
+        assertThat(notif.title()).isEqualTo("Shop đã phản hồi đánh giá của bạn");
+        assertThat(notif.body()).isEqualTo("Cam on ban da ung ho");
+        assertThat(notif.link()).isEqualTo("/product/" + productId);
     }
 }

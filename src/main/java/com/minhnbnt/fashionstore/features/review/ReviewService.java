@@ -9,6 +9,8 @@ import com.minhnbnt.fashionstore.dto.review.SellerReviewResponse;
 import com.minhnbnt.fashionstore.dto.review.UpdateReviewRequest;
 import com.minhnbnt.fashionstore.features.catalog.ProductStockService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
+import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
+import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.review.repository.ReviewRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
@@ -24,6 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -41,6 +44,8 @@ public class ReviewService {
     private final ShopAccessChecker access;
 
     private final ShopAuditService audit;
+
+    private final NotificationService notifications;
 
     @Transactional(readOnly = true)
     public List<ReviewResponse> getReviews(@NonNull UUID productId) {
@@ -148,6 +153,16 @@ public class ReviewService {
             "REVIEW",
             saved.getId(),
             "Phản hồi đánh giá: " + request.reply()
+        );
+
+        notifications.create(
+            Set.of(saved.getBuyerId()),
+            NotificationCategory.ACTIVITY,
+            "REVIEW_REPLIED",
+            "Shop đã phản hồi đánh giá của bạn",
+            request.reply(),
+            "/product/" + saved.getProductId(),
+            saved.getId()
         );
 
         return toSellerResponse(saved);

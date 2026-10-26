@@ -2,6 +2,7 @@ package com.minhnbnt.fashionstore.features.notification;
 
 import com.minhnbnt.fashionstore.config.SecurityConfig;
 import com.minhnbnt.fashionstore.dto.common.PageResponse;
+import com.minhnbnt.fashionstore.dto.notification.NotificationCountResponse;
 import com.minhnbnt.fashionstore.dto.notification.NotificationResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,12 +16,14 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -51,6 +54,7 @@ class NotificationControllerTest {
         var createdAt = Instant.parse("2026-10-24T10:00:00Z");
         var notification = new NotificationResponse(
             UUID.randomUUID(),
+            "ACTIVITY",
             "SHOP_INVITATION",
             "Lời mời tham gia shop An Nhiên",
             "Chủ shop mời bạn làm nhân viên.",
@@ -58,7 +62,7 @@ class NotificationControllerTest {
             null,
             createdAt
         );
-        when(notificationService.page(userId, 0, 20))
+        when(notificationService.page(userId, null, 0, 20))
             .thenReturn(new PageResponse<>(List.of(notification), 1, 0, 20));
 
         mockMvc.perform(get("/api/notifications")
@@ -68,20 +72,60 @@ class NotificationControllerTest {
             .andExpect(jsonPath("$.items[0].link").value("/invitations/token-1"))
             .andExpect(jsonPath("$.total").value(1));
 
-        verify(notificationService).page(userId, 0, 20);
+        verify(notificationService).page(userId, null, 0, 20);
+    }
+
+    @Test
+    void listPassesCategoriesToService() throws Exception {
+        var userId = UUID.randomUUID();
+        when(notificationService.page(userId, List.of("ORDER", "ACTIVITY"), 0, 20))
+            .thenReturn(new PageResponse<>(List.of(), 0, 0, 20));
+
+        mockMvc.perform(get("/api/notifications?categories=ORDER,ACTIVITY")
+                .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+            .andExpect(status().isOk());
+
+        verify(notificationService).page(userId, List.of("ORDER", "ACTIVITY"), 0, 20);
+    }
+
+    @Test
+    void listRejectsUnknownCategory() throws Exception {
+        var userId = UUID.randomUUID();
+
+        mockMvc.perform(get("/api/notifications?categories=BOGUS")
+                .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+            .andExpect(status().isBadRequest());
     }
 
     @Test
     void unreadCountReturnsNumber() throws Exception {
         var userId = UUID.randomUUID();
-        when(notificationService.unreadCount(userId)).thenReturn(3L);
+        when(notificationService.unreadSummary(userId, null))
+            .thenReturn(new NotificationCountResponse(3L, Map.of("ORDER", 2L, "ACTIVITY", 1L)));
 
         mockMvc.perform(get("/api/notifications/unread-count")
                 .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.unread").value(3));
+            .andExpect(jsonPath("$.unread").value(3))
+            .andExpect(jsonPath("$.byCategory.ORDER").value(2))
+            .andExpect(jsonPath("$.byCategory.ACTIVITY").value(1));
 
-        verify(notificationService).unreadCount(userId);
+        verify(notificationService).unreadSummary(userId, null);
+    }
+
+    @Test
+    void unreadCountPassesCategoriesToService() throws Exception {
+        var userId = UUID.randomUUID();
+        when(notificationService.unreadSummary(userId, List.of("SELLING")))
+            .thenReturn(new NotificationCountResponse(5L, Map.of("SELLING", 5L)));
+
+        mockMvc.perform(get("/api/notifications/unread-count?categories=SELLING")
+                .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.unread").value(5))
+            .andExpect(jsonPath("$.byCategory.SELLING").value(5));
+
+        verify(notificationService).unreadSummary(userId, List.of("SELLING"));
     }
 
     @Test
@@ -104,6 +148,41 @@ class NotificationControllerTest {
                 .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
             .andExpect(status().isNoContent());
 
-        verify(notificationService).markAllRead(userId);
+        verify(notificationService).markAllRead(userId, null);
+    }
+
+    @Test
+    void markAllReadPassesCategoriesToService() throws Exception {
+        var userId = UUID.randomUUID();
+
+        mockMvc.perform(patch("/api/notifications/read-all?categories=ORDER")
+                .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+            .andExpect(status().isNoContent());
+
+        verify(notificationService).markAllRead(userId, List.of("ORDER"));
+    }
+
+    @Test
+    void deleteReturns204AndVerifiesService() throws Exception {
+        var userId = UUID.randomUUID();
+        var notificationId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/api/notifications/{id}", notificationId)
+                .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+            .andExpect(status().isNoContent());
+
+        verify(notificationService).deleteNotification(userId, notificationId);
+    }
+
+    @Test
+    void deleteReturns404WhenNotFound() throws Exception {
+        var userId = UUID.randomUUID();
+        var notificationId = UUID.randomUUID();
+        doThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found"))
+            .when(notificationService).deleteNotification(userId, notificationId);
+
+        mockMvc.perform(delete("/api/notifications/{id}", notificationId)
+                .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+            .andExpect(status().isNotFound());
     }
 }
