@@ -22,6 +22,7 @@ dependencies {
 
     implementation("org.flywaydb:flyway-database-postgresql")
     implementation("software.amazon.awssdk:s3:2.55.7")
+    implementation("org.apache.poi:poi-ooxml:5.3.0")
 
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
@@ -43,7 +44,6 @@ dependencies {
 
     runtimeOnly("org.postgresql:postgresql")
 
-    testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
     testImplementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server-test")
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")

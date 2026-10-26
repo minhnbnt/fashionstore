@@ -19,6 +19,7 @@
 - `V12__site_content.sql`: `site_banner`, `site_popup` (lịch chạy `starts_at`/`ends_at`, CHECK kết thúc sau bắt đầu), `site_page` (slug unique, `DRAFT`/`PUBLISHED`), `faq_item`; seed 5 trang chính sách + vài FAQ.
 - `V15__admin_order_monitoring.sql`: ghi nhận bên hủy đơn (`BUYER`/`SELLER`/`ADMIN`) và index phục vụ màn giám sát toàn sàn.
 - `V16__public_holiday.sql`: lịch nghỉ/ngày làm bù cho SLA đơn hàng + trạng thái đồng bộ Calendarific; seed lịch 2026–2027.
+- `V28__shop_invitations.sql`: Bảng `shop_invitations` (lưu lời mời nhân sự với `token` 64 hex, `expires_at` 7 ngày, partial unique index `(shop_id, lower(email))` khi `accepted_at IS NULL`). Bảng `shop_member` bổ sung cột `status VARCHAR(20) DEFAULT 'ACTIVE'` với constraint CHECK `status IN ('ACTIVE', 'DEACTIVATED')`.
 - Repository Spring Data JDBC: derived query sắp nhiều cột (`OrderByAAscBAsc`) làm AOT repository sinh code không compile được → viết `@Query` SQL tay.
 
 ## Search BM25 (pg_textsearch)

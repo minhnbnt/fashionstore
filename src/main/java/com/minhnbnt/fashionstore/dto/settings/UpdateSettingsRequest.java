@@ -40,7 +40,10 @@ public record UpdateSettingsRequest(
     @Min(0)
     @Nullable Long codMinTotal,
 
-    @Schema(description = "Tổng đơn tối đa cho COD, VND; 0 = không giới hạn; bỏ trống = không đổi", example = "10000000")
+    @Schema(
+        description = "Tổng đơn tối đa cho COD, VND; 0 = không giới hạn; bỏ trống = không đổi",
+        example = "10000000"
+    )
     @Min(0)
     @Nullable Long codMaxTotal
 ) {

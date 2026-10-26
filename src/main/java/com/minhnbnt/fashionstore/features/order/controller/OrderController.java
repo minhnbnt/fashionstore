@@ -99,7 +99,10 @@ public class OrderController {
     }
 
     @PatchMapping("/{id}/received")
-    @Operation(summary = "Xac nhan da nhan hang", description = "Chi xac nhan duoc don DELIVERED. Mo khoa viet danh gia.")
+    @Operation(
+        summary = "Xac nhan da nhan hang",
+        description = "Chi xac nhan duoc don DELIVERED. Mo khoa viet danh gia."
+    )
     @ApiResponse(responseCode = "200", description = "Don sau khi xac nhan")
     @ApiResponse(responseCode = "401", description = "Thieu hoac sai JWT")
     @ApiResponse(responseCode = "404", description = "Don khong ton tai hoac khong phai cua ban")

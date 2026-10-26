@@ -6,12 +6,11 @@ import com.minhnbnt.fashionstore.dto.chat.ConversationEvent;
 import com.minhnbnt.fashionstore.dto.chat.SendMessageRequest;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatConversationRepository;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatMessageRepository;
-import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
-import com.minhnbnt.fashionstore.features.shop.ShopRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
+import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.infrastructure.realtime.ChatRealtimePublisher;
 import com.minhnbnt.fashionstore.model.ChatConversation;
 import com.minhnbnt.fashionstore.model.ChatMessage;
-import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
@@ -28,9 +27,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,13 +48,19 @@ class ChatServiceUnitTest {
     private ChatMessageRepository messages;
 
     @Mock
-    private ShopRepository shops;
+    private ShopService shops;
 
     @Mock
-    private ShopMemberRepository members;
+    private ShopAccessChecker access;
+
+    @Mock
+    private ShopAuditService audit;
 
     @Mock
     private ChatRealtimePublisher realtime;
+
+    @Mock
+    private com.minhnbnt.fashionstore.features.notification.NotificationService notifications;
 
     @InjectMocks
     private ChatService chatService;
@@ -76,7 +85,7 @@ class ChatServiceUnitTest {
         var shopId = UUID.randomUUID();
         var shop = ShopTestFixtures.shop("Fashion Hub", "fashion-hub", "Mo ta");
 
-        when(shops.findById(shopId)).thenReturn(Optional.of(shop));
+        when(shops.findEntityById(shopId)).thenReturn(Optional.of(shop));
         when(conversations.findByShopIdAndBuyerId(shopId, buyerId)).thenReturn(Optional.empty());
         when(conversations.save(any(ChatConversation.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -103,8 +112,8 @@ class ChatServiceUnitTest {
         );
 
         when(conversations.findById(convId)).thenReturn(Optional.of(conv));
-        when(shops.findById(shopId)).thenReturn(Optional.of(shop));
-        when(members.findOwner(shopId)).thenReturn(Optional.of(ownerId));
+        when(shops.findEntityById(shopId)).thenReturn(Optional.of(shop));
+        when(shops.ownerOf(shopId)).thenReturn(ownerId);
 
         var req = new SendMessageRequest("Shop oi, mau xanh con size M khong?", null);
         var resp = chatService.sendMessage(buyerId, convId, req);
@@ -129,7 +138,7 @@ class ChatServiceUnitTest {
         var conv = ChatConversation.create(shopId, buyerId);
 
         when(conversations.findById(convId)).thenReturn(Optional.of(conv));
-        when(members.findRole(shopId, strangerId)).thenReturn(Optional.empty());
+        when(shops.isMember(shopId, strangerId)).thenReturn(false);
 
         var req = new SendMessageRequest("Hello", null);
 
@@ -149,7 +158,7 @@ class ChatServiceUnitTest {
 
         var sellerId = UUID.randomUUID();
         when(conversations.findById(convId)).thenReturn(Optional.of(conv));
-        when(members.findRole(shopId, sellerId)).thenReturn(Optional.of(MemberRole.OWNER));
+        when(shops.isMember(shopId, sellerId)).thenReturn(true);
 
         chatService.markRead(sellerId, convId);
 
@@ -167,7 +176,7 @@ class ChatServiceUnitTest {
         var conv = ChatConversation.create(shopId, buyerId);
 
         when(conversations.findById(convId)).thenReturn(Optional.of(conv));
-        when(members.findActiveUserIdsByShop(shopId)).thenReturn(List.of(ownerId, staffId));
+        when(shops.findActiveUserIdsByShop(shopId)).thenReturn(List.of(ownerId, staffId));
 
         var req = new SendMessageRequest("Hello shop", null);
         var resp = chatService.sendMessage(buyerId, convId, req);
@@ -199,9 +208,9 @@ class ChatServiceUnitTest {
         );
 
         when(conversations.findById(convId)).thenReturn(Optional.of(conv));
-        when(shops.findById(shopId)).thenReturn(Optional.of(shop));
-        when(members.findOwner(shopId)).thenReturn(Optional.of(ownerId));
-        when(members.findActiveUserIdsByShop(shopId)).thenReturn(List.of(ownerId));
+        when(shops.findEntityById(shopId)).thenReturn(Optional.of(shop));
+        when(shops.ownerOf(shopId)).thenReturn(ownerId);
+        when(shops.findActiveUserIdsByShop(shopId)).thenReturn(List.of(ownerId));
 
         var req = new SendMessageRequest("Shop oi, mau xanh con size M khong?", null);
         chatService.sendMessage(buyerId, convId, req);
@@ -223,8 +232,8 @@ class ChatServiceUnitTest {
         var conv = ChatConversation.create(shopId, buyerId);
 
         when(conversations.findById(convId)).thenReturn(Optional.of(conv));
-        when(members.findRole(shopId, sellerId)).thenReturn(Optional.of(MemberRole.OWNER));
-        when(members.findActiveUserIdsByShop(shopId)).thenReturn(List.of(sellerId));
+        when(shops.isMember(shopId, sellerId)).thenReturn(true);
+        when(shops.findActiveUserIdsByShop(shopId)).thenReturn(List.of(sellerId));
 
         var req = new SendMessageRequest("Van con hang ban nhe", null);
         chatService.sendMessage(sellerId, convId, req);
@@ -244,7 +253,7 @@ class ChatServiceUnitTest {
         conv.recordNewMessage("Hello", true);
 
         when(conversations.findById(convId)).thenReturn(Optional.of(conv));
-        when(members.findActiveUserIdsByShop(shopId)).thenReturn(List.of(ownerId));
+        when(shops.findActiveUserIdsByShop(shopId)).thenReturn(List.of(ownerId));
 
         chatService.markRead(buyerId, convId);
 
@@ -264,12 +273,63 @@ class ChatServiceUnitTest {
         conv.recordNewMessage("Hello", true);
 
         when(conversations.findById(convId)).thenReturn(Optional.of(conv));
-        when(members.findRole(shopId, sellerId)).thenReturn(Optional.of(MemberRole.OWNER));
+        when(shops.isMember(shopId, sellerId)).thenReturn(true);
 
         chatService.markRead(sellerId, convId);
 
         verify(realtime).publishReadReceipt(recipientsCaptor.capture(), readEventCaptor.capture());
         assertThat(recipientsCaptor.getValue()).containsExactly(buyerId);
         assertThat(readEventCaptor.getValue().readerId()).isEqualTo(sellerId);
+    }
+
+    @Test
+    void sendMessageFromShopNotifiesBuyer() {
+        var buyerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var sellerId = UUID.randomUUID();
+        var conv = ChatConversation.create(shopId, buyerId);
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(shops.isMember(shopId, sellerId)).thenReturn(true);
+        when(shops.getShopName(shopId)).thenReturn("Fashion Hub");
+        when(shops.findActiveUserIdsByShop(shopId)).thenReturn(List.of(sellerId));
+
+        var req = new SendMessageRequest("Shop chao ban", null);
+        chatService.sendMessage(sellerId, convId, req);
+
+        verify(notifications).create(
+            eq(Set.of(buyerId)),
+            eq(NotificationCategory.ACTIVITY),
+            eq("CHAT_MESSAGE"),
+            eq("Tin nhắn mới từ Fashion Hub"),
+            eq("Shop chao ban"),
+            eq(null),
+            any()
+        );
+    }
+
+    @Test
+    void sendMessageFromBuyerDoesNotNotifySeller() {
+        var buyerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var conv = ChatConversation.create(shopId, buyerId);
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(shops.findActiveUserIdsByShop(shopId)).thenReturn(List.of(UUID.randomUUID()));
+
+        var req = new SendMessageRequest("Buyer chao shop", null);
+        chatService.sendMessage(buyerId, convId, req);
+
+        verify(notifications, never()).create(
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
     }
 }

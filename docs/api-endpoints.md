@@ -213,11 +213,16 @@ Buyer tạo/sửa/xóa đánh giá đã chuyển hẳn về Flow 14 (`review`, b
 | [x] | 72 | PUT | `/api/seller/shops/{shopId}/roles/{roleId}` | Chỉnh sửa tên và quyền của vai trò tùy chỉnh |
 | [x] | 73 | DELETE | `/api/seller/shops/{shopId}/roles/{roleId}` | Xóa vai trò tùy chỉnh |
 | [x] | 74 | GET | `/api/seller/shops/{shopId}/members` | Danh sách nhân viên và quyền hạn hiện tại |
-| [x] | 75 | POST | `/api/seller/shops/{shopId}/invitations` | Mời nhân viên qua email kèm gán vai trò |
-| [x] | 76 | POST | `/api/invitations/{token}/accept` | Nhân viên chấp nhận lời mời tham gia shop |
-| [x] | 77 | PATCH | `/api/seller/shops/{shopId}/members/{memberId}/role` | Chủ shop thay đổi vai trò nhân viên |
-| [x] | 78 | DELETE | `/api/seller/shops/{shopId}/members/{memberId}` | Chủ shop thu hồi quyền và xóa nhân viên |
-| [x] | 79 | GET | `/api/seller/shops/{shopId}/audit` | Nhật ký thao tác nhân sự (Audit Log) |
+| [x] | 75 | POST | `/api/seller/shops/{shopId}/invitations` | Mời nhân viên qua email tài khoản kèm gán vai trò |
+| [x] | 76 | GET | `/api/seller/shops/{shopId}/invitations` | Danh sách lời mời nhân viên đang chờ chấp thuận |
+| [x] | 77 | DELETE | `/api/seller/shops/{shopId}/invitations/{invitationId}` | Chủ shop thu hồi lời mời nhân viên |
+| [x] | 78 | GET | `/api/seller/invitations/{token}` | Xem chi tiết lời mời tham gia shop qua token |
+| [x] | 79 | POST | `/api/seller/invitations/{token}/accept` | Nhân viên chấp nhận lời mời tham gia shop |
+| [x] | 80 | PATCH | `/api/seller/shops/{shopId}/members/{memberId}/role` | Chủ shop thay đổi vai trò nhân viên |
+| [x] | 81 | PATCH | `/api/seller/shops/{shopId}/members/{memberId}/status` | Vô hiệu hóa hoặc kích hoạt lại nhân viên (`ACTIVE`/`DEACTIVATED`) |
+| [x] | 82 | DELETE | `/api/seller/shops/{shopId}/members/{memberId}` | Chủ shop thu hồi quyền và xóa nhân viên |
+| [x] | 83 | GET | `/api/seller/shops/{shopId}/my-permissions` | Lấy danh sách quyền hạn và vai trò của user hiện tại trong shop |
+| [x] | 84 | GET | `/api/seller/shops/{shopId}/audit-logs` | Nhật ký thao tác nhân sự & hoạt động nghiệp vụ shop (hỗ trợ lọc `action`, phân trang `page`, `size`) |
 
 ## Flow 13 — Cart (giỏ + checkout nhiều shop)
 
@@ -253,3 +258,33 @@ Chi tiết luồng này xem `docs/review.md`.
 | [x] | 93 | DELETE | `/api/wishlist/items/{productId}` | Xóa khỏi wishlist |
 
 Chi tiết luồng này xem `docs/wishlist.md`.
+
+## Flow 16 — Thông báo trong Website (In-App Notifications)
+
+| Xong | # | Method | Path | Mô tả |
+|------|---|--------|------|-------|
+| [x] | 94 | GET | `/api/notifications` | Danh sách thông báo phân trang của user hiện tại |
+| [x] | 95 | GET | `/api/notifications/unread-count` | Số lượng thông báo chưa đọc (Unread Count) |
+| [x] | 96 | PATCH | `/api/notifications/{id}/read` | Đánh dấu một thông báo đã đọc |
+| [x] | 97 | POST | `/api/notifications/mark-all-read` | Đánh dấu tất cả thông báo của user đã đọc |
+
+## Flow 17 — Thống kê & Báo cáo Shop (Seller Statistics & Reporting)
+
+| Xong | # | Method | Path | Mô tả |
+|------|---|--------|------|-------|
+| [x] | 98 | GET | `/api/seller/shops/{shopId}/stats/dashboard` | Dashboard tổng quan: doanh thu hôm nay/hôm qua, đơn hàng, lượt truy cập |
+| [x] | 99 | GET | `/api/seller/shops/{shopId}/stats/performance` | Hiệu suất shop: tỷ lệ phản hồi chat, hủy đơn, giao đúng hạn, rating |
+| [x] | 100 | GET | `/api/seller/shops/{shopId}/stats/alerts` | Cảnh báo vận hành: đơn chờ, hết hàng, đổi trả |
+| [x] | 101 | GET | `/api/seller/shops/{shopId}/stats/revenue/detail` | Chi tiết doanh thu theo chu kỳ (day, week, month, year) |
+| [x] | 102 | GET | `/api/seller/shops/{shopId}/stats/revenue/comparison` | So sánh doanh thu chu kỳ hiện tại vs kỳ trước |
+| [x] | 103 | GET | `/api/seller/shops/{shopId}/stats/revenue/by-category` | Doanh thu phân bổ theo danh mục sản phẩm |
+| [x] | 104 | GET | `/api/seller/shops/{shopId}/stats/revenue/by-payment` | Doanh thu theo phương thức thanh toán (COD, VNPAY, MOMO) |
+| [x] | 105 | GET | `/api/seller/shops/{shopId}/stats/revenue/order-status-summary` | Tổng hợp giá trị đơn hoàn thành, đơn hủy, đổi trả |
+| [x] | 106 | GET | `/api/seller/shops/{shopId}/stats/revenue/export` | Xuất báo cáo doanh thu CSV/Excel |
+| [x] | 107 | GET | `/api/seller/shops/{shopId}/stats/products/top-selling` | Top sản phẩm bán chạy nhất |
+| [x] | 108 | GET | `/api/seller/shops/{shopId}/stats/products/low-conversion` | Sản phẩm xem nhiều mua ít (tỷ lệ chuyển đổi thấp) |
+| [x] | 109 | GET | `/api/seller/shops/{shopId}/stats/products/out-of-stock` | Sản phẩm hết hàng |
+| [x] | 110 | GET | `/api/seller/shops/{shopId}/stats/products/slow-moving` | Sản phẩm tồn kho lâu ngày không bán được |
+| [x] | 111 | GET | `/api/seller/shops/{shopId}/stats/customers/overview` | Tổng quan khách hàng: mới, quay lại, retention rate, AOV |
+| [x] | 112 | GET | `/api/seller/shops/{shopId}/stats/customers/top` | Top khách hàng chi tiêu nhiều nhất |
+| [x] | 113 | GET | `/api/seller/shops/{shopId}/stats/customers/follower-trend` | Tăng trưởng người theo dõi shop |

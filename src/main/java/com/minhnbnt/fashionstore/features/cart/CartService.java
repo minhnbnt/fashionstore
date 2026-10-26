@@ -10,17 +10,13 @@ import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
 import com.minhnbnt.fashionstore.features.cart.repository.CartItemRepository;
 import com.minhnbnt.fashionstore.features.cart.repository.CartRepository;
-import com.minhnbnt.fashionstore.features.catalog.repository.ProductImageRepository;
-import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
-import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepository;
+import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
-import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.Cart;
 import com.minhnbnt.fashionstore.model.CartItem;
 import com.minhnbnt.fashionstore.model.ProductImage;
 import com.minhnbnt.fashionstore.model.ProductStatus;
-import com.minhnbnt.fashionstore.model.Shop;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -44,13 +40,7 @@ public class CartService {
 
     private final CartItemRepository items;
 
-    private final ProductRepository products;
-
-    private final ProductVariantRepository variants;
-
-    private final ProductImageRepository images;
-
-    private final ShopRepository shopRepo;
+    private final CatalogService catalog;
 
     private final ShopService shops;
 
@@ -63,12 +53,12 @@ public class CartService {
             return new CartResponse(List.of(), 0, 0L);
         }
 
-        return toResponse(cart, items.findByCartIdOrderByCreatedAtAsc(cart.getId()));
+        return toResponse(items.findByCartIdOrderByCreatedAtAsc(cart.getId()));
     }
 
     @Transactional
     public CartResponse addItem(@NonNull UUID buyerId, @NonNull CartItemRequest request) {
-        var variant = variants.findById(request.variantId()).orElse(null);
+        var variant = catalog.findVariantById(request.variantId()).orElse(null);
         if (variant == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found");
         }
@@ -85,7 +75,7 @@ public class CartService {
             items.save(existing);
         }
 
-        return toResponse(cart, items.findByCartIdOrderByCreatedAtAsc(cart.getId()));
+        return toResponse(items.findByCartIdOrderByCreatedAtAsc(cart.getId()));
     }
 
     @Transactional
@@ -101,7 +91,7 @@ public class CartService {
         cart.touch();
         carts.save(cart);
 
-        return toResponse(cart, items.findByCartIdOrderByCreatedAtAsc(cart.getId()));
+        return toResponse(items.findByCartIdOrderByCreatedAtAsc(cart.getId()));
     }
 
     @Transactional
@@ -116,7 +106,7 @@ public class CartService {
         cart.touch();
         carts.save(cart);
 
-        return toResponse(cart, items.findByCartIdOrderByCreatedAtAsc(cart.getId()));
+        return toResponse(items.findByCartIdOrderByCreatedAtAsc(cart.getId()));
     }
 
     @Transactional
@@ -126,7 +116,7 @@ public class CartService {
         carts.save(cart);
         items.deleteByCartId(cart.getId());
 
-        return toResponse(cart, List.of());
+        return toResponse(List.of());
     }
 
     @Transactional
@@ -158,13 +148,13 @@ public class CartService {
         var problems = new ArrayList<CheckoutBlockedItem>();
 
         for (var item : checked) {
-            var variant = variants.findById(item.getVariantId()).orElse(null);
+            var variant = catalog.findVariantById(item.getVariantId()).orElse(null);
             if (variant == null) {
                 problems.add(new CheckoutBlockedItem(item.getVariantId(), "Variant not found"));
                 continue;
             }
 
-            var product = products.findById(variant.getProductId()).orElse(null);
+            var product = catalog.findProductById(variant.getProductId()).orElse(null);
             if (product == null) {
                 problems.add(new CheckoutBlockedItem(item.getVariantId(), "Product not found"));
                 continue;
@@ -227,7 +217,7 @@ public class CartService {
         return cart;
     }
 
-    private CartResponse toResponse(Cart cart, List<CartItem> lines) {
+    private CartResponse toResponse(List<CartItem> lines) {
         var responses = new ArrayList<CartItemResponse>();
         var itemCount = 0;
         var subtotal = 0L;
@@ -235,23 +225,19 @@ public class CartService {
         var imageCache = new HashMap<UUID, List<ProductImage>>();
 
         for (var item : lines) {
-            var variant = variants.findById(item.getVariantId()).orElse(null);
+            var variant = catalog.findVariantById(item.getVariantId()).orElse(null);
             if (variant == null) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found");
             }
 
-            var product = products.findById(variant.getProductId()).orElse(null);
+            var product = catalog.findProductById(variant.getProductId()).orElse(null);
             if (product == null) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
             }
 
-            var shopName = shopCache.computeIfAbsent(variant.getShopId(), id ->
-                shopRepo.findById(id).map(Shop::getName).orElse("Cửa hàng")
-            );
+            var shopName = shopCache.computeIfAbsent(variant.getShopId(), shops::getShopName);
 
-            var productImages = imageCache.computeIfAbsent(variant.getProductId(), id ->
-                images.findByProductIdOrderBySortOrderAsc(id)
-            );
+            var productImages = imageCache.computeIfAbsent(variant.getProductId(), catalog::findImagesByProductId);
 
             String imageKey = null;
             for (var img : productImages) {

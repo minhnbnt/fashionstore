@@ -14,7 +14,10 @@ public interface ShopFollowerRepository extends Repository<ShopFollower, UUID> {
     Optional<ShopFollower> find(UUID shopId, UUID userId);
 
     @Modifying
-    @Query("INSERT INTO shop_follower (shop_id, user_id, created_at) VALUES (:shopId, :userId, now()) ON CONFLICT DO NOTHING")
+    @Query("""
+        INSERT INTO shop_follower (shop_id, user_id, created_at)
+        VALUES (:shopId, :userId, now()) ON CONFLICT DO NOTHING
+        """)
     int add(UUID shopId, UUID userId);
 
     @Modifying

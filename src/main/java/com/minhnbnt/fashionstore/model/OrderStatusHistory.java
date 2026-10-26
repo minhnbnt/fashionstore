@@ -47,10 +47,15 @@ public class OrderStatusHistory implements Persistable<UUID> {
         @Nullable UUID changedBy,
         String note
     ) {
+        String fromName = null;
+        if (from != null) {
+            fromName = from.name();
+        }
+
         return new OrderStatusHistory(
             UUID.randomUUID(),
             orderId,
-            from == null ? null : from.name(),
+            fromName,
             to.name(),
             changedBy,
             note,

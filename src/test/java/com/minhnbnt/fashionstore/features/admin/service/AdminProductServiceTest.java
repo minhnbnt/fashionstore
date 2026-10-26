@@ -92,7 +92,9 @@ class AdminProductServiceTest {
         var shopId = approvedShop(ownerId, "ban-off-market");
         var product = product(ownerId, shopId, "ban-off-market-ao");
 
-        var banned = adminProducts.ban(adminId, product.id(), ProductViolationType.COUNTERFEIT, "Hàng nhái thương hiệu");
+        var banned = adminProducts.ban(
+            adminId, product.id(), ProductViolationType.COUNTERFEIT, "Hàng nhái thương hiệu"
+        );
 
         assertThat(banned.status()).isEqualTo("BANNED");
         assertThat(banned.violationType()).isEqualTo("COUNTERFEIT");

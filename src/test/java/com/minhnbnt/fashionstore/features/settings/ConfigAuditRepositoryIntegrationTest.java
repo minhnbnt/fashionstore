@@ -71,7 +71,8 @@ class ConfigAuditRepositoryIntegrationTest {
     @Test
     void pagingPartitionsAllRowsAndCountMatchesTotal() {
         for (var i = 0; i < 3; i++) {
-            audits.insert(ConfigAuditEntity.SETTING, "audit-test-page-" + i + "-" + UUID.randomUUID(), "UPDATE", null, "\"1\"", admin());
+            var targetId = "audit-test-page-" + i + "-" + UUID.randomUUID();
+            audits.insert(ConfigAuditEntity.SETTING, targetId, "UPDATE", null, "\"1\"", admin());
         }
 
         var all = audits.search(null, 0, 100);

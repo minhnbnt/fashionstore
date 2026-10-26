@@ -25,6 +25,7 @@ import com.minhnbnt.fashionstore.dto.catalog.BulkUpdateStockRequest;
 import com.minhnbnt.fashionstore.dto.catalog.InventoryItemResponse;
 import com.minhnbnt.fashionstore.dto.catalog.SellerProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.StockMovementResponse;
+import com.minhnbnt.fashionstore.dto.catalog.WishlistProductCard;
 import com.minhnbnt.fashionstore.dto.common.PageResponse;
 import com.minhnbnt.fashionstore.features.catalog.repository.CategoryRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductAdminQueryRepository;
@@ -38,10 +39,9 @@ import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepos
 import com.minhnbnt.fashionstore.features.catalog.repository.StockMovementRepository;
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.review.ReviewService;
-import com.minhnbnt.fashionstore.features.shop.ShopRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.infrastructure.media.VideoMetadataService;
-import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.Product;
 import com.minhnbnt.fashionstore.model.ProductAuditLog;
 import com.minhnbnt.fashionstore.model.ProductImage;
@@ -50,6 +50,7 @@ import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.model.ProductVariant;
 import com.minhnbnt.fashionstore.model.ProductViolationType;
 import com.minhnbnt.fashionstore.model.ReportStatus;
+import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.model.StockMovement;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
@@ -73,6 +74,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.StreamSupport;
 
@@ -104,11 +106,11 @@ public class CatalogService {
 
     private final ShopService shops;
 
-    private final ShopRepository shopRepository;
-
     private final ReviewService reviews;
 
     private final ShopAccessChecker access;
+
+    private final ShopAuditService audit;
 
     private final VideoMetadataService videoMetadataService;
 
@@ -122,7 +124,7 @@ public class CatalogService {
         @NonNull UUID shopId,
         @NonNull CreateProductRequest request
     ) {
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
 
         requireSingleDefault(request.variants());
 
@@ -158,8 +160,7 @@ public class CatalogService {
 
         videoMetadataService.validateVideoDuration(request.videoKey());
 
-        var shop = shopRepository.findById(shopId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found"));
+        var shop = shops.requireShop(shopId);
 
         ProductStatus initialStatus;
         if (shop.isTrusted()) {
@@ -269,6 +270,32 @@ public class CatalogService {
 
         keywordScanner.scan(product.getId(), product.getName(), product.getDescription());
 
+        var totalStock = 0;
+        var minPrice = Long.MAX_VALUE;
+        for (var reqVar : request.variants()) {
+            totalStock = totalStock + reqVar.stockQuantity();
+            if (reqVar.price() < minPrice) {
+                minPrice = reqVar.price();
+            }
+        }
+        if (minPrice == Long.MAX_VALUE) {
+            minPrice = 0L;
+        }
+
+        var catName = "Không phân loại";
+        if (request.categoryId() != null) {
+            var cat = categories.findById(request.categoryId()).orElse(null);
+            if (cat != null) {
+                catName = cat.getName();
+            }
+        }
+
+        var createDetail = "Tạo sản phẩm: \"" + product.getName() + "\" | Danh mục: " + catName
+            + " | Giá từ: " + minPrice + "₫ | Tồn kho ban đầu: " + totalStock
+            + " (" + request.variants().size() + " phân loại)";
+
+        audit.record(product.getShopId(), userId, "PRODUCT_CREATE", "PRODUCT", product.getId(), createDetail);
+
         return toResponse(product);
     }
 
@@ -284,7 +311,7 @@ public class CatalogService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
         }
 
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
 
         if (product.getStatus() == ProductStatus.DELETED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Deleted product cannot be modified");
@@ -309,7 +336,19 @@ public class CatalogService {
             newValues.put("name", request.name());
         }
         if (request.categoryId() != null && !request.categoryId().equals(product.getCategoryId())) {
-            changes.add("Đổi danh mục ngành hàng");
+            var oldCatName = "Chưa phân loại";
+            if (product.getCategoryId() != null) {
+                var oldCat = categories.findById(product.getCategoryId()).orElse(null);
+                if (oldCat != null) {
+                    oldCatName = oldCat.getName();
+                }
+            }
+            var newCatName = "Chưa phân loại";
+            var newCat = categories.findById(request.categoryId()).orElse(null);
+            if (newCat != null) {
+                newCatName = newCat.getName();
+            }
+            changes.add("Đổi danh mục: [" + oldCatName + "] -> [" + newCatName + "]");
             oldValues.put("categoryId", product.getCategoryId());
             newValues.put("categoryId", request.categoryId());
         }
@@ -336,6 +375,62 @@ public class CatalogService {
             }
             oldValues.put("tryOnEnabled", product.isTryOnEnabled());
             newValues.put("tryOnEnabled", request.tryOnEnabled());
+        }
+        if (request.material() != null && !request.material().equals(product.getMaterial())) {
+            var oldMat = "Chưa có";
+            if (product.getMaterial() != null) {
+                oldMat = product.getMaterial();
+            }
+            changes.add("Chất liệu: " + oldMat + " -> " + request.material());
+            oldValues.put("material", product.getMaterial());
+            newValues.put("material", request.material());
+        }
+        if (request.origin() != null && !request.origin().equals(product.getOrigin())) {
+            var oldOri = "Chưa có";
+            if (product.getOrigin() != null) {
+                oldOri = product.getOrigin();
+            }
+            changes.add("Xuất xứ: " + oldOri + " -> " + request.origin());
+            oldValues.put("origin", product.getOrigin());
+            newValues.put("origin", request.origin());
+        }
+        if (request.weightGrams() != null && !request.weightGrams().equals(product.getWeightGrams())) {
+            var oldW = "Chưa có";
+            if (product.getWeightGrams() != null) {
+                oldW = product.getWeightGrams() + "g";
+            }
+            changes.add("Khối lượng: " + oldW + " -> " + request.weightGrams() + "g");
+            oldValues.put("weightGrams", product.getWeightGrams());
+            newValues.put("weightGrams", request.weightGrams());
+        }
+        var dimChanged = false;
+        if (request.lengthCm() != null && !request.lengthCm().equals(product.getLengthCm())) {
+            dimChanged = true;
+        }
+        if (request.widthCm() != null && !request.widthCm().equals(product.getWidthCm())) {
+            dimChanged = true;
+        }
+        if (request.heightCm() != null && !request.heightCm().equals(product.getHeightCm())) {
+            dimChanged = true;
+        }
+        if (dimChanged) {
+            var oldDim = product.getLengthCm() + "x" + product.getWidthCm() + "x" + product.getHeightCm() + "cm";
+            var newL = product.getLengthCm();
+            if (request.lengthCm() != null) {
+                newL = request.lengthCm();
+            }
+            var newW = product.getWidthCm();
+            if (request.widthCm() != null) {
+                newW = request.widthCm();
+            }
+            var newH = product.getHeightCm();
+            if (request.heightCm() != null) {
+                newH = request.heightCm();
+            }
+            var newDim = newL + "x" + newW + "x" + newH + "cm";
+            changes.add("Kích thước đóng gói: " + oldDim + " -> " + newDim);
+            oldValues.put("dimensions", oldDim);
+            newValues.put("dimensions", newDim);
         }
         if (request.status() != null && !request.status().equalsIgnoreCase(product.getStatus().name())) {
             changes.add("Đổi trạng thái: " + product.getStatus().name() + " -> " + request.status());
@@ -365,6 +460,7 @@ public class CatalogService {
         }
 
         if (request.images() != null) {
+            var oldCount = images.findByProductIdOrderBySortOrderAsc(product.getId()).size();
             images.deleteByProductId(product.getId());
             var newImages = request.images().stream()
                 .map(img -> ProductImage.create(
@@ -375,7 +471,9 @@ public class CatalogService {
                 ))
                 .toList();
             images.saveAll(newImages);
-            changes.add("Cập nhật lại " + newImages.size() + " ảnh sản phẩm");
+            changes.add("Cập nhật bộ ảnh: " + oldCount + " ảnh cũ -> " + newImages.size() + " ảnh mới");
+            oldValues.put("imageCount", oldCount);
+            newValues.put("imageCount", newImages.size());
         }
 
         if (request.variants() != null) {
@@ -385,7 +483,7 @@ public class CatalogService {
         var saved = products.save(product);
         keywordScanner.scan(saved.getId(), saved.getName(), saved.getDescription());
 
-        var summary = String.join("; ", changes);
+        var summary = String.join(" | ", changes);
         if (summary.isBlank()) {
             summary = "Cập nhật sản phẩm";
         }
@@ -398,6 +496,9 @@ public class CatalogService {
             toJson(oldValues),
             toJson(newValues)
         ));
+
+        var updateDetail = "Cập nhật sản phẩm: \"" + saved.getName() + "\" | " + summary;
+        audit.record(saved.getShopId(), userId, "PRODUCT_UPDATE", "PRODUCT", saved.getId(), updateDetail);
 
         return toResponse(saved);
     }
@@ -414,7 +515,7 @@ public class CatalogService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
         }
 
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
 
         for (var item : request.images()) {
             if (item.variantId() != null) {
@@ -680,17 +781,55 @@ public class CatalogService {
                 }
 
                 if (update.stockQuantity() != null && update.stockQuantity() != variant.getStockQuantity()) {
-                    changes.add("Tồn kho " + variant.getSize() + "/" + variant.getColor() + ": "
-                        + variant.getStockQuantity() + " -> " + update.stockQuantity());
+                    var delta = update.stockQuantity() - variant.getStockQuantity();
+                    var deltaSign = "";
+                    if (delta > 0) {
+                        deltaSign = "+";
+                    }
+                    changes.add("Tồn kho " + variant.getSize() + "/" + variant.getColor()
+                        + " (SKU: " + variant.getSku() + "): "
+                        + variant.getStockQuantity() + " -> " + update.stockQuantity()
+                        + " (" + deltaSign + delta + ")");
                     oldValues.put("stock_" + variant.getId(), variant.getStockQuantity());
                     newValues.put("stock_" + variant.getId(), update.stockQuantity());
                 }
 
                 if (update.price() != null && !update.price().equals(variant.getPrice())) {
                     changes.add("Giá bán " + variant.getSize() + "/" + variant.getColor() + ": "
-                        + variant.getPrice() + " -> " + update.price());
+                        + variant.getPrice() + "₫ -> " + update.price() + "₫");
                     oldValues.put("price_" + variant.getId(), variant.getPrice());
                     newValues.put("price_" + variant.getId(), update.price());
+                }
+
+                if (update.compareAtPrice() != null && !update.compareAtPrice().equals(variant.getCompareAtPrice())) {
+                    var oldCap = "Chưa có";
+                    if (variant.getCompareAtPrice() != null) {
+                        oldCap = variant.getCompareAtPrice() + "₫";
+                    }
+                    changes.add("Giá niêm yết " + variant.getSize() + "/" + variant.getColor() + ": "
+                        + oldCap + " -> " + update.compareAtPrice() + "₫");
+                    oldValues.put("compareAtPrice_" + variant.getId(), variant.getCompareAtPrice());
+                    newValues.put("compareAtPrice_" + variant.getId(), update.compareAtPrice());
+                }
+
+                if (update.size() != null && !update.size().trim().equals(variant.getSize())) {
+                    changes.add("Đổi kích cỡ biến thể (SKU: " + variant.getSku() + "): "
+                        + variant.getSize() + " -> " + update.size().trim());
+                    oldValues.put("size_" + variant.getId(), variant.getSize());
+                    newValues.put("size_" + variant.getId(), update.size().trim());
+                }
+
+                if (update.color() != null && !update.color().trim().equals(variant.getColor())) {
+                    changes.add("Đổi màu sắc biến thể (SKU: " + variant.getSku() + "): "
+                        + variant.getColor() + " -> " + update.color().trim());
+                    oldValues.put("color_" + variant.getId(), variant.getColor());
+                    newValues.put("color_" + variant.getId(), update.color().trim());
+                }
+
+                if (update.sku() != null && !update.sku().trim().equals(variant.getSku())) {
+                    changes.add("Đổi mã SKU: " + variant.getSku() + " -> " + update.sku().trim());
+                    oldValues.put("sku_" + variant.getId(), variant.getSku());
+                    newValues.put("sku_" + variant.getId(), update.sku().trim());
                 }
 
                 variant.updateDetails(
@@ -737,10 +876,8 @@ public class CatalogService {
                     unsetCurrentDefault(product.getId(), newVar.getId());
                 }
                 variants.save(newVar);
-                changes.add(
-                    "Thêm biến thể mới: " + newVar.getSize() + " - " + newVar.getColor()
-                        + " (SKU: " + newVar.getSku() + ")"
-                );
+                changes.add("Thêm phân loại mới: Size " + newVar.getSize() + ", Màu " + newVar.getColor()
+                    + " (SKU: " + newVar.getSku() + ", Giá: " + newVar.getPrice() + "₫, Tồn kho: " + stock + ")");
                 newValues.put("new_variant_" + newVar.getSku(), newVar.getSize() + "/" + newVar.getColor());
             }
         }
@@ -764,7 +901,7 @@ public class CatalogService {
         if (product == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
         }
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_READ);
 
         return toResponse(product);
     }
@@ -779,7 +916,7 @@ public class CatalogService {
         if (product == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
         }
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_READ);
 
         return auditLogs.findByProductIdOrderByCreatedAtDesc(productId).stream()
             .map(log -> new ProductAuditLogResponse(
@@ -806,7 +943,7 @@ public class CatalogService {
         if (product == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
         }
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
 
         var oldStatus = product.getStatus().name();
         String newStatus;
@@ -833,6 +970,10 @@ public class CatalogService {
             toJson(Map.of("status", oldStatus)),
             toJson(Map.of("status", newStatus))
         ));
+
+        var statusDetail = "Đổi trạng thái sản phẩm \"" + product.getName()
+            + "\": [" + oldStatus + "] -> [" + newStatus + "]";
+        audit.record(product.getShopId(), userId, "PRODUCT_STATUS", "PRODUCT", productId, statusDetail);
 
         return toResponse(saved);
     }
@@ -972,7 +1113,7 @@ public class CatalogService {
 
     @Transactional
     public void deleteProduct(@NonNull UUID userId, @NonNull UUID shopId, @NonNull UUID productId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
         var product = products.findByShopIdAndId(shopId, productId).orElse(null);
         if (product == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
@@ -1000,6 +1141,8 @@ public class CatalogService {
             toJson(Map.of("status", oldStatus)),
             toJson(Map.of("status", "DELETED"))
         ));
+        var deleteDetail = "Xóa sản phẩm: \"" + product.getName() + "\" (Mã ID: " + productId + ")";
+        audit.record(product.getShopId(), userId, "PRODUCT_DELETE", "PRODUCT", productId, deleteDetail);
     }
 
     @Transactional
@@ -1009,7 +1152,7 @@ public class CatalogService {
         @NonNull UUID productId,
         @NonNull UUID imageId
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
         var product = products.findByShopIdAndId(shopId, productId).orElse(null);
         if (product == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
@@ -1019,6 +1162,10 @@ public class CatalogService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Image not found");
         }
         images.delete(image);
+
+        var imageDetail = "Xóa ảnh của sản phẩm: \"" + product.getName() + "\" (Thứ tự: "
+                + image.getSortOrder() + ")";
+        audit.record(product.getShopId(), userId, "PRODUCT_IMAGE_DELETE", "PRODUCT", productId, imageDetail);
     }
 
     @Transactional(readOnly = true)
@@ -1058,7 +1205,7 @@ public class CatalogService {
         int page,
         int limit
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.PRODUCT_READ);
         List<Product> all;
         var statusNeedsLookup = !statusFilter.isBlank()
             && !"ALL".equalsIgnoreCase(statusFilter)
@@ -1171,7 +1318,7 @@ public class CatalogService {
         @NonNull UUID shopId,
         @NonNull BulkUpdateProductStatusRequest request
     ) {
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
         var targetStatus = ProductStatus.valueOf(request.status());
         var successCount = 0;
         var failedCount = 0;
@@ -1231,6 +1378,16 @@ public class CatalogService {
                 "{\"status\":\"" + oldStatus + "\"}",
                 "{\"status\":\"" + targetStatus.name() + "\"}"
             ));
+            var bulkStatusDetail = "Đổi trạng thái sản phẩm \"" + product.getName()
+                + "\": [" + oldStatus + "] -> [" + targetStatus.name() + "] (Hàng loạt)";
+            audit.record(
+                product.getShopId(),
+                userId,
+                "PRODUCT_STATUS_BULK",
+                "PRODUCT",
+                product.getId(),
+                bulkStatusDetail
+            );
             successCount++;
         }
 
@@ -1243,7 +1400,7 @@ public class CatalogService {
         @NonNull UUID shopId,
         @NonNull BulkDeleteProductsRequest request
     ) {
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
         var successCount = 0;
         var failedCount = 0;
         var messages = new ArrayList<String>();
@@ -1284,6 +1441,15 @@ public class CatalogService {
                 null,
                 null
             ));
+            var bulkDeleteDetail = "Xóa sản phẩm: \"" + product.getName() + "\" (Xóa hàng loạt)";
+            audit.record(
+                product.getShopId(),
+                userId,
+                "PRODUCT_DELETE_BULK",
+                "PRODUCT",
+                productId,
+                bulkDeleteDetail
+            );
             successCount++;
         }
 
@@ -1296,7 +1462,7 @@ public class CatalogService {
         @NonNull UUID shopId,
         @NonNull BulkUpdatePriceRequest request
     ) {
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
         var successCount = 0;
         var failedCount = 0;
         var messages = new ArrayList<String>();
@@ -1353,6 +1519,15 @@ public class CatalogService {
                 null,
                 null
             ));
+            var bulkPriceDetail = "Cập nhật giá sản phẩm \"" + product.getName() + "\": " + summary;
+            audit.record(
+                product.getShopId(),
+                userId,
+                "PRODUCT_PRICE_BULK",
+                "PRODUCT",
+                productId,
+                bulkPriceDetail
+            );
             successCount++;
         }
 
@@ -1365,7 +1540,7 @@ public class CatalogService {
         @NonNull UUID shopId,
         @NonNull BulkUpdateStockRequest request
     ) {
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.INVENTORY_WRITE);
         var successCount = 0;
         var failedCount = 0;
         var messages = new ArrayList<String>();
@@ -1418,6 +1593,15 @@ public class CatalogService {
                 null,
                 null
             ));
+            var bulkStockDetail = "Cập nhật tồn kho sản phẩm \"" + product.getName() + "\": " + summary;
+            audit.record(
+                product.getShopId(),
+                userId,
+                "INVENTORY_ADJUST_BULK",
+                "PRODUCT",
+                productId,
+                bulkStockDetail
+            );
             successCount++;
         }
 
@@ -1430,7 +1614,7 @@ public class CatalogService {
         @NonNull UUID shopId,
         boolean onlyLowStock
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.INVENTORY_READ);
         var variantsList = variants.findByShopId(shopId);
         var result = new ArrayList<InventoryItemResponse>();
         for (var v : variantsList) {
@@ -1466,7 +1650,7 @@ public class CatalogService {
         @NonNull UUID variantId,
         @NonNull AdjustStockRequest request
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.INVENTORY_WRITE);
         var variant = variants.findByShopIdAndId(shopId, variantId).orElse(null);
         if (variant == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found");
@@ -1493,6 +1677,24 @@ public class CatalogService {
         }
         var isLow = variant.getStockQuantity() <= variant.getLowStockThreshold();
 
+        var deltaStr = String.valueOf(delta);
+        if (delta > 0) {
+            deltaStr = "+" + delta;
+        }
+        var adjustDetail = "Điều chỉnh tồn kho sản phẩm: \"" + prodName + "\" | Phân loại: Size "
+                + variant.getSize()
+                + ", Màu " + variant.getColor() + " (SKU: " + variant.getSku() + ") | Tồn kho: "
+            + oldStock + " -> " + request.newStock() + " (" + deltaStr + ") | Lý do: " + reason;
+
+        audit.record(
+            variant.getShopId(),
+            userId,
+            "INVENTORY_ADJUST",
+            "PRODUCT",
+            variant.getProductId(),
+            adjustDetail
+        );
+
         return new InventoryItemResponse(
             variant.getId(),
             variant.getProductId(),
@@ -1513,7 +1715,7 @@ public class CatalogService {
         @NonNull UUID shopId,
         @NonNull UUID variantId
     ) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.INVENTORY_READ);
         var variant = variants.findByShopIdAndId(shopId, variantId).orElse(null);
         if (variant == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found");
@@ -1534,7 +1736,7 @@ public class CatalogService {
     @Transactional
     @SuppressWarnings("StringSplitter")
     public BulkImportResult bulkImport(@NonNull UUID userId, @NonNull UUID shopId, byte[] csvBytes) {
-        access.requireApprovedShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireApprovedShopPermission(userId, shopId, ShopPermission.PRODUCT_WRITE);
         var content = new String(csvBytes, StandardCharsets.UTF_8);
         var lines = Pattern.compile("\\r?\\n").split(content);
         var success = 0;
@@ -1581,12 +1783,24 @@ public class CatalogService {
                 errors.add("Row " + (i + 1) + ": " + ex.getMessage());
             }
         }
+
+        if (success > 0) {
+            audit.record(
+                shopId,
+                userId,
+                "PRODUCT_IMPORT",
+                "PRODUCT",
+                null,
+                "Nhập khẩu thành công " + success + " sản phẩm từ file CSV"
+            );
+        }
+
         return new BulkImportResult(success, failed, errors);
     }
 
     @Transactional(readOnly = true)
     public String exportCsv(@NonNull UUID userId, @NonNull UUID shopId) {
-        access.requireShopRole(userId, shopId, MemberRole.OWNER, MemberRole.STAFF);
+        access.requireShopPermission(userId, shopId, ShopPermission.PRODUCT_READ);
         var allProducts = products.findByShopIdOrderByCreatedAtDesc(shopId);
         var sb = new StringBuilder("name,slug,description,sku,size,color,price,stockQuantity,status\n");
         for (var p : allProducts) {
@@ -1660,5 +1874,121 @@ public class CatalogService {
             return null;
         }
         return violationType.name();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<ProductVariant> findVariantById(@NonNull UUID variantId) {
+        return variants.findById(variantId);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Product> findProductById(@NonNull UUID productId) {
+        return products.findById(productId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductImage> findImagesByProductId(@NonNull UUID productId) {
+        return images.findByProductIdOrderBySortOrderAsc(productId);
+    }
+
+    @Transactional(readOnly = true)
+    public Product requireActiveProduct(@NonNull UUID productId) {
+        var product = products.findById(productId).orElse(null);
+        if (product == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        if (product.getStatus() != ProductStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        if (!shops.isShopApproved(product.getShopId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        return product;
+    }
+
+    @Transactional(readOnly = true)
+    public ProductVariant requireVariant(@NonNull UUID variantId) {
+        var variant = variants.findById(variantId).orElse(null);
+        if (variant == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found");
+        }
+        return variant;
+    }
+
+    @Transactional
+    public boolean decrementVariantStock(@NonNull UUID variantId, int quantity) {
+        return variants.decrementStock(variantId, quantity);
+    }
+
+    @Transactional
+    public void incrementVariantStock(@NonNull UUID variantId, int quantity) {
+        variants.incrementStock(variantId, quantity);
+    }
+
+    @Transactional
+    public void recordStockMovement(
+        @NonNull UUID variantId,
+        @NonNull UUID shopId,
+        int quantity,
+        @NonNull String type,
+        @NonNull UUID referenceId
+    ) {
+        movements.save(StockMovement.record(
+            variantId,
+            shopId,
+            quantity,
+            type,
+            referenceId
+        ));
+    }
+
+    @Transactional(readOnly = true)
+    public WishlistProductCard getWishlistProductCard(@NonNull UUID productId) {
+        var product = products.findById(productId).orElse(null);
+        if (product == null) {
+            return new WishlistProductCard(productId, null, null, null, null, false, "Product no longer exists");
+        }
+
+        String reason = null;
+        if (product.getStatus() != ProductStatus.ACTIVE) {
+            reason = "Product is hidden";
+        } else if (!shops.isShopApproved(product.getShopId())) {
+            reason = "Shop is not approved for selling";
+        }
+
+        if (reason != null) {
+            return new WishlistProductCard(
+                productId,
+                product.getName(),
+                product.getSlug(),
+                null,
+                null,
+                false,
+                reason
+            );
+        }
+
+        Long minPrice = null;
+        for (var variant : variants.findByProductIdOrderByCreatedAtAsc(productId)) {
+            if (minPrice == null || variant.getPrice() < minPrice) {
+                minPrice = variant.getPrice();
+            }
+        }
+
+        String defaultImageKey = null;
+        var productImages = images.findByProductIdOrderBySortOrderAsc(productId);
+        if (!productImages.isEmpty()) {
+            defaultImageKey = productImages.get(0).getS3Key();
+        }
+
+        return new WishlistProductCard(
+            productId,
+            product.getName(),
+            product.getSlug(),
+            minPrice,
+            defaultImageKey,
+            true,
+            null
+        );
     }
 }
