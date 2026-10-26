@@ -75,7 +75,12 @@ class ShopMemberRepositoryIntegrationTest {
         var otherShopId = shop(user());
         var staffId = user();
 
-        var foreignRole = ShopRole.create(otherShopId, "Foreign Desk", new String[]{"ORDER_READ", "ORDER_PROCESS"}, false);
+        var foreignRole = ShopRole.create(
+            otherShopId,
+            "Foreign Desk",
+            new String[]{"ORDER_READ", "ORDER_PROCESS"},
+            false
+        );
         roles.save(foreignRole);
         members.add(ShopMember.staff(shopId, staffId, foreignRole.getId(), ownerId));
 
@@ -101,7 +106,12 @@ class ShopMemberRepositoryIntegrationTest {
 
         var otherOwnerId = user();
         var staffShopId = shop(otherOwnerId);
-        var warehouseRole = ShopRole.create(staffShopId, "Kho vận", new String[]{"INVENTORY_READ", "ORDER_READ"}, false);
+        var warehouseRole = ShopRole.create(
+            staffShopId,
+            "Kho vận",
+            new String[]{"INVENTORY_READ", "ORDER_READ"},
+            false
+        );
         roles.save(warehouseRole);
         members.add(ShopMember.staff(staffShopId, userId, warehouseRole.getId(), otherOwnerId));
 

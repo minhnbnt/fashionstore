@@ -403,7 +403,8 @@ public class OrderService {
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CONFIRMED, userId));
 
         var saved = orders.save(order);
-        var confirmDetail = "Xác nhận đơn hàng #" + saved.getCode() + " | Tổng tiền: " + saved.getTotal() + "₫ (" + orderItems.size() + " món)";
+        var confirmDetail = "Xác nhận đơn hàng #" + saved.getCode()
+            + " | Tổng tiền: " + saved.getTotal() + "₫ (" + orderItems.size() + " món)";
         audit.record(saved.getShopId(), userId, "ORDER_CONFIRM", "ORDER", saved.getId(), confirmDetail);
 
         return toResponse(saved, orderItems);
@@ -438,7 +439,8 @@ public class OrderService {
 
         var orderItems = items.findByOrderId(order.getId());
         var saved = orders.save(order);
-        var deliverDetail = "Đánh dấu đơn hàng #" + saved.getCode() + " giao thành công | Doanh thu thanh toán: " + saved.getSubtotal() + "₫";
+        var deliverDetail = "Đánh dấu đơn hàng #" + saved.getCode()
+            + " giao thành công | Doanh thu thanh toán: " + saved.getSubtotal() + "₫";
         audit.record(saved.getShopId(), userId, "ORDER_DELIVER", "ORDER", saved.getId(), deliverDetail);
 
         return toResponse(saved, orderItems);

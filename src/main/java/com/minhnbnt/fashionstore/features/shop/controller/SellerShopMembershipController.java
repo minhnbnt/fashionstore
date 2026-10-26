@@ -29,7 +29,8 @@ public class SellerShopMembershipController {
     @Operation(
         operationId = "getMyShops",
         summary = "Danh sách gian hàng của tôi",
-        description = "Trả về danh sách tất cả các gian hàng mà người dùng hiện tại tham gia làm chủ gian hàng hoặc nhân viên (bao gồm thông tin vai trò, trạng thái thành viên và quyền hạn)."
+        description = "Trả về danh sách tất cả các gian hàng mà người dùng hiện tại tham gia "
+            + "làm chủ gian hàng hoặc nhân viên (bao gồm thông tin vai trò, trạng thái thành viên và quyền hạn)."
     )
     @ApiResponse(responseCode = "200", description = "Danh sách gian hàng của người dùng hiện tại")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")

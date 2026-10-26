@@ -56,7 +56,8 @@ public class SellerShopDecorationController {
     @Operation(
         operationId = "saveDraft",
         summary = "Lưu nháp bố cục trang trí",
-        description = "Lưu lại bản nháp các block (Banner, Sản phẩm nổi bật, Bộ sưu tập, Đếm ngược Flash Sale, Video) để xem trước."
+        description = "Lưu lại bản nháp các block (Banner, Sản phẩm nổi bật, "
+            + "Bộ sưu tập, Đếm ngược Flash Sale, Video) để xem trước."
     )
     @ApiResponse(responseCode = "200", description = "Bản nháp sau khi lưu")
     @ApiResponse(responseCode = "400", description = "Body không hợp lệ")

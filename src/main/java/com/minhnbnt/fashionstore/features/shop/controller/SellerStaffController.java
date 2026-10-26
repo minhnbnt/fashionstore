@@ -163,7 +163,8 @@ public class SellerStaffController {
     @Operation(
         operationId = "inviteStaff",
         summary = "Mời nhân viên vào shop",
-        description = "Gửi lời mời tham gia shop cho tài khoản đã đăng ký theo email kèm theo vai trò. Lời mời được giao qua thông báo trong website, không gửi email."
+        description = "Gửi lời mời tham gia shop cho tài khoản đã đăng ký theo email kèm theo vai trò. "
+            + "Lời mời được giao qua thông báo trong website, không gửi email."
     )
     @ApiResponse(responseCode = "201", description = "Tạo lời mời thành công")
     @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")

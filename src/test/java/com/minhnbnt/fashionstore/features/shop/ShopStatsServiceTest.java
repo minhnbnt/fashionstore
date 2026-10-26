@@ -129,7 +129,8 @@ class ShopStatsServiceTest {
     void exportRevenueReportCsvCallsReportBuilder() {
         var rows = List.of(new ShopStatsRepository.RevenuePeriodRow("2026-10-24", 100000L, 1L));
         when(repository.revenueByPeriod(eq(shopId), eq("day"), any(), any())).thenReturn(rows);
-        when(reportBuilder.buildCsvReport(rows)).thenReturn("test-csv".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        when(reportBuilder.buildCsvReport(rows))
+            .thenReturn("test-csv".getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
         var bytes = service.exportRevenueReport(userId, shopId, "csv", null, null);
 
@@ -154,8 +155,9 @@ class ShopStatsServiceTest {
         when(repository.ordersForExport(eq(shopId), any(), any())).thenReturn(List.of());
 
         var expectedBytes = new byte[]{1, 2, 3};
-        when(reportBuilder.buildExcelReport(eq("Test Shop"), eq("test-shop"), any(), any(), eq(summary), eq(rows), any(), any(), any(), eq(true)))
-            .thenReturn(expectedBytes);
+        when(reportBuilder.buildExcelReport(
+            eq("Test Shop"), eq("test-shop"), any(), any(), eq(summary), eq(rows), any(), any(), any(), eq(true)
+        )).thenReturn(expectedBytes);
 
         var bytes = service.exportRevenueReport(userId, shopId, "xlsx", null, null);
 

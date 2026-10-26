@@ -34,7 +34,11 @@ public class SellerReturnController {
     private final ReturnRequestService returns;
 
     @GetMapping
-    @Operation(summary = "Danh sách yêu cầu đổi/trả", description = "Cần quyền RETURN_PROCESS. Lọc theo shop hoặc trạng thái (REQUESTED, APPROVED, REJECTED, COMPLETED).")
+    @Operation(
+        summary = "Danh sách yêu cầu đổi/trả",
+        description = "Cần quyền RETURN_PROCESS. Lọc theo shop hoặc trạng thái "
+            + "(REQUESTED, APPROVED, REJECTED, COMPLETED)."
+    )
     @ApiResponse(responseCode = "200", description = "Danh sách yêu cầu")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @SecurityRequirement(name = "bearerAuth")
@@ -67,7 +71,10 @@ public class SellerReturnController {
     }
 
     @PatchMapping("/{id}/approve")
-    @Operation(summary = "Chấp thuận yêu cầu đổi/trả", description = "Seller đồng ý và chọn phương án hoàn tiền/đổi hàng.")
+    @Operation(
+        summary = "Chấp thuận yêu cầu đổi/trả",
+        description = "Seller đồng ý và chọn phương án hoàn tiền/đổi hàng."
+    )
     @ApiResponse(responseCode = "200", description = "Yêu cầu sau khi duyệt")
     @ApiResponse(responseCode = "400", description = "Body không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")

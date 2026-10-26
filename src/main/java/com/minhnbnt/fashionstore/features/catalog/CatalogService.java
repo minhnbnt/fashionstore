@@ -786,8 +786,10 @@ public class CatalogService {
                     if (delta > 0) {
                         deltaSign = "+";
                     }
-                    changes.add("Tồn kho " + variant.getSize() + "/" + variant.getColor() + " (SKU: " + variant.getSku() + "): "
-                        + variant.getStockQuantity() + " -> " + update.stockQuantity() + " (" + deltaSign + delta + ")");
+                    changes.add("Tồn kho " + variant.getSize() + "/" + variant.getColor()
+                        + " (SKU: " + variant.getSku() + "): "
+                        + variant.getStockQuantity() + " -> " + update.stockQuantity()
+                        + " (" + deltaSign + delta + ")");
                     oldValues.put("stock_" + variant.getId(), variant.getStockQuantity());
                     newValues.put("stock_" + variant.getId(), update.stockQuantity());
                 }
@@ -811,13 +813,15 @@ public class CatalogService {
                 }
 
                 if (update.size() != null && !update.size().trim().equals(variant.getSize())) {
-                    changes.add("Đổi kích cỡ biến thể (SKU: " + variant.getSku() + "): " + variant.getSize() + " -> " + update.size().trim());
+                    changes.add("Đổi kích cỡ biến thể (SKU: " + variant.getSku() + "): "
+                        + variant.getSize() + " -> " + update.size().trim());
                     oldValues.put("size_" + variant.getId(), variant.getSize());
                     newValues.put("size_" + variant.getId(), update.size().trim());
                 }
 
                 if (update.color() != null && !update.color().trim().equals(variant.getColor())) {
-                    changes.add("Đổi màu sắc biến thể (SKU: " + variant.getSku() + "): " + variant.getColor() + " -> " + update.color().trim());
+                    changes.add("Đổi màu sắc biến thể (SKU: " + variant.getSku() + "): "
+                        + variant.getColor() + " -> " + update.color().trim());
                     oldValues.put("color_" + variant.getId(), variant.getColor());
                     newValues.put("color_" + variant.getId(), update.color().trim());
                 }
@@ -967,7 +971,8 @@ public class CatalogService {
             toJson(Map.of("status", newStatus))
         ));
 
-        var statusDetail = "Đổi trạng thái sản phẩm \"" + product.getName() + "\": [" + oldStatus + "] -> [" + newStatus + "]";
+        var statusDetail = "Đổi trạng thái sản phẩm \"" + product.getName()
+            + "\": [" + oldStatus + "] -> [" + newStatus + "]";
         audit.record(product.getShopId(), userId, "PRODUCT_STATUS", "PRODUCT", productId, statusDetail);
 
         return toResponse(saved);
@@ -1372,7 +1377,8 @@ public class CatalogService {
                 "{\"status\":\"" + oldStatus + "\"}",
                 "{\"status\":\"" + targetStatus.name() + "\"}"
             ));
-            var bulkStatusDetail = "Đổi trạng thái sản phẩm \"" + product.getName() + "\": [" + oldStatus + "] -> [" + targetStatus.name() + "] (Hàng loạt)";
+            var bulkStatusDetail = "Đổi trạng thái sản phẩm \"" + product.getName()
+                + "\": [" + oldStatus + "] -> [" + targetStatus.name() + "] (Hàng loạt)";
             audit.record(
                 product.getShopId(),
                 userId,

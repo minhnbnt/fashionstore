@@ -171,7 +171,8 @@ class ShopStaffServiceUnitTest {
         when(identity.findByEmail("staff@store.com"))
             .thenReturn(Optional.of(new AccountInfo(inviteeId, "staff@store.com", "Staff")));
         when(members.findMember(shopId, inviteeId)).thenReturn(Optional.empty());
-        when(shops.findById(shopId)).thenReturn(Optional.of(ShopTestFixtures.shop("Fashion Shop", "fashion-shop", "Mo ta")));
+        when(shops.findById(shopId))
+            .thenReturn(Optional.of(ShopTestFixtures.shop("Fashion Shop", "fashion-shop", "Mo ta")));
         when(identity.findById(ownerId))
             .thenReturn(Optional.of(new AccountInfo(ownerId, "owner@store.com", "Owner")));
 

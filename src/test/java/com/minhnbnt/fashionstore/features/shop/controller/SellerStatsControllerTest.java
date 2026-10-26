@@ -106,7 +106,10 @@ class SellerStatsControllerTest {
                 .param("format", "csv")
                 .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
             .andExpect(status().isOk())
-            .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, org.hamcrest.Matchers.containsString("bao-cao-doanh-thu-")))
+            .andExpect(header().string(
+                HttpHeaders.CONTENT_DISPOSITION,
+                org.hamcrest.Matchers.containsString("bao-cao-doanh-thu-")
+            ))
             .andExpect(content().contentType("text/csv;charset=UTF-8"));
     }
 
@@ -119,7 +122,10 @@ class SellerStatsControllerTest {
         mockMvc.perform(get("/api/seller/shops/{shopId}/stats/revenue/export", shopId)
                 .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
             .andExpect(status().isOk())
-            .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, org.hamcrest.Matchers.containsString("bao-cao-doanh-thu-")))
+            .andExpect(header().string(
+                HttpHeaders.CONTENT_DISPOSITION,
+                org.hamcrest.Matchers.containsString("bao-cao-doanh-thu-")
+            ))
             .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, org.hamcrest.Matchers.containsString(".xlsx")))
             .andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
     }

@@ -92,7 +92,8 @@ public class ShopStaffService {
         roles.save(role);
 
         var permsJoined = String.join(", ", request.permissions());
-        var createDetail = "Tạo vai trò: \"" + role.getName() + "\" gồm " + request.permissions().size() + " quyền: [" + permsJoined + "]";
+        var createDetail = "Tạo vai trò: \"" + role.getName() + "\" gồm "
+            + request.permissions().size() + " quyền: [" + permsJoined + "]";
         audit.record(shopId, userId, "CREATE_ROLE", "ROLE", role.getId(), createDetail);
 
         return toRoleResponse(role);
@@ -448,7 +449,8 @@ public class ShopStaffService {
 
         var targetEmail = identity.findById(targetMemberId).map(AccountInfo::email).orElse("thành viên");
         members.updateRole(shopId, targetMemberId, MemberRole.STAFF, request.roleId());
-        var detail = "Đổi vai trò của " + targetEmail + " | Vai trò cũ: [" + oldRoleName + "] -> Vai trò mới: [" + role.getName() + "] (" + permCount + " quyền)";
+        var detail = "Đổi vai trò của " + targetEmail + " | Vai trò cũ: [" + oldRoleName
+            + "] -> Vai trò mới: [" + role.getName() + "] (" + permCount + " quyền)";
         audit.record(
             shopId,
             userId,

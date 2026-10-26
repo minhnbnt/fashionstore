@@ -38,7 +38,10 @@ public class SellerRevenueController {
     private final RevenueService revenue;
 
     @GetMapping("/revenue/summary")
-    @Operation(summary = "Tổng quan doanh thu", description = "Tổng doanh thu đơn đã giao, số lượng đơn, giá trị trung bình đơn, số dư ví khả dụng và đang giữ.")
+    @Operation(
+        summary = "Tổng quan doanh thu",
+        description = "Tổng doanh thu đơn đã giao, số lượng đơn, giá trị trung bình đơn, số dư ví khả dụng và đang giữ."
+    )
     @ApiResponse(responseCode = "200", description = "Dữ liệu tổng quan doanh thu")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền REVENUE_READ")
@@ -70,7 +73,10 @@ public class SellerRevenueController {
     }
 
     @GetMapping("/revenue/top-products")
-    @Operation(summary = "Top sản phẩm bán chạy", description = "Danh sách sản phẩm có doanh thu và số lượng bán cao nhất.")
+    @Operation(
+        summary = "Top sản phẩm bán chạy",
+        description = "Danh sách sản phẩm có doanh thu và số lượng bán cao nhất."
+    )
     @ApiResponse(responseCode = "200", description = "Top sản phẩm")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền REVENUE_READ")
@@ -87,7 +93,10 @@ public class SellerRevenueController {
     }
 
     @GetMapping("/settlements")
-    @Operation(summary = "Danh sách giải ngân (Settlements)", description = "Lọc các khoản tiền đang giữ (HOLDING) hoặc đã vào ví (RELEASED).")
+    @Operation(
+        summary = "Danh sách giải ngân (Settlements)",
+        description = "Lọc các khoản tiền đang giữ (HOLDING) hoặc đã vào ví (RELEASED)."
+    )
     @ApiResponse(responseCode = "200", description = "Danh sách giải ngân")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền REVENUE_READ")
@@ -95,7 +104,8 @@ public class SellerRevenueController {
     public List<SettlementResponse> settlements(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "Id shop") @RequestParam UUID shopId,
-        @Parameter(description = "Lọc trạng thái (HOLDING, RELEASED, WITHDRAWN)") @RequestParam(required = false) String status
+        @Parameter(description = "Lọc trạng thái (HOLDING, RELEASED, WITHDRAWN)")
+        @RequestParam(required = false) String status
     ) {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var userId = UUID.fromString(subject);

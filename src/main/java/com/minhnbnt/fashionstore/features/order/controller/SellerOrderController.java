@@ -33,14 +33,19 @@ public class SellerOrderController {
     private final OrderService orders;
 
     @GetMapping
-    @Operation(summary = "Đơn của shop", description = "Cần quyền ORDER_READ ở shop tương ứng, gom mọi shop mình tham gia. Hỗ trợ lọc theo shop, status, từ khóa.")
+    @Operation(
+        summary = "Đơn của shop",
+        description = "Cần quyền ORDER_READ ở shop tương ứng, gom mọi shop mình tham gia. "
+            + "Hỗ trợ lọc theo shop, status, từ khóa."
+    )
     @ApiResponse(responseCode = "200", description = "Danh sách đơn")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @SecurityRequirement(name = "bearerAuth")
     public List<OrderResponse> list(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "Lọc theo shop cụ thể") @RequestParam(required = false) UUID shopId,
-        @Parameter(description = "Lọc theo trạng thái (PENDING, CONFIRMED, SHIPPING, DELIVERED, CANCELLED)") @RequestParam(required = false) String status,
+        @Parameter(description = "Lọc theo trạng thái (PENDING, CONFIRMED, SHIPPING, DELIVERED, CANCELLED)")
+        @RequestParam(required = false) String status,
         @Parameter(description = "Tìm theo mã đơn hoặc tên người nhận") @RequestParam(required = false) String q,
         @Parameter(description = "Trang bắt đầu từ 0") @RequestParam(defaultValue = "0") int page,
         @Parameter(description = "Số đơn mỗi trang") @RequestParam(defaultValue = "20") int limit
@@ -106,7 +111,11 @@ public class SellerOrderController {
     }
 
     @PatchMapping("/{id}/cancel")
-    @Operation(summary = "Seller hủy đơn", description = "PENDING hoặc CONFIRMED -> CANCELLED. Nếu đã CONFIRMED, tự động hoàn kho nguyên tử và ghi nhật ký tồn kho.")
+    @Operation(
+        summary = "Seller hủy đơn",
+        description = "PENDING hoặc CONFIRMED -> CANCELLED. Nếu đã CONFIRMED, tự động hoàn kho nguyên tử "
+            + "và ghi nhật ký tồn kho."
+    )
     @ApiResponse(responseCode = "200", description = "Đơn sau khi hủy")
     @ApiResponse(responseCode = "400", description = "Body không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
