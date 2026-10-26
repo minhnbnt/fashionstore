@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(
     name = "Banks",
-    description = "Danh mục ngân hàng Việt Nam và tra cứu tài khoản Napas 24/7 qua VietQR. Công khai, không cần đăng nhập."
+    description = "Danh mục ngân hàng Việt Nam và tra cứu tài khoản Napas 24/7. Công khai, không cần đăng nhập."
 )
 public class BankController {
 

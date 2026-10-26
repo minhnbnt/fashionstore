@@ -19,11 +19,11 @@ calendarific:
   # 03:00 ngày 1 hằng tháng (giờ VN), đồng bộ năm nay + năm sau.
   sync-cron: "0 0 3 1 * *"
 
-# Cấu hình tra cứu Napas 24/7 qua VietQR Public API
-vietqr:
-  base-url: ${VIETQR_BASE_URL:https://api.vietqr.io}
-  client-id: ${VIETQR_CLIENT_ID:}
-  api-key: ${VIETQR_API_KEY:}
-  mock-account-name: ${VIETQR_MOCK_ACCOUNT_NAME:}
+# Cấu hình tra cứu Napas 24/7 qua BankLookup API (https://api.banklookup.net)
+banklookup:
+  base-url: ${BANKLOOKUP_BASE_URL:https://api.banklookup.net}
+  api-key: ${BANKLOOKUP_API_KEY:}
+  api-secret: ${BANKLOOKUP_API_SECRET:}
+  mock-account-name: ${BANKLOOKUP_MOCK_ACCOUNT_NAME:}
   connect-timeout-ms: 5000
   read-timeout-ms: 8000

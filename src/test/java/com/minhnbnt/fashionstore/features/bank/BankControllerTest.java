@@ -41,7 +41,15 @@ class BankControllerTest {
     @DisplayName("GET /api/public/banks returns list of banks without auth")
     void listsBanksWithoutAuth() throws Exception {
         when(bankService.listBanks()).thenReturn(List.of(
-            new BankResponse("17", "Ngân hàng TMCP Ngoại Thương Việt Nam", "VCB", "970436", "Vietcombank", "https://api.vietqr.io/img/VCB.png", true)
+            new BankResponse(
+                "17",
+                "Ngân hàng TMCP Ngoại Thương Việt Nam",
+                "VCB",
+                "970436",
+                "Vietcombank",
+                "https://api.vietqr.io/img/VCB.png",
+                true
+            )
         ));
 
         mockMvc.perform(get("/api/public/banks"))
