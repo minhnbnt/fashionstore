@@ -25,7 +25,14 @@ public class ShopStatsRepository {
 
     public record RevenueByPaymentRow(String paymentMethod, long revenue, long orderCount) {}
 
-    public record OrderStatusSummaryRow(long completedOrders, long completedValue, long cancelledOrders, long cancelledValue, long returnedOrders, long returnedValue) {}
+    public record OrderStatusSummaryRow(
+        long completedOrders,
+        long completedValue,
+        long cancelledOrders,
+        long cancelledValue,
+        long returnedOrders,
+        long returnedValue
+    ) {}
 
     public record OrderExportRow(
         UUID orderId,
@@ -51,21 +58,48 @@ public class ShopStatsRepository {
         int currentStock
     ) {}
 
-    public record ProductStatsRow(UUID productId, String productName, @Nullable String defaultImageKey, long totalSold, long totalRevenue, long viewCount, int currentStock) {}
+    public record ProductStatsRow(
+        UUID productId,
+        String productName,
+        @Nullable String defaultImageKey,
+        long totalSold,
+        long totalRevenue,
+        long viewCount,
+        int currentStock
+    ) {}
 
-    public record CustomerOverviewRow(long totalCustomers, long newCustomers, long returningCustomers, long avgOrderValue) {}
+    public record CustomerOverviewRow(
+        long totalCustomers,
+        long newCustomers,
+        long returningCustomers,
+        long avgOrderValue
+    ) {}
 
-    public record TopCustomerRow(UUID buyerId, String buyerName, long totalSpent, long orderCount, Instant lastOrderAt) {}
+    public record TopCustomerRow(
+        UUID buyerId,
+        String buyerName,
+        long totalSpent,
+        long orderCount,
+        Instant lastOrderAt
+    ) {}
 
     public record FollowerTrendRow(long totalFollowers, long previousMonthFollowers) {}
 
     public TodayStatsRow todayStats(UUID shopId) {
         var sql = """
             SELECT
-                COALESCE(SUM(CASE WHEN created_at >= CURRENT_DATE AND created_at < CURRENT_DATE + INTERVAL '1 day' AND status != 'CANCELLED' THEN total ELSE 0 END), 0) AS today_revenue,
-                COALESCE(COUNT(CASE WHEN created_at >= CURRENT_DATE AND created_at < CURRENT_DATE + INTERVAL '1 day' AND status != 'CANCELLED' THEN 1 END), 0) AS today_orders,
-                COALESCE(SUM(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '1 day' AND created_at < CURRENT_DATE AND status != 'CANCELLED' THEN total ELSE 0 END), 0) AS yesterday_revenue,
-                COALESCE(COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '1 day' AND created_at < CURRENT_DATE AND status != 'CANCELLED' THEN 1 END), 0) AS yesterday_orders
+                COALESCE(SUM(CASE
+                    WHEN created_at >= CURRENT_DATE AND created_at < CURRENT_DATE + INTERVAL '1 day'
+                    AND status != 'CANCELLED' THEN total ELSE 0 END), 0) AS today_revenue,
+                COALESCE(COUNT(CASE
+                    WHEN created_at >= CURRENT_DATE AND created_at < CURRENT_DATE + INTERVAL '1 day'
+                    AND status != 'CANCELLED' THEN 1 END), 0) AS today_orders,
+                COALESCE(SUM(CASE
+                    WHEN created_at >= CURRENT_DATE - INTERVAL '1 day' AND created_at < CURRENT_DATE
+                    AND status != 'CANCELLED' THEN total ELSE 0 END), 0) AS yesterday_revenue,
+                COALESCE(COUNT(CASE
+                    WHEN created_at >= CURRENT_DATE - INTERVAL '1 day' AND created_at < CURRENT_DATE
+                    AND status != 'CANCELLED' THEN 1 END), 0) AS yesterday_orders
             FROM orders
             WHERE shop_id = :shopId
             """;
@@ -95,7 +129,10 @@ public class ShopStatsRepository {
                 COUNT(*) AS total_orders,
                 COUNT(CASE WHEN status = 'CANCELLED' THEN 1 END) AS cancelled_orders,
                 COUNT(CASE WHEN status = 'DELIVERED' THEN 1 END) AS delivered_orders,
-                COUNT(CASE WHEN status = 'DELIVERED' AND (shipped_at IS NULL OR delivered_at IS NULL OR delivered_at <= shipped_at + INTERVAL '7 days') THEN 1 END) AS on_time_orders
+                COUNT(CASE
+                    WHEN status = 'DELIVERED' AND (shipped_at IS NULL
+                        OR delivered_at IS NULL
+                        OR delivered_at <= shipped_at + INTERVAL '7 days') THEN 1 END) AS on_time_orders
             FROM orders
             WHERE shop_id = :shopId
             """;
@@ -299,15 +336,19 @@ public class ShopStatsRepository {
                 p.id AS product_id,
                 p.name AS product_name,
                 c.name AS category_name,
-                COALESCE((SELECT pv.sku FROM product_variant pv WHERE pv.product_id = p.id ORDER BY pv.price ASC LIMIT 1), 'N/A') AS sku,
-                COALESCE((SELECT pv.price FROM product_variant pv WHERE pv.product_id = p.id ORDER BY pv.price ASC LIMIT 1), 0) AS price,
+                COALESCE((SELECT pv.sku FROM product_variant pv
+                    WHERE pv.product_id = p.id ORDER BY pv.price ASC LIMIT 1), 'N/A') AS sku,
+                COALESCE((SELECT pv.price FROM product_variant pv
+                    WHERE pv.product_id = p.id ORDER BY pv.price ASC LIMIT 1), 0) AS price,
                 COALESCE(SUM(oi.quantity), 0) AS total_sold,
                 COALESCE(SUM(oi.line_total), 0) AS total_revenue,
-                COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variant pv WHERE pv.product_id = p.id), 0) AS current_stock
+                COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variant pv
+                    WHERE pv.product_id = p.id), 0) AS current_stock
             FROM product p
             JOIN category c ON p.category_id = c.id
             LEFT JOIN order_item oi ON oi.product_id = p.id
-            LEFT JOIN orders o ON oi.order_id = o.id AND o.status != 'CANCELLED' AND o.created_at >= :from AND o.created_at < :to
+            LEFT JOIN orders o ON oi.order_id = o.id AND o.status != 'CANCELLED'
+                AND o.created_at >= :from AND o.created_at < :to
             WHERE p.shop_id = :shopId
             GROUP BY p.id, p.name, c.name
             ORDER BY total_revenue DESC, total_sold DESC
@@ -338,7 +379,8 @@ public class ShopStatsRepository {
                 COALESCE(COUNT(CASE WHEN o.status = 'CANCELLED' THEN 1 END), 0) AS cancelled_orders,
                 COALESCE(SUM(CASE WHEN o.status = 'CANCELLED' THEN o.total ELSE 0 END), 0) AS cancelled_value,
                 COALESCE(COUNT(rr.id), 0) AS returned_orders,
-                COALESCE(SUM(CASE WHEN rr.id IS NOT NULL THEN COALESCE(rr.refund_amount, 0) ELSE 0 END), 0) AS returned_value
+                COALESCE(SUM(CASE
+                    WHEN rr.id IS NOT NULL THEN COALESCE(rr.refund_amount, 0) ELSE 0 END), 0) AS returned_value
             FROM orders o
             LEFT JOIN return_request rr ON rr.order_id = o.id AND rr.status = 'APPROVED'
             WHERE o.shop_id = :shopId
@@ -366,11 +408,13 @@ public class ShopStatsRepository {
             SELECT
                 p.id AS product_id,
                 p.name AS product_name,
-                (SELECT pi.s3_key FROM product_image pi WHERE pi.product_id = p.id ORDER BY pi.sort_order ASC LIMIT 1) AS default_image_key,
+                (SELECT pi.s3_key FROM product_image pi
+                    WHERE pi.product_id = p.id ORDER BY pi.sort_order ASC LIMIT 1) AS default_image_key,
                 COALESCE(SUM(oi.quantity), 0) AS total_sold,
                 COALESCE(SUM(oi.line_total), 0) AS total_revenue,
                 p.view_count AS view_count,
-                COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variant pv WHERE pv.product_id = p.id), 0) AS current_stock
+                COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variant pv
+                    WHERE pv.product_id = p.id), 0) AS current_stock
             FROM product p
             JOIN order_item oi ON oi.product_id = p.id
             JOIN orders o ON oi.order_id = o.id
@@ -401,11 +445,13 @@ public class ShopStatsRepository {
             SELECT
                 p.id AS product_id,
                 p.name AS product_name,
-                (SELECT pi.s3_key FROM product_image pi WHERE pi.product_id = p.id ORDER BY pi.sort_order ASC LIMIT 1) AS default_image_key,
+                (SELECT pi.s3_key FROM product_image pi
+                    WHERE pi.product_id = p.id ORDER BY pi.sort_order ASC LIMIT 1) AS default_image_key,
                 COALESCE(SUM(oi.quantity), 0) AS total_sold,
                 COALESCE(SUM(oi.line_total), 0) AS total_revenue,
                 p.view_count AS view_count,
-                COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variant pv WHERE pv.product_id = p.id), 0) AS current_stock
+                COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variant pv
+                    WHERE pv.product_id = p.id), 0) AS current_stock
             FROM product p
             LEFT JOIN order_item oi ON oi.product_id = p.id
             LEFT JOIN orders o ON oi.order_id = o.id AND o.status != 'CANCELLED'
@@ -437,7 +483,8 @@ public class ShopStatsRepository {
             SELECT
                 p.id AS product_id,
                 p.name AS product_name,
-                (SELECT pi.s3_key FROM product_image pi WHERE pi.product_id = p.id ORDER BY pi.sort_order ASC LIMIT 1) AS default_image_key,
+                (SELECT pi.s3_key FROM product_image pi
+                    WHERE pi.product_id = p.id ORDER BY pi.sort_order ASC LIMIT 1) AS default_image_key,
                 COALESCE(SUM(oi.quantity), 0) AS total_sold,
                 COALESCE(SUM(oi.line_total), 0) AS total_revenue,
                 p.view_count AS view_count,
@@ -472,11 +519,13 @@ public class ShopStatsRepository {
             SELECT
                 p.id AS product_id,
                 p.name AS product_name,
-                (SELECT pi.s3_key FROM product_image pi WHERE pi.product_id = p.id ORDER BY pi.sort_order ASC LIMIT 1) AS default_image_key,
+                (SELECT pi.s3_key FROM product_image pi
+                    WHERE pi.product_id = p.id ORDER BY pi.sort_order ASC LIMIT 1) AS default_image_key,
                 COALESCE(SUM(oi.quantity), 0) AS total_sold,
                 COALESCE(SUM(oi.line_total), 0) AS total_revenue,
                 p.view_count AS view_count,
-                COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variant pv WHERE pv.product_id = p.id), 0) AS current_stock
+                COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variant pv
+                    WHERE pv.product_id = p.id), 0) AS current_stock
             FROM product p
             LEFT JOIN order_item oi ON oi.product_id = p.id
             LEFT JOIN orders o ON oi.order_id = o.id AND o.status != 'CANCELLED'

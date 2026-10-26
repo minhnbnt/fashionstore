@@ -120,7 +120,9 @@ public class SellerExcelReportBuilder {
         var metaRow2 = sheet.createRow(2);
         metaRow2.createCell(0).setCellValue("Kỳ báo cáo:");
         metaRow2.getCell(0).setCellStyle(styles.metaLabelStyle);
-        metaRow2.createCell(1).setCellValue("Từ " + fromDate.format(DATE_FORMATTER) + " đến " + toDate.format(DATE_FORMATTER));
+        metaRow2.createCell(1).setCellValue(
+            "Từ " + fromDate.format(DATE_FORMATTER) + " đến " + toDate.format(DATE_FORMATTER)
+        );
         metaRow2.getCell(1).setCellStyle(styles.metaValueStyle);
 
         var metaRow3 = sheet.createRow(3);
@@ -143,24 +145,33 @@ public class SellerExcelReportBuilder {
         createCell(tblHeader, 3, "Diễn giải nghiệp vụ", styles.headerStyle);
 
         int r = 7;
-        r = addKpiRow(sheet, r, "Tổng doanh thu bán hàng", summary.completedValue(), styles.currencyStyle, "VND", "Doanh thu các đơn giao thành công (DELIVERED)", styles);
-        r = addKpiRow(sheet, r, "Tổng số đơn hoàn thành", summary.completedOrders(), styles.integerStyle, "Đơn", "Số đơn giao thành công tới người mua", styles);
+        r = addKpiRow(sheet, r, "Tổng doanh thu bán hàng", summary.completedValue(),
+            styles.currencyStyle, "VND", "Doanh thu các đơn giao thành công (DELIVERED)", styles);
+        r = addKpiRow(sheet, r, "Tổng số đơn hoàn thành", summary.completedOrders(),
+            styles.integerStyle, "Đơn", "Số đơn giao thành công tới người mua", styles);
 
         long aov = 0;
         if (summary.completedOrders() > 0) {
             aov = summary.completedValue() / summary.completedOrders();
         }
-        r = addKpiRow(sheet, r, "Giá trị trung bình / đơn (AOV)", aov, styles.currencyStyle, "VND", "Tổng doanh thu / Số đơn thành công", styles);
-        r = addKpiRow(sheet, r, "Tổng giá trị đơn đã hủy", summary.cancelledValue(), styles.currencyStyle, "VND", "Đơn hàng bị người mua hoặc shop hủy (CANCELLED)", styles);
-        r = addKpiRow(sheet, r, "Số lượng đơn đã hủy", summary.cancelledOrders(), styles.integerStyle, "Đơn", "Số đơn hủy trong kỳ", styles);
-        r = addKpiRow(sheet, r, "Tổng tiền hoàn đổi trả", summary.returnedValue(), styles.currencyStyle, "VND", "Yêu cầu đổi trả đã chấp thuận hoàn tiền", styles);
-        r = addKpiRow(sheet, r, "Số đơn đổi trả hoàn tiền", summary.returnedOrders(), styles.integerStyle, "Đơn", "Số đơn đổi trả thành công", styles);
+        r = addKpiRow(sheet, r, "Giá trị trung bình / đơn (AOV)", aov,
+            styles.currencyStyle, "VND", "Tổng doanh thu / Số đơn thành công", styles);
+        r = addKpiRow(sheet, r, "Tổng giá trị đơn đã hủy", summary.cancelledValue(),
+            styles.currencyStyle, "VND", "Đơn hàng bị người mua hoặc shop hủy (CANCELLED)", styles);
+        r = addKpiRow(sheet, r, "Số lượng đơn đã hủy", summary.cancelledOrders(),
+            styles.integerStyle, "Đơn", "Số đơn hủy trong kỳ", styles);
+        r = addKpiRow(sheet, r, "Tổng tiền hoàn đổi trả", summary.returnedValue(),
+            styles.currencyStyle, "VND", "Yêu cầu đổi trả đã chấp thuận hoàn tiền", styles);
+        r = addKpiRow(sheet, r, "Số đơn đổi trả hoàn tiền", summary.returnedOrders(),
+            styles.integerStyle, "Đơn", "Số đơn đổi trả thành công", styles);
 
         long platformFee = Math.round(summary.completedValue() * 0.05);
-        r = addKpiRow(sheet, r, "Ước tính phí nền tảng (5%)", platformFee, styles.currencyStyle, "VND", "Phí dịch vụ sàn thương mại nét", styles);
+        r = addKpiRow(sheet, r, "Ước tính phí nền tảng (5%)", platformFee,
+            styles.currencyStyle, "VND", "Phí dịch vụ sàn thương mại nét", styles);
 
         long profit = summary.completedValue() - platformFee;
-        r = addKpiRow(sheet, r, "Lợi nhuận kinh doanh tạm tính", profit, styles.currencyStyle, "VND", "Doanh thu sau khi trừ phí nền tảng", styles);
+        r = addKpiRow(sheet, r, "Lợi nhuận kinh doanh tạm tính", profit,
+            styles.currencyStyle, "VND", "Doanh thu sau khi trừ phí nền tảng", styles);
 
         // Section 2: Payment Breakdown
         r += 2;
