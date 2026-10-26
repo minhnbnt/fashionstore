@@ -32,6 +32,8 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
+import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -43,6 +45,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -74,6 +77,8 @@ public class OrderService {
     private final Clock clock;
 
     private final OrderSlaPolicy sla;
+
+    private final NotificationService notifications;
 
     @Transactional
     public OrderResponse checkout(@NonNull UUID buyerId, @NonNull CheckoutRequest request) {
@@ -157,6 +162,16 @@ public class OrderService {
 
         histories.save(OrderStatusHistory.record(order.getId(), null, OrderStatus.PENDING, buyerId));
 
+        notifications.create(
+            shops.findActiveUserIdsByShop(order.getShopId()),
+            NotificationCategory.SELLING,
+            "ORDER_PLACED",
+            "Có đơn hàng mới #" + order.getCode(),
+            "Khách hàng vừa đặt đơn #" + order.getCode() + " tại shop của bạn.",
+            "/shop?tab=orders",
+            order.getId()
+        );
+
         return toResponse(order, createdItems);
     }
 
@@ -211,6 +226,16 @@ public class OrderService {
         order.cancel();
         histories.save(OrderStatusHistory.record(order.getId(), OrderStatus.PENDING, OrderStatus.CANCELLED, buyerId));
 
+        notifications.create(
+            shops.findActiveUserIdsByShop(order.getShopId()),
+            NotificationCategory.SELLING,
+            "ORDER_CANCELLED",
+            "Đơn #" + order.getCode() + " đã bị hủy",
+            "Khách hàng đã hủy đơn #" + order.getCode() + ".",
+            "/shop?tab=orders",
+            order.getId()
+        );
+
         var orderItems = items.findByOrderId(order.getId());
         return toResponse(orders.save(order), orderItems);
     }
@@ -263,6 +288,16 @@ public class OrderService {
         }
         cancelDetail = cancelDetail + " | Khôi phục tồn kho cho " + orderItems.size() + " mặt hàng";
         audit.record(saved.getShopId(), userId, "ORDER_CANCEL", "ORDER", saved.getId(), cancelDetail);
+
+        notifications.create(
+            Set.of(order.getBuyerId()),
+            NotificationCategory.ORDER,
+            "ORDER_CANCELLED",
+            "Đơn #" + order.getCode() + " đã bị hủy",
+            "Đơn #" + order.getCode() + " đã bị hủy: " + request.reason(),
+            "/account",
+            order.getId()
+        );
 
         return toResponse(saved, orderItems);
     }
@@ -330,6 +365,16 @@ public class OrderService {
         restockIfConfirmed(order, from, orderItems);
         orders.save(order);
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CANCELLED, adminId, note));
+
+        notifications.create(
+            Set.of(order.getBuyerId()),
+            NotificationCategory.ORDER,
+            "ORDER_CANCELLED",
+            "Đơn #" + order.getCode() + " đã bị hủy",
+            "Đơn #" + order.getCode() + " đã bị hủy: " + reason.name(),
+            "/account",
+            order.getId()
+        );
 
         return requireAdminOrder(orderId);
     }
@@ -407,6 +452,16 @@ public class OrderService {
             + " | Tổng tiền: " + saved.getTotal() + "₫ (" + orderItems.size() + " món)";
         audit.record(saved.getShopId(), userId, "ORDER_CONFIRM", "ORDER", saved.getId(), confirmDetail);
 
+        notifications.create(
+            Set.of(order.getBuyerId()),
+            NotificationCategory.ORDER,
+            "ORDER_CONFIRMED",
+            "Đơn #" + order.getCode() + " đã được xác nhận",
+            "Shop đã xác nhận đơn #" + order.getCode() + ", đang chuẩn bị hàng.",
+            "/account",
+            order.getId()
+        );
+
         return toResponse(saved, orderItems);
     }
 
@@ -424,6 +479,16 @@ public class OrderService {
         var shipDetail = "Giao đơn hàng #" + saved.getCode() + " (" + orderItems.size()
                 + " món) cho đơn vị vận chuyển";
         audit.record(saved.getShopId(), userId, "ORDER_SHIP", "ORDER", saved.getId(), shipDetail);
+
+        notifications.create(
+            Set.of(order.getBuyerId()),
+            NotificationCategory.ORDER,
+            "ORDER_SHIPPED",
+            "Đơn #" + order.getCode() + " đang được giao",
+            "Shop đã bàn giao đơn #" + order.getCode() + " cho đơn vị vận chuyển.",
+            "/account",
+            order.getId()
+        );
 
         return toResponse(saved, orderItems);
     }
@@ -443,6 +508,16 @@ public class OrderService {
         var deliverDetail = "Đánh dấu đơn hàng #" + saved.getCode()
             + " giao thành công | Doanh thu thanh toán: " + saved.getSubtotal() + "₫";
         audit.record(saved.getShopId(), userId, "ORDER_DELIVER", "ORDER", saved.getId(), deliverDetail);
+
+        notifications.create(
+            Set.of(order.getBuyerId()),
+            NotificationCategory.ORDER,
+            "ORDER_DELIVERED",
+            "Đơn #" + order.getCode() + " đã được giao",
+            "Đơn #" + order.getCode() + " đã giao thành công. Đừng quên đánh giá sản phẩm!",
+            "/account",
+            order.getId()
+        );
 
         return toResponse(saved, orderItems);
     }

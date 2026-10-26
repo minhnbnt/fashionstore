@@ -42,6 +42,9 @@ class OrderServiceTest {
     @Autowired
     private UserService users;
 
+    @Autowired
+    private com.minhnbnt.fashionstore.features.notification.NotificationRepository notifications;
+
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
         users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U", null));
@@ -258,5 +261,133 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orders.confirm(strangerId, created.id()))
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.FORBIDDEN));
+    }
+
+    @Test
+    void checkoutNotifiesShopMembers() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-order-notif-1");
+        var variantId = variantInShop(ownerId, shopId, "ao-notif-1", "SKU-NOTIF-1", 10);
+
+        var created = orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+        );
+
+        var ownerPage = notifications.findPage(ownerId, null, 0, 10);
+        assertThat(ownerPage).hasSize(1);
+        var notif = ownerPage.getFirst();
+        assertThat(notif.category()).isEqualTo("SELLING");
+        assertThat(notif.type()).isEqualTo("ORDER_PLACED");
+        assertThat(notif.title()).isEqualTo("Có đơn hàng mới #" + created.code());
+        assertThat(notif.body()).isEqualTo("Khách hàng vừa đặt đơn #" + created.code() + " tại shop của bạn.");
+        assertThat(notif.link()).isEqualTo("/shop?tab=orders");
+
+        var buyerPage = notifications.findPage(buyerId, null, 0, 10);
+        assertThat(buyerPage).isEmpty();
+    }
+
+    @Test
+    void confirmShipDeliverNotifyBuyer() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-order-notif-2");
+        var variantId = variantInShop(ownerId, shopId, "ao-notif-2", "SKU-NOTIF-2", 10);
+
+        var created = orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+        );
+
+        // Confirm
+        orders.confirm(ownerId, created.id());
+        var buyerPage1 = notifications.findPage(buyerId, null, 0, 10);
+        assertThat(buyerPage1).hasSize(1);
+        assertThat(buyerPage1.getFirst().category()).isEqualTo("ORDER");
+        assertThat(buyerPage1.getFirst().type()).isEqualTo("ORDER_CONFIRMED");
+        assertThat(buyerPage1.getFirst().title()).isEqualTo("Đơn #" + created.code() + " đã được xác nhận");
+        assertThat(buyerPage1.getFirst().link()).isEqualTo("/account");
+
+        // Ship
+        orders.ship(ownerId, created.id());
+        var buyerPage2 = notifications.findPage(buyerId, null, 0, 10);
+        assertThat(buyerPage2).hasSize(2);
+        assertThat(buyerPage2.getFirst().category()).isEqualTo("ORDER");
+        assertThat(buyerPage2.getFirst().type()).isEqualTo("ORDER_SHIPPED");
+        assertThat(buyerPage2.getFirst().title()).isEqualTo("Đơn #" + created.code() + " đang được giao");
+        assertThat(buyerPage2.getFirst().link()).isEqualTo("/account");
+
+        // Deliver
+        orders.deliver(ownerId, created.id());
+        var buyerPage3 = notifications.findPage(buyerId, null, 0, 10);
+        assertThat(buyerPage3).hasSize(3);
+        assertThat(buyerPage3.getFirst().category()).isEqualTo("ORDER");
+        assertThat(buyerPage3.getFirst().type()).isEqualTo("ORDER_DELIVERED");
+        assertThat(buyerPage3.getFirst().title()).isEqualTo("Đơn #" + created.code() + " đã được giao");
+        assertThat(buyerPage3.getFirst().link()).isEqualTo("/account");
+    }
+
+    @Test
+    void buyerCancelNotifiesShopMembers() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-order-notif-3");
+        var variantId = variantInShop(ownerId, shopId, "ao-notif-3", "SKU-NOTIF-3", 10);
+
+        var created = orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+        );
+
+        orders.cancel(buyerId, created.id());
+
+        var ownerPage = notifications.findPage(ownerId, null, 0, 10);
+        assertThat(ownerPage).hasSize(2);
+        var cancelNotif = ownerPage.getFirst();
+        assertThat(cancelNotif.category()).isEqualTo("SELLING");
+        assertThat(cancelNotif.type()).isEqualTo("ORDER_CANCELLED");
+        assertThat(cancelNotif.title()).isEqualTo("Đơn #" + created.code() + " đã bị hủy");
+        assertThat(cancelNotif.body()).isEqualTo("Khách hàng đã hủy đơn #" + created.code() + ".");
+        assertThat(cancelNotif.link()).isEqualTo("/shop?tab=orders");
+    }
+
+    @Test
+    void sellerCancelNotifiesBuyer() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-order-notif-4");
+        var variantId = variantInShop(ownerId, shopId, "ao-notif-4", "SKU-NOTIF-4", 10);
+
+        var created = orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+        );
+
+        orders.sellerCancel(ownerId, created.id(), new com.minhnbnt.fashionstore.dto.order.CancelOrderRequest("Hết hàng", "Hết màu trắng"));
+
+        var buyerPage = notifications.findPage(buyerId, null, 0, 10);
+        assertThat(buyerPage).hasSize(1);
+        var cancelNotif = buyerPage.getFirst();
+        assertThat(cancelNotif.category()).isEqualTo("ORDER");
+        assertThat(cancelNotif.type()).isEqualTo("ORDER_CANCELLED");
+        assertThat(cancelNotif.title()).isEqualTo("Đơn #" + created.code() + " đã bị hủy");
+        assertThat(cancelNotif.body()).isEqualTo("Đơn #" + created.code() + " đã bị hủy: Hết hàng");
+        assertThat(cancelNotif.link()).isEqualTo("/account");
+    }
+
+    @Test
+    void checkoutFailureLeavesNoNotification() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var unapprovedShopId = UUID.randomUUID();
+
+        assertThatThrownBy(() -> orders.checkout(
+            buyerId,
+            new CheckoutRequest(unapprovedShopId, List.of(new CheckoutItemRequest(UUID.randomUUID(), 1)), "An", "0901", "Ha Noi", 0L)
+        )).isInstanceOf(ResponseStatusException.class);
+
+        assertThat(notifications.countByUser(ownerId)).isZero();
+        assertThat(notifications.countByUser(buyerId)).isZero();
     }
 }
