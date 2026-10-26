@@ -56,7 +56,6 @@ import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -103,12 +102,10 @@ public class CatalogService {
 
     private final KeywordScanner keywordScanner;
 
-    @Lazy
     private final OrderService orderService;
 
     private final ShopService shops;
 
-    @Lazy
     private final ReviewService reviews;
 
     private final ShopAccessChecker access;

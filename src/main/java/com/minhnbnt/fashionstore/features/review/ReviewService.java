@@ -7,7 +7,7 @@ import com.minhnbnt.fashionstore.dto.review.ReportReviewRequest;
 import com.minhnbnt.fashionstore.dto.review.ReviewResponse;
 import com.minhnbnt.fashionstore.dto.review.SellerReviewResponse;
 import com.minhnbnt.fashionstore.dto.review.UpdateReviewRequest;
-import com.minhnbnt.fashionstore.features.catalog.CatalogService;
+import com.minhnbnt.fashionstore.features.catalog.ProductStockService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.review.repository.ReviewRepository;
@@ -17,7 +17,6 @@ import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,8 +32,7 @@ public class ReviewService {
 
     private final ReviewRepository reviews;
 
-    @Lazy
-    private final CatalogService catalog;
+    private final ProductStockService productStock;
 
     private final OrderService orderService;
 
@@ -77,7 +75,7 @@ public class ReviewService {
         @NonNull UUID productId,
         @NonNull CreateReviewRequest request
     ) {
-        if (catalog.findProductById(productId).isEmpty()) {
+        if (productStock.findProductById(productId).isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
         }
         if (reviews.findByProductIdAndBuyerId(productId, buyerId).isPresent()) {
@@ -164,7 +162,7 @@ public class ReviewService {
     }
 
     private void requireVisible(UUID productId) {
-        catalog.requireActiveProduct(productId);
+        productStock.requireActiveProduct(productId);
     }
 
     private Review requireOwnReview(UUID buyerId, UUID productId) {
@@ -182,7 +180,7 @@ public class ReviewService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Review not found");
         }
 
-        var product = catalog.findProductById(review.getProductId()).orElse(null);
+        var product = productStock.findProductById(review.getProductId()).orElse(null);
         if (product == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Review not found");
         }

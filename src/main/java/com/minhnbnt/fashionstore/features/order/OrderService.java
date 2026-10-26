@@ -11,7 +11,7 @@ import com.minhnbnt.fashionstore.dto.order.CancelOrderRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderItemResponse;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
-import com.minhnbnt.fashionstore.features.catalog.CatalogService;
+import com.minhnbnt.fashionstore.features.catalog.ProductStockService;
 import com.minhnbnt.fashionstore.features.order.repository.OrderAdminQueryRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderMonitoringQueryRepository;
@@ -30,7 +30,6 @@ import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,8 +55,7 @@ public class OrderService {
 
     private final OrderStatusHistoryRepository histories;
 
-    @Lazy
-    private final CatalogService catalog;
+    private final ProductStockService productStock;
 
     private final ShopService shops;
 
@@ -99,7 +97,7 @@ public class OrderService {
         var subtotal = 0L;
 
         for (var item : request.items()) {
-            var variant = catalog.findVariantById(item.variantId()).orElse(null);
+            var variant = productStock.findVariantById(item.variantId()).orElse(null);
             if (variant == null) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Variant not found");
             }
@@ -107,7 +105,7 @@ public class OrderService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "All items must belong to one shop");
             }
 
-            var product = catalog.findProductById(variant.getProductId()).orElse(null);
+            var product = productStock.findProductById(variant.getProductId()).orElse(null);
             if (product == null) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
             }
@@ -396,7 +394,7 @@ public class OrderService {
             if (item.getVariantId() == null) {
                 continue;
             }
-            if (!catalog.decrementVariantStock(item.getVariantId(), item.getQuantity())) {
+            if (!productStock.decrementVariantStock(item.getVariantId(), item.getQuantity())) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Insufficient stock");
             }
         }
@@ -541,8 +539,8 @@ public class OrderService {
             if (item.getVariantId() == null) {
                 continue;
             }
-            catalog.incrementVariantStock(item.getVariantId(), item.getQuantity());
-            catalog.recordStockMovement(
+            productStock.incrementVariantStock(item.getVariantId(), item.getQuantity());
+            productStock.recordStockMovement(
                 item.getVariantId(),
                 order.getShopId(),
                 item.getQuantity(),
