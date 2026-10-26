@@ -10,6 +10,9 @@ public record NotificationResponse(
     @Schema(description = "Id thông báo")
     UUID id,
 
+    @Schema(description = "Nhóm thông báo: ORDER, ACTIVITY, SELLING", example = "ACTIVITY")
+    String category,
+
     @Schema(description = "Loại thông báo, ví dụ SHOP_INVITATION")
     String type,
 

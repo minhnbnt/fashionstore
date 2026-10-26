@@ -51,6 +51,7 @@ class NotificationControllerTest {
         var createdAt = Instant.parse("2026-10-24T10:00:00Z");
         var notification = new NotificationResponse(
             UUID.randomUUID(),
+            "ACTIVITY",
             "SHOP_INVITATION",
             "Lời mời tham gia shop An Nhiên",
             "Chủ shop mời bạn làm nhân viên.",

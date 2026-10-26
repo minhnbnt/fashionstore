@@ -33,7 +33,7 @@ public class NotificationService {
         var title = "Lời mời tham gia shop " + shopName;
         var body = ownerName + " mời bạn làm " + roleName + " tại " + shopName + ".";
 
-        notifications.insert(userId, SHOP_INVITATION, title, body, "/invitations/" + token, invitationId);
+        notifications.insert(userId, NotificationCategory.ACTIVITY, SHOP_INVITATION, title, body, "/invitations/" + token, invitationId);
     }
 
     public void deleteByRefId(UUID refId) {
@@ -44,10 +44,11 @@ public class NotificationService {
         var targetPage = Math.max(0, page);
         var targetSize = Math.clamp(size, 1, 100);
         var total = notifications.countByUser(userId);
-        var rows = notifications.findPage(userId, targetPage, targetSize);
+        var rows = notifications.findPage(userId, null, targetPage, targetSize);
         var items = rows.stream()
             .map(row -> new NotificationResponse(
                 row.id(),
+                row.category(),
                 row.type(),
                 row.title(),
                 row.body(),
@@ -60,7 +61,7 @@ public class NotificationService {
     }
 
     public long unreadCount(UUID userId) {
-        return notifications.countUnread(userId);
+        return notifications.countUnread(userId, null);
     }
 
     @Transactional
@@ -73,6 +74,6 @@ public class NotificationService {
 
     @Transactional
     public void markAllRead(UUID userId) {
-        notifications.markAllRead(userId);
+        notifications.markAllRead(userId, null);
     }
 }

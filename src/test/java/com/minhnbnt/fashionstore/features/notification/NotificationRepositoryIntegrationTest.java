@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,30 +28,64 @@ class NotificationRepositoryIntegrationTest {
     private UserService users;
 
     @Test
-    void insertListCountAndMarkRead() {
+    void insertReturnsRowWithCategory() {
         var userId = user();
+        var row = notifications.insert(userId, NotificationCategory.ORDER, "ORDER_PLACED", "Đơn mới", "Chi tiết", "/account", null);
 
-        notifications.insert(userId, "SHOP_INVITATION", "Lời mời", "Tham gia shop", "/invitations/abc", null);
-        notifications.insert(userId, "SHOP_INVITATION", "Lời mời 2", "Tham gia shop 2", null, null);
+        assertThat(row.id()).isNotNull();
+        assertThat(row.category()).isEqualTo("ORDER");
+        assertThat(row.type()).isEqualTo("ORDER_PLACED");
+        assertThat(row.createdAt()).isNotNull();
+    }
 
-        assertThat(notifications.countUnread(userId)).isEqualTo(2);
+    @Test
+    void findPageFiltersByCategories() {
+        var userId = user();
+        notifications.insert(userId, NotificationCategory.ORDER, "ORDER_PLACED", "Đơn hàng", "Body", null, null);
+        notifications.insert(userId, NotificationCategory.ACTIVITY, "SHOP_INVITATION", "Hoạt động", "Body", null, null);
 
-        var page = notifications.findPage(userId, 0, 1);
-        assertThat(page).hasSize(1);
-        assertThat(notifications.findPage(userId, 1, 1)).hasSize(1);
+        var orderItems = notifications.findPage(userId, List.of("ORDER"), 0, 20);
+        assertThat(orderItems).hasSize(1);
+        assertThat(orderItems.getFirst().type()).isEqualTo("ORDER_PLACED");
+        assertThat(orderItems.getFirst().category()).isEqualTo("ORDER");
 
-        var first = page.getFirst();
-        assertThat(first.type()).isEqualTo("SHOP_INVITATION");
-        assertThat(first.readAt()).isNull();
+        var allItems = notifications.findPage(userId, null, 0, 20);
+        assertThat(allItems).hasSize(2);
+    }
 
-        notifications.markRead(userId, first.id());
-        assertThat(notifications.countUnread(userId)).isEqualTo(1);
+    @Test
+    void unreadCountFiltersByCategories() {
+        var userId = user();
+        notifications.insert(userId, NotificationCategory.ORDER, "ORDER_PLACED", "Đơn 1", "Body", null, null);
+        notifications.insert(userId, NotificationCategory.ACTIVITY, "SHOP_INVITATION", "Hoạt động 1", "Body", null, null);
 
-        notifications.markRead(user(), first.id());
-        assertThat(notifications.countUnread(userId)).isEqualTo(1);
+        assertThat(notifications.countUnread(userId, List.of("ACTIVITY"))).isEqualTo(1);
+        assertThat(notifications.countUnread(userId, null)).isEqualTo(2);
+    }
 
-        notifications.markAllRead(userId);
-        assertThat(notifications.countUnread(userId)).isZero();
+    @Test
+    void markAllReadScopedByCategories() {
+        var userId = user();
+        notifications.insert(userId, NotificationCategory.ORDER, "ORDER_PLACED", "Đơn 1", "Body", null, null);
+        notifications.insert(userId, NotificationCategory.ACTIVITY, "SHOP_INVITATION", "Hoạt động 1", "Body", null, null);
+
+        notifications.markAllRead(userId, List.of("ORDER"));
+
+        assertThat(notifications.countUnread(userId, List.of("ACTIVITY"))).isEqualTo(1);
+        assertThat(notifications.countUnread(userId, List.of("ORDER"))).isZero();
+    }
+
+    @Test
+    void deleteRemovesOwnNotificationOnly() {
+        var owner = user();
+        var stranger = user();
+        var row = notifications.insert(owner, NotificationCategory.ORDER, "ORDER_PLACED", "Đơn hàng", "Body", null, null);
+
+        notifications.delete(stranger, row.id());
+        assertThat(notifications.findPage(owner, null, 0, 10)).hasSize(1);
+
+        notifications.delete(owner, row.id());
+        assertThat(notifications.findPage(owner, null, 0, 10)).isEmpty();
     }
 
     @Test
@@ -58,12 +93,12 @@ class NotificationRepositoryIntegrationTest {
         var userId = user();
         var refId = UUID.randomUUID();
 
-        notifications.insert(userId, "SHOP_INVITATION", "Có ref", "Body", null, refId);
-        notifications.insert(userId, "SHOP_INVITATION", "Không ref", "Body", null, null);
+        notifications.insert(userId, NotificationCategory.ACTIVITY, "SHOP_INVITATION", "Có ref", "Body", null, refId);
+        notifications.insert(userId, NotificationCategory.ACTIVITY, "SHOP_INVITATION", "Không ref", "Body", null, null);
 
         notifications.deleteByRefId(refId);
 
-        assertThat(notifications.findPage(userId, 0, 10))
+        assertThat(notifications.findPage(userId, null, 0, 10))
             .extracting(NotificationRepository.NotificationRow::title)
             .containsExactly("Không ref");
     }
