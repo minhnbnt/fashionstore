@@ -1163,7 +1163,8 @@ public class CatalogService {
         }
         images.delete(image);
 
-        var imageDetail = "Xóa ảnh của sản phẩm: \"" + product.getName() + "\" (Thứ tự: " + image.getSortOrder() + ")";
+        var imageDetail = "Xóa ảnh của sản phẩm: \"" + product.getName() + "\" (Thứ tự: "
+                + image.getSortOrder() + ")";
         audit.record(product.getShopId(), userId, "PRODUCT_IMAGE_DELETE", "PRODUCT", productId, imageDetail);
     }
 
@@ -1680,8 +1681,9 @@ public class CatalogService {
         if (delta > 0) {
             deltaStr = "+" + delta;
         }
-        var adjustDetail = "Điều chỉnh tồn kho sản phẩm: \"" + prodName + "\" | Phân loại: Size " + variant.getSize()
-            + ", Màu " + variant.getColor() + " (SKU: " + variant.getSku() + ") | Tồn kho: "
+        var adjustDetail = "Điều chỉnh tồn kho sản phẩm: \"" + prodName + "\" | Phân loại: Size "
+                + variant.getSize()
+                + ", Màu " + variant.getColor() + " (SKU: " + variant.getSku() + ") | Tồn kho: "
             + oldStock + " -> " + request.newStock() + " (" + deltaStr + ") | Lý do: " + reason;
 
         audit.record(

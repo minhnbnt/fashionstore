@@ -35,7 +35,8 @@ public class NotificationController {
     @Operation(
         operationId = "listNotifications",
         summary = "Danh sách thông báo của tôi",
-        description = "Lấy danh sách thông báo của người dùng hiện tại theo phân trang, mới nhất trước."
+        description = "Lấy danh sách thông báo của người dùng hiện tại "
+                + "theo phân trang, mới nhất trước."
     )
     @ApiResponse(responseCode = "200", description = "Trang thông báo")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
@@ -43,7 +44,8 @@ public class NotificationController {
     public PageResponse<NotificationResponse> listNotifications(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "Trang hiện tại, đếm từ 0") @RequestParam(defaultValue = "0") int page,
-        @Parameter(description = "Số phần tử mỗi trang, tối đa 100") @RequestParam(defaultValue = "20") int size
+        @Parameter(description = "Số phần tử mỗi trang, tối đa 100")
+        @RequestParam(defaultValue = "20") int size
     ) {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var userId = UUID.fromString(subject);

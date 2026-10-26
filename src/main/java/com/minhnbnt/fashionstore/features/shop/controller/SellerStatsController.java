@@ -71,7 +71,8 @@ public class SellerStatsController {
     @Operation(
         operationId = "getShopPerformance",
         summary = "Hiệu suất hoạt động của shop",
-        description = "Tỷ lệ phản hồi chat, tỷ lệ hủy đơn, tỷ lệ giao đúng hạn và đánh giá trung bình."
+        description = "Tỷ lệ phản hồi chat, tỷ lệ hủy đơn, tỷ lệ giao đúng hạn "
+                + "và đánh giá trung bình."
     )
     @ApiResponse(responseCode = "200", description = "Chỉ số hiệu suất của shop")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
@@ -109,7 +110,8 @@ public class SellerStatsController {
     @Operation(
         operationId = "getRevenueDetail",
         summary = "Biểu đồ doanh thu chi tiết",
-        description = "Doanh thu theo chu kỳ ngày, tuần, tháng hoặc năm trong khoảng thời gian chỉ định."
+        description = "Doanh thu theo chu kỳ ngày, tuần, tháng hoặc năm "
+                + "trong khoảng thời gian chỉ định."
     )
     @ApiResponse(responseCode = "200", description = "Dữ liệu doanh thu theo chu kỳ")
     @ApiResponse(responseCode = "400", description = "Tham số không hợp lệ")
@@ -173,7 +175,8 @@ public class SellerStatsController {
     @Operation(
         operationId = "getOrderStatusSummary",
         summary = "Báo cáo tổng kết trạng thái đơn hàng",
-        description = "Số lượng và tổng giá trị của đơn hoàn thành, đơn hủy và đơn đổi trả."
+        description = "Số lượng và tổng giá trị của đơn hoàn thành, "
+                + "đơn hủy và đơn đổi trả."
     )
     @ApiResponse(responseCode = "200", description = "Tổng kết trạng thái đơn hàng")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
@@ -194,7 +197,8 @@ public class SellerStatsController {
     @Operation(
         operationId = "getPeriodComparison",
         summary = "So sánh hiệu suất doanh thu",
-        description = "So sánh doanh thu và số đơn giữa chu kỳ hiện tại và chu kỳ liền kề trước đó."
+        description = "So sánh doanh thu và số đơn giữa chu kỳ hiện tại "
+                + "và chu kỳ liền kề trước đó."
     )
     @ApiResponse(responseCode = "200", description = "Số liệu so sánh chu kỳ")
     @ApiResponse(responseCode = "400", description = "Tham số không hợp lệ")
@@ -312,7 +316,8 @@ public class SellerStatsController {
     @Operation(
         operationId = "getCustomerOverview",
         summary = "Tổng quan hành vi khách hàng",
-        description = "Tỷ lệ khách mới vs quay lại, tỷ lệ giữ chân (retention) và giá trị đơn trung bình (AOV)."
+        description = "Tỷ lệ khách mới vs quay lại, tỷ lệ giữ chân (retention) "
+                + "và giá trị đơn trung bình (AOV)."
     )
     @ApiResponse(responseCode = "200", description = "Tổng quan khách hàng")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
@@ -377,7 +382,8 @@ public class SellerStatsController {
     @Operation(
         operationId = "exportRevenueReport",
         summary = "Xuất file báo cáo doanh thu",
-        description = "Tải về báo cáo doanh thu dưới định dạng Excel (.xlsx) đa sheet hoặc CSV theo khoảng thời gian."
+        description = "Tải về báo cáo doanh thu dưới định dạng Excel (.xlsx) "
+                + "đa sheet hoặc CSV theo khoảng thời gian."
     )
     @ApiResponse(responseCode = "200", description = "File báo cáo doanh thu")
     @ApiResponse(responseCode = "400", description = "Tham số không hợp lệ")

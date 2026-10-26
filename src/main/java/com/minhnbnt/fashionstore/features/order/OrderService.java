@@ -421,7 +421,8 @@ public class OrderService {
 
         var orderItems = items.findByOrderId(order.getId());
         var saved = orders.save(order);
-        var shipDetail = "Giao đơn hàng #" + saved.getCode() + " (" + orderItems.size() + " món) cho đơn vị vận chuyển";
+        var shipDetail = "Giao đơn hàng #" + saved.getCode() + " (" + orderItems.size()
+                + " món) cho đơn vị vận chuyển";
         audit.record(saved.getShopId(), userId, "ORDER_SHIP", "ORDER", saved.getId(), shipDetail);
 
         return toResponse(saved, orderItems);

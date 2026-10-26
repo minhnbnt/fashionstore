@@ -41,7 +41,8 @@ public class SellerReviewController {
     )
     @ApiResponse(responseCode = "200", description = "Danh sách đánh giá")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền REVIEW_READ")
+    @ApiResponse(responseCode = "403",
+            description = "Không phải thành viên shop hoặc thiếu quyền REVIEW_READ")
     @SecurityRequirement(name = "bearerAuth")
     public List<SellerReviewResponse> list(
         @AuthenticationPrincipal Jwt jwt,
@@ -63,7 +64,8 @@ public class SellerReviewController {
     @ApiResponse(responseCode = "200", description = "Đánh giá sau khi phản hồi")
     @ApiResponse(responseCode = "400", description = "Body không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền REVIEW_REPLY")
+    @ApiResponse(responseCode = "403",
+            description = "Không phải thành viên shop hoặc thiếu quyền REVIEW_REPLY")
     @ApiResponse(responseCode = "404", description = "Đánh giá không tồn tại")
     @ApiResponse(responseCode = "409", description = "Đánh giá đã được phản hồi trước đó")
     @SecurityRequirement(name = "bearerAuth")
@@ -86,7 +88,8 @@ public class SellerReviewController {
     @ApiResponse(responseCode = "200", description = "Đã gửi báo cáo")
     @ApiResponse(responseCode = "400", description = "Body không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền REVIEW_REPLY")
+    @ApiResponse(responseCode = "403",
+            description = "Không phải thành viên shop hoặc thiếu quyền REVIEW_REPLY")
     @ApiResponse(responseCode = "404", description = "Đánh giá không tồn tại")
     @SecurityRequirement(name = "bearerAuth")
     public SellerReviewResponse report(

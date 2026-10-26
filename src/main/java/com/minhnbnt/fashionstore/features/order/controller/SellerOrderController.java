@@ -60,7 +60,8 @@ public class SellerOrderController {
     @Operation(summary = "Xác nhận đơn", description = "PENDING -> CONFIRMED, trừ kho nguyên tử.")
     @ApiResponse(responseCode = "200", description = "Đơn sau xác nhận")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền ORDER_PROCESS")
+    @ApiResponse(responseCode = "403",
+            description = "Không phải thành viên shop hoặc thiếu quyền ORDER_PROCESS")
     @ApiResponse(responseCode = "404", description = "Đơn không tồn tại")
     @ApiResponse(responseCode = "409", description = "Hết kho hoặc sai trạng thái")
     @SecurityRequirement(name = "bearerAuth")
@@ -78,7 +79,8 @@ public class SellerOrderController {
     @Operation(summary = "Giao cho vận chuyển", description = "CONFIRMED -> SHIPPING.")
     @ApiResponse(responseCode = "200", description = "Đơn sau khi ship")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền ORDER_PROCESS")
+    @ApiResponse(responseCode = "403",
+            description = "Không phải thành viên shop hoặc thiếu quyền ORDER_PROCESS")
     @ApiResponse(responseCode = "404", description = "Đơn không tồn tại")
     @ApiResponse(responseCode = "409", description = "Sai trạng thái")
     @SecurityRequirement(name = "bearerAuth")
@@ -96,7 +98,8 @@ public class SellerOrderController {
     @Operation(summary = "Hoàn tất đơn COD", description = "SHIPPING -> DELIVERED, thu tiền COD.")
     @ApiResponse(responseCode = "200", description = "Đơn sau khi giao")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền ORDER_PROCESS")
+    @ApiResponse(responseCode = "403",
+            description = "Không phải thành viên shop hoặc thiếu quyền ORDER_PROCESS")
     @ApiResponse(responseCode = "404", description = "Đơn không tồn tại")
     @ApiResponse(responseCode = "409", description = "Sai trạng thái")
     @SecurityRequirement(name = "bearerAuth")
@@ -113,13 +116,14 @@ public class SellerOrderController {
     @PatchMapping("/{id}/cancel")
     @Operation(
         summary = "Seller hủy đơn",
-        description = "PENDING hoặc CONFIRMED -> CANCELLED. Nếu đã CONFIRMED, tự động hoàn kho nguyên tử "
-            + "và ghi nhật ký tồn kho."
+        description = "PENDING hoặc CONFIRMED -> CANCELLED. Nếu đã CONFIRMED, "
+                + "tự động hoàn kho nguyên tử và ghi nhật ký tồn kho."
     )
     @ApiResponse(responseCode = "200", description = "Đơn sau khi hủy")
     @ApiResponse(responseCode = "400", description = "Body không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
-    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền ORDER_CANCEL")
+    @ApiResponse(responseCode = "403",
+            description = "Không phải thành viên shop hoặc thiếu quyền ORDER_CANCEL")
     @ApiResponse(responseCode = "404", description = "Đơn không tồn tại")
     @ApiResponse(responseCode = "409", description = "Sai trạng thái đơn")
     @SecurityRequirement(name = "bearerAuth")

@@ -171,7 +171,8 @@ public class SellerProductController {
     @GetMapping("/inventory")
     @Operation(
         summary = "Quản lý kho hàng",
-        description = "Liệt kê các biến thể, có thể lọc các biến thể sắp hết hàng (lowStock=true)."
+        description = "Liệt kê các biến thể, có thể lọc các biến thể "
+                + "sắp hết hàng (lowStock=true)."
     )
     @ApiResponse(responseCode = "200", description = "Danh sách tồn kho")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")

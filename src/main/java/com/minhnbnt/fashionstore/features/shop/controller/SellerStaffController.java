@@ -49,7 +49,8 @@ public class SellerStaffController {
     @Operation(
         operationId = "listRoles",
         summary = "Danh sách vai trò của shop",
-        description = "Lấy danh sách các vai trò mặc định (Quản lý, CSKH, Kho vận, Marketing) và các vai trò tùy chỉnh."
+        description = "Lấy danh sách các vai trò mặc định (Quản lý, CSKH, Kho vận, Marketing) "
+                + "và các vai trò tùy chỉnh."
     )
     @ApiResponse(responseCode = "200", description = "Danh sách vai trò")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
@@ -93,7 +94,8 @@ public class SellerStaffController {
     @Operation(
         operationId = "updateRole",
         summary = "Cập nhật vai trò tùy chỉnh",
-        description = "Chỉnh sửa tên và quyền của vai trò tùy chỉnh. Không thể sửa vai trò hệ thống."
+        description = "Chỉnh sửa tên và quyền của vai trò tùy chỉnh. "
+                + "Không thể sửa vai trò hệ thống."
     )
     @ApiResponse(responseCode = "200", description = "Cập nhật thành công")
     @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")
@@ -209,7 +211,8 @@ public class SellerStaffController {
     @Operation(
         operationId = "revokeInvitation",
         summary = "Thu hồi lời mời",
-        description = "Chủ shop thu hồi một lời mời đang chờ; thông báo trong website của người được mời cũng bị xóa."
+        description = "Chủ shop thu hồi một lời mời đang chờ; thông báo trong website "
+                + "của người được mời cũng bị xóa."
     )
     @ApiResponse(responseCode = "204", description = "Đã thu hồi lời mời")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
@@ -259,8 +262,9 @@ public class SellerStaffController {
     @Operation(
         operationId = "updateMemberStatus",
         summary = "Kích hoạt hoặc vô hiệu hóa nhân viên",
-        description = "Chủ shop đổi trạng thái hoạt động của nhân viên. Nhân viên bị vô hiệu hóa mất quyền "
-            + "truy cập shop ngay ở request kế tiếp, không cần đăng xuất."
+        description = "Chủ shop đổi trạng thái hoạt động của nhân viên. "
+                + "Nhân viên bị vô hiệu hóa mất quyền truy cập shop ngay "
+                + "ở request kế tiếp, không cần đăng xuất."
     )
     @ApiResponse(responseCode = "204", description = "Cập nhật trạng thái thành công")
     @ApiResponse(responseCode = "400", description = "Trạng thái không hợp lệ")
@@ -286,8 +290,9 @@ public class SellerStaffController {
     @Operation(
         operationId = "removeMember",
         summary = "Vô hiệu hóa nhân viên khỏi shop",
-        description = "Chủ shop vô hiệu hóa nhân viên: nhân viên mất quyền truy cập shop ngay lập tức "
-            + "nhưng vẫn còn trong danh sách thành viên để có thể kích hoạt lại."
+        description = "Chủ shop vô hiệu hóa nhân viên: nhân viên mất quyền "
+                + "truy cập shop ngay lập tức nhưng vẫn còn trong danh sách "
+                + "thành viên để có thể kích hoạt lại."
     )
     @ApiResponse(responseCode = "204", description = "Đã vô hiệu hóa nhân viên")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
@@ -331,8 +336,8 @@ public class SellerStaffController {
     @Operation(
         operationId = "listAuditLogs",
         summary = "Nhật ký hoạt động của shop",
-        description = "Chủ shop xem nhật ký mọi thao tác nghiệp vụ và nhân sự trong shop, mới nhất trước. "
-            + "Có thể lọc theo mã hành động."
+        description = "Chủ shop xem nhật ký mọi thao tác nghiệp vụ và nhân sự "
+                + "trong shop, mới nhất trước. Có thể lọc theo mã hành động."
     )
     @ApiResponse(responseCode = "200", description = "Trang nhật ký hoạt động")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
@@ -344,7 +349,8 @@ public class SellerStaffController {
         @Parameter(description = "Lọc theo mã hành động, ví dụ PRODUCT_CREATE")
         @RequestParam(required = false) String action,
         @Parameter(description = "Trang hiện tại, đếm từ 0") @RequestParam(defaultValue = "0") int page,
-        @Parameter(description = "Số phần tử mỗi trang, tối đa 100") @RequestParam(defaultValue = "20") int size
+        @Parameter(description = "Số phần tử mỗi trang, tối đa 100")
+        @RequestParam(defaultValue = "20") int size
     ) {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var userId = UUID.fromString(subject);

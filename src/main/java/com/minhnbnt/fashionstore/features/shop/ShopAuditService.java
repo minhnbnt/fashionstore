@@ -13,7 +13,8 @@ import java.sql.SQLException;
 import java.util.UUID;
 
 /**
- * Ghi nhật ký hoạt động của shop. Lỗi ghi audit chỉ được log, không làm hỏng thao tác nghiệp vụ.
+ * Ghi nhật ký hoạt động của shop. Lỗi ghi audit chỉ được log,
+ * không làm hỏng thao tác nghiệp vụ.
  * Khi đang có transaction, mỗi lần ghi chạy trong savepoint để lỗi audit không abort transaction
  * nghiệp vụ, còn audit row vẫn biến mất nếu transaction nghiệp vụ rollback.
  */
@@ -72,7 +73,8 @@ public class ShopAuditService {
                 logFailure(action, shopId, e);
             }
         } catch (SQLException e) {
-            // Không tạo/không rollback được savepoint: thà mất audit row còn hơn làm hỏng nghiệp vụ.
+            // Không tạo/không rollback được savepoint: thà mất audit row
+            // còn hơn làm hỏng nghiệp vụ.
             log.error("Failed to isolate shop audit action {} for shop {}", action, shopId, e);
         } finally {
             DataSourceUtils.releaseConnection(connection, dataSource);

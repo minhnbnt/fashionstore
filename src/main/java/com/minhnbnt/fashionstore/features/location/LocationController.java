@@ -19,7 +19,8 @@ import java.util.List;
 @RequiredArgsConstructor
 @Tag(
     name = "Locations",
-    description = "Danh mục tỉnh/thành và xã/phường sau sáp nhập 2025. Công khai, không cần đăng nhập."
+    description = "Danh mục tỉnh/thành và xã/phường sau sáp nhập 2025. "
+            + "Công khai, không cần đăng nhập."
 )
 public class LocationController {
 

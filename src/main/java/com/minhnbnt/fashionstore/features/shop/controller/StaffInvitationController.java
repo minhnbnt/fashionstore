@@ -33,7 +33,8 @@ public class StaffInvitationController {
     @Operation(
         operationId = "getInvitation",
         summary = "Chi tiết lời mời theo token",
-        description = "Trả về shop, vai trò, email được mời và trạng thái lời mời để trang chấp nhận hiển thị."
+        description = "Trả về shop, vai trò, email được mời và trạng thái lời mời "
+                + "để trang chấp nhận hiển thị."
     )
     @ApiResponse(responseCode = "200", description = "Chi tiết lời mời")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
@@ -55,7 +56,8 @@ public class StaffInvitationController {
         operationId = "acceptInvitation",
         summary = "Chấp nhận lời mời tham gia shop",
         description = "Người dùng đã đăng nhập chấp nhận liên kết vào shop theo token lời mời. "
-            + "Tài khoản phải đúng người được mời; nhân viên đang bị vô hiệu hóa sẽ được kích hoạt lại."
+            + "Tài khoản phải đúng người được mời; nhân viên đang bị vô hiệu hóa "
+            + "sẽ được kích hoạt lại."
     )
     @ApiResponse(responseCode = "204", description = "Chấp nhận lời mời thành công")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
