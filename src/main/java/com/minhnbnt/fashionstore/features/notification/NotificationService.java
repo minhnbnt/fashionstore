@@ -1,6 +1,7 @@
 package com.minhnbnt.fashionstore.features.notification;
 
 import com.minhnbnt.fashionstore.dto.common.PageResponse;
+import com.minhnbnt.fashionstore.dto.notification.NotificationCountResponse;
 import com.minhnbnt.fashionstore.dto.notification.NotificationResponse;
 import com.minhnbnt.fashionstore.infrastructure.realtime.NotificationRealtimePublisher;
 import lombok.RequiredArgsConstructor;
@@ -92,6 +93,16 @@ public class NotificationService {
 
     public long unreadCount(UUID userId, @Nullable List<String> categories) {
         return notifications.countUnread(userId, categories);
+    }
+
+    public NotificationCountResponse unreadSummary(UUID userId) {
+        return unreadSummary(userId, null);
+    }
+
+    public NotificationCountResponse unreadSummary(UUID userId, @Nullable List<String> categories) {
+        var unread = notifications.countUnread(userId, categories);
+        var byCategory = notifications.countUnreadByCategory(userId, categories);
+        return new NotificationCountResponse(unread, byCategory);
     }
 
     @Transactional

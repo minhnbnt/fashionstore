@@ -9,7 +9,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Repository
@@ -103,6 +105,28 @@ public class NotificationRepository {
             spec.param("cats", categories.toArray(new String[0]));
         }
         return spec.query(Long.class).single();
+    }
+
+    public Map<String, Long> countUnreadByCategory(UUID userId, @Nullable List<String> categories) {
+        var sql = new StringBuilder("""
+            SELECT category, count(*) AS cnt
+            FROM user_notification
+            WHERE user_id = :user AND read_at IS NULL
+            """);
+        if (categories != null && !categories.isEmpty()) {
+            sql.append(" AND category = ANY(:cats)");
+        }
+        sql.append(" GROUP BY category");
+        var spec = jdbc.sql(sql.toString()).param("user", userId);
+        if (categories != null && !categories.isEmpty()) {
+            spec.param("cats", categories.toArray(new String[0]));
+        }
+        var result = new HashMap<String, Long>();
+        var rows = spec.query((rs, rowNum) -> Map.entry(rs.getString("category"), rs.getLong("cnt"))).list();
+        for (var row : rows) {
+            result.put(row.getKey(), row.getValue());
+        }
+        return result;
     }
 
     public long countByUser(UUID userId) {

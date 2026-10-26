@@ -64,6 +64,22 @@ class NotificationRepositoryIntegrationTest {
     }
 
     @Test
+    void countUnreadByCategoryGroupsCorrectly() {
+        var userId = user();
+        notifications.insert(userId, NotificationCategory.ORDER, "ORDER_PLACED", "Đơn 1", "Body", null, null);
+        notifications.insert(userId, NotificationCategory.ACTIVITY, "SHOP_INVITATION", "Hoạt động 1", "Body", null, null);
+        notifications.insert(userId, NotificationCategory.ACTIVITY, "SHOP_INVITATION", "Hoạt động 2", "Body", null, null);
+
+        var counts = notifications.countUnreadByCategory(userId, null);
+        assertThat(counts).containsEntry("ORDER", 1L);
+        assertThat(counts).containsEntry("ACTIVITY", 2L);
+
+        var filtered = notifications.countUnreadByCategory(userId, List.of("ORDER"));
+        assertThat(filtered).containsEntry("ORDER", 1L);
+        assertThat(filtered).doesNotContainKey("ACTIVITY");
+    }
+
+    @Test
     void markAllReadScopedByCategories() {
         var userId = user();
         notifications.insert(userId, NotificationCategory.ORDER, "ORDER_PLACED", "Đơn 1", "Body", null, null);

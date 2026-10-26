@@ -144,6 +144,18 @@ class NotificationServiceTest {
         assertThat(page.items()).hasSize(2);
     }
 
+    @Test
+    void unreadSummaryReturnsCountAndByCategory() {
+        var owner = user();
+        notifications.create(Set.of(owner), NotificationCategory.ORDER, "ORDER_PLACED", "Đơn", "Body", null, null);
+        notifications.notifyInvitation(owner, UUID.randomUUID(), "Shop A", "Nhân viên", "Chủ shop", "token-a");
+
+        var summary = notifications.unreadSummary(owner);
+        assertThat(summary.unread()).isEqualTo(2);
+        assertThat(summary.byCategory()).containsEntry("ORDER", 1L);
+        assertThat(summary.byCategory()).containsEntry("ACTIVITY", 1L);
+    }
+
     private UUID user() {
         var id = UUID.randomUUID();
         users.upsert(id, new CreateUserRequest("notification-service-" + id + "@t.local", "Notification User", null));

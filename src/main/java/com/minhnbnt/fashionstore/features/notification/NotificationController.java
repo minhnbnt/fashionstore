@@ -78,7 +78,7 @@ public class NotificationController {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var userId = UUID.fromString(subject);
 
-        return new NotificationCountResponse(notificationService.unreadCount(userId, parseCategories(categories)));
+        return notificationService.unreadSummary(userId, parseCategories(categories));
     }
 
     @PatchMapping("/{id}/read")

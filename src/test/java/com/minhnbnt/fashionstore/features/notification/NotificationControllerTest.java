@@ -2,6 +2,7 @@ package com.minhnbnt.fashionstore.features.notification;
 
 import com.minhnbnt.fashionstore.config.SecurityConfig;
 import com.minhnbnt.fashionstore.dto.common.PageResponse;
+import com.minhnbnt.fashionstore.dto.notification.NotificationCountResponse;
 import com.minhnbnt.fashionstore.dto.notification.NotificationResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.Mockito.doThrow;
@@ -98,27 +100,32 @@ class NotificationControllerTest {
     @Test
     void unreadCountReturnsNumber() throws Exception {
         var userId = UUID.randomUUID();
-        when(notificationService.unreadCount(userId, null)).thenReturn(3L);
+        when(notificationService.unreadSummary(userId, null))
+            .thenReturn(new NotificationCountResponse(3L, Map.of("ORDER", 2L, "ACTIVITY", 1L)));
 
         mockMvc.perform(get("/api/notifications/unread-count")
                 .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.unread").value(3));
+            .andExpect(jsonPath("$.unread").value(3))
+            .andExpect(jsonPath("$.byCategory.ORDER").value(2))
+            .andExpect(jsonPath("$.byCategory.ACTIVITY").value(1));
 
-        verify(notificationService).unreadCount(userId, null);
+        verify(notificationService).unreadSummary(userId, null);
     }
 
     @Test
     void unreadCountPassesCategoriesToService() throws Exception {
         var userId = UUID.randomUUID();
-        when(notificationService.unreadCount(userId, List.of("SELLING"))).thenReturn(5L);
+        when(notificationService.unreadSummary(userId, List.of("SELLING")))
+            .thenReturn(new NotificationCountResponse(5L, Map.of("SELLING", 5L)));
 
         mockMvc.perform(get("/api/notifications/unread-count?categories=SELLING")
                 .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.unread").value(5));
+            .andExpect(jsonPath("$.unread").value(5))
+            .andExpect(jsonPath("$.byCategory.SELLING").value(5));
 
-        verify(notificationService).unreadCount(userId, List.of("SELLING"));
+        verify(notificationService).unreadSummary(userId, List.of("SELLING"));
     }
 
     @Test
