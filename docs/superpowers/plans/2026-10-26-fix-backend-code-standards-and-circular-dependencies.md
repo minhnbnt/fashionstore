@@ -1,6 +1,6 @@
 # Fix Backend Code Standards & Break Service Circular Dependencies Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Khắc phục triệt để 59 dòng quá 120 ký tự, phá vỡ circular dependency giữa CatalogService ⇄ OrderService/ReviewService bằng việc tách `ProductStockService`, xóa bỏ hoàn toàn 4 annotation `@Lazy` cùng file `lombok.config`, và kiểm chứng gate `./gradlew test` trước khi merge vào master.
 
@@ -58,7 +58,7 @@
   public void recordStockMovement(@NonNull UUID variantId, @NonNull UUID shopId, int quantity, @NonNull String type, @NonNull UUID referenceId);
   ```
 
-- [ ] **Step 1: Viết test failing trong `ProductStockServiceUnitTest.java`**
+- [x] **Step 1: Viết test failing trong `ProductStockServiceUnitTest.java`**
 
 Tạo file `src/test/java/com/minhnbnt/fashionstore/features/catalog/ProductStockServiceUnitTest.java`:
 - Test `decrementVariantStock` thành công khi tồn kho đủ (trả về `true`).
@@ -68,12 +68,12 @@ Tạo file `src/test/java/com/minhnbnt/fashionstore/features/catalog/ProductStoc
 - Test `requireActiveProduct` ném `400 BAD_REQUEST` khi product không `ACTIVE` hoặc shop chưa approved.
 - Test `recordStockMovement` lưu entity `StockMovement` với đúng thông tin.
 
-- [ ] **Step 2: Chạy test để xác nhận fail vì chưa có `ProductStockService`**
+- [x] **Step 2: Chạy test để xác nhận fail vì chưa có `ProductStockService`**
 
 Run: `.\gradlew.bat test --tests "com.minhnbnt.fashionstore.features.catalog.ProductStockServiceUnitTest"`
 Expected: FAIL với lỗi compile "cannot find symbol class ProductStockService".
 
-- [ ] **Step 3: Triển khai `ProductStockService.java`**
+- [x] **Step 3: Triển khai `ProductStockService.java`**
 
 Tạo file `src/main/java/com/minhnbnt/fashionstore/features/catalog/ProductStockService.java`:
 ```java
@@ -165,7 +165,7 @@ public class ProductStockService {
 }
 ```
 
-- [ ] **Step 4: Chạy lại test để xác nhận pass**
+- [x] **Step 4: Chạy lại test để xác nhận pass**
 
 Run: `.\gradlew.bat test --tests "com.minhnbnt.fashionstore.features.catalog.ProductStockServiceUnitTest"`
 Expected: PASS 100%.
@@ -180,7 +180,7 @@ Expected: PASS 100%.
 - Modify: `src/main/java/com/minhnbnt/fashionstore/features/catalog/CatalogService.java`
 - Delete: `lombok.config`
 
-- [ ] **Step 1: Cập nhật `OrderService.java`**
+- [x] **Step 1: Cập nhật `OrderService.java`**
 1. Đổi `import com.minhnbnt.fashionstore.features.catalog.CatalogService;` thành `import com.minhnbnt.fashionstore.features.catalog.ProductStockService;`.
 2. Thay trường:
 ```java
@@ -198,7 +198,7 @@ Bằng:
 - Line 544: `catalog.incrementVariantStock(...)` -> `productStock.incrementVariantStock(...)`
 - Line 545: `catalog.recordStockMovement(...)` -> `productStock.recordStockMovement(...)`
 
-- [ ] **Step 2: Cập nhật `ReviewService.java`**
+- [x] **Step 2: Cập nhật `ReviewService.java`**
 1. Đổi `import com.minhnbnt.fashionstore.features.catalog.CatalogService;` thành `import com.minhnbnt.fashionstore.features.catalog.ProductStockService;`.
 2. Thay trường:
 ```java
@@ -214,17 +214,17 @@ Bằng:
 - Line 167: `catalog.requireActiveProduct(...)` -> `productStock.requireActiveProduct(...)`
 - Line 185: `catalog.findProductById(...)` -> `productStock.findProductById(...)`
 
-- [ ] **Step 3: Cập nhật `CatalogService.java`**
+- [x] **Step 3: Cập nhật `CatalogService.java`**
 1. Xóa bỏ `@Lazy` ở line 106 (`orderService`).
 2. Xóa bỏ `@Lazy` ở line 111 (`reviews`).
 3. Inject thêm `private final ProductStockService productStock;` (hoặc ủy quyền cho `productStock`).
 4. Trong các phương thức `findVariantById`, `findProductById`, `requireActiveProduct`, `decrementVariantStock`, `incrementVariantStock`, `recordStockMovement`, ủy quyền cho `productStock` để giữ nguyên tương thích hoàn toàn cho các caller khác nếu có.
 
-- [ ] **Step 4: Xóa bỏ file `lombok.config`**
+- [x] **Step 4: Xóa bỏ file `lombok.config`**
 
 Xóa file `lombok.config` khỏi root repo.
 
-- [ ] **Step 5: Chạy unit test của `OrderService` và `ReviewService`**
+- [x] **Step 5: Chạy unit test của `OrderService` và `ReviewService`**
 
 Run: `.\gradlew.bat test --tests "com.minhnbnt.fashionstore.features.catalog.ProductStockServiceUnitTest" --tests "com.minhnbnt.fashionstore.features.review.ReviewControllerTest"`
 Expected: PASS.
@@ -237,18 +237,18 @@ Expected: PASS.
 - Modify: `src/main/java/com/minhnbnt/fashionstore/features/shop/ShopStatsRepository.java` (21 dòng)
 - Modify: `src/main/java/com/minhnbnt/fashionstore/features/shop/excel/SellerExcelReportBuilder.java` (10 dòng)
 
-- [ ] **Step 1: Format `ShopStatsRepository.java`**
+- [x] **Step 1: Format `ShopStatsRepository.java`**
 - Line 28: Ngắt dòng các trường trong record `OrderStatusSummaryRow`.
 - Line 54: Ngắt dòng các trường trong record `ProductStatsRow`.
 - Line 56: Ngắt dòng các trường trong record `CustomerOverviewRow`.
 - Line 58: Ngắt dòng các trường trong record `TopCustomerRow`.
 - Lines 65, 66, 67, 68, 98, 302, 303, 306, 310, 341, 369, 373, 404, 408, 440, 475, 479: Xuống dòng các mệnh đề SQL `COALESCE`, `SELECT`, `CASE WHEN`, `LEFT JOIN` trong `@Query`.
 
-- [ ] **Step 2: Format `SellerExcelReportBuilder.java`**
+- [x] **Step 2: Format `SellerExcelReportBuilder.java`**
 - Line 123: Ngắt dòng chuỗi ngày tháng `"Từ " + ... + " đến " + ...`.
 - Lines 146, 147, 153, 154, 155, 156, 157, 160, 163: Xuống dòng các tham số trong `addKpiRow(...)`.
 
-- [ ] **Step 3: Kiểm tra độ dài dòng của 2 file này**
+- [x] **Step 3: Kiểm tra độ dài dòng của 2 file này**
 
 Chạy script python:
 ```bash
@@ -261,7 +261,7 @@ for f in ['src/main/java/com/minhnbnt/fashionstore/features/shop/ShopStatsReposi
 ```
 Expected: `0 lines > 120` cho cả 2 files.
 
-- [ ] **Step 4: Chạy test `SellerExcelReportBuilderTest`**
+- [x] **Step 4: Chạy test `SellerExcelReportBuilderTest`**
 
 Run: `.\gradlew.bat test --tests "com.minhnbnt.fashionstore.features.shop.excel.SellerExcelReportBuilderTest"`
 Expected: PASS.
@@ -290,13 +290,13 @@ Expected: PASS.
   - `src/test/java/com/minhnbnt/fashionstore/features/shop/controller/SellerStatsControllerTest.java` (lines 109, 122)
   - `src/test/java/com/minhnbnt/fashionstore/features/shop/ShopStaffServiceUnitTest.java` (line 174)
 
-- [ ] **Step 1: Format các chuỗi audit log trong `CatalogService`, `ShopDecorationService`, `OrderService`, `ReviewService`, `ShopStaffService`**
+- [x] **Step 1: Format các chuỗi audit log trong `CatalogService`, `ShopDecorationService`, `OrderService`, `ReviewService`, `ShopStaffService`**
 Ngắt dòng chuỗi nối chuỗi (`+`) thành nhiều dòng rõ ràng, thụt lề 4 spaces.
 
-- [ ] **Step 2: Format `Shop.java:361`**
+- [x] **Step 2: Format `Shop.java:361`**
 Xuống dòng câu lệnh `throw new ResponseStatusException(...)`.
 
-- [ ] **Step 3: Format annotation OpenAPI/Swagger trong các Controller**
+- [x] **Step 3: Format annotation OpenAPI/Swagger trong các Controller**
 Tách `summary` và `description` ra các dòng riêng biệt theo đúng chuẩn `docs/code-guide.md`:
 ```java
     @Operation(
@@ -305,10 +305,10 @@ Tách `summary` và `description` ra các dòng riêng biệt theo đúng chuẩ
     )
 ```
 
-- [ ] **Step 4: Format các dòng dài trong 4 file test**
+- [x] **Step 4: Format các dòng dài trong 4 file test**
 Xuống dòng các tham số `ShopRole.create(...)`, `when(...).thenReturn(...)`, `.andExpect(...)`.
 
-- [ ] **Step 5: Quét kiểm tra toàn bộ file code nguồn**
+- [x] **Step 5: Quét kiểm tra toàn bộ file code nguồn**
 
 Chạy script python kiểm tra toàn diện các file đã sửa:
 Expected: 0 dòng > 120 ký tự.
@@ -319,12 +319,12 @@ Expected: 0 dòng > 120 ký tự.
 
 **Files:** Toàn bộ repository `fashionstore`.
 
-- [ ] **Step 1: Quét toàn bộ repo xác nhận không còn `@Lazy`**
+- [x] **Step 1: Quét toàn bộ repo xác nhận không còn `@Lazy`**
 
 Run: `git grep "@Lazy" src/`
 Expected: 0 kết quả.
 
-- [ ] **Step 2: Quét toàn bộ git diff xác nhận không còn dòng > 120 ký tự**
+- [x] **Step 2: Quét toàn bộ git diff xác nhận không còn dòng > 120 ký tự**
 
 Run:
 ```bash
@@ -347,7 +347,7 @@ for c, l in longs[:10]:
 ```
 Expected: `Total java diff lines > 120: 0`.
 
-- [ ] **Step 3: Chạy toàn bộ test suite dự án**
+- [x] **Step 3: Chạy toàn bộ test suite dự án**
 
 Run: `.\gradlew.bat test`
 Expected: **BUILD SUCCESSFUL, all tests passing, 0 failures, 0 errors**.
