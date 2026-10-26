@@ -41,17 +41,17 @@
   - `NotificationCountResponse(long unread, Map<String, Long> byCategory)`
   - `NotificationRepository.countUnreadByCategory(UUID userId, @Nullable List<String> categories) -> Map<String, Long>`
 
-- [ ] **Step 1: Write the failing repository integration test**
+- [x] **Step 1: Write the failing repository integration test**
 
 In `fashionstore/src/test/java/com/minhnbnt/fashionstore/features/notification/NotificationRepositoryIntegrationTest.java`:
 Add test `countUnreadByCategoryGroupsCorrectly()` creating notifications for `ORDER` and `ACTIVITY`, verifying that `countUnreadByCategory` returns `{ "ORDER": 1, "ACTIVITY": 2 }` and filtering with `categories` list returns only requested subset.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./gradlew test --tests "com.minhnbnt.fashionstore.features.notification.NotificationRepositoryIntegrationTest"`
 Expected: FAIL (compilation error: `countUnreadByCategory` does not exist).
 
-- [ ] **Step 3: Update `NotificationCountResponse` and implement `countUnreadByCategory`**
+- [x] **Step 3: Update `NotificationCountResponse` and implement `countUnreadByCategory`**
 
 1. In `NotificationCountResponse.java`:
 ```java
@@ -70,12 +70,12 @@ public record NotificationCountResponse(
 2. In `NotificationRepository.java`:
 Implement `countUnreadByCategory(UUID userId, @Nullable List<String> categories)` using `SELECT category, count(*) AS cnt FROM user_notification WHERE user_id = :user AND read_at IS NULL GROUP BY category` (appending `AND category = ANY(:cats)` if `categories != null && !categories.isEmpty()`).
 
-- [ ] **Step 4: Run repository tests to verify they pass**
+- [x] **Step 4: Run repository tests to verify they pass**
 
 Run: `./gradlew test --tests "com.minhnbnt.fashionstore.features.notification.NotificationRepositoryIntegrationTest"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/minhnbnt/fashionstore/dto/notification/NotificationCountResponse.java src/main/java/com/minhnbnt/fashionstore/features/notification/NotificationRepository.java src/test/java/com/minhnbnt/fashionstore/features/notification/NotificationRepositoryIntegrationTest.java
@@ -98,17 +98,17 @@ git commit -m "feat(notification): add countUnreadByCategory in repository and r
   - `NotificationService.unreadSummary(UUID userId, @Nullable List<String> categories) -> NotificationCountResponse`
   - `GET /api/notifications/unread-count` returns `NotificationCountResponse` with `unread` and `byCategory`.
 
-- [ ] **Step 1: Write failing controller test for `byCategory` JSON response**
+- [x] **Step 1: Write failing controller test for `byCategory` JSON response**
 
 In `fashionstore/src/test/java/com/minhnbnt/fashionstore/features/notification/NotificationControllerTest.java`:
 Update `unreadCountReturnsNumber()` and `unreadCountPassesCategoriesToService()` to mock `notificationService.unreadSummary` returning `new NotificationCountResponse(3L, Map.of("ORDER", 2L, "ACTIVITY", 1L))` and assert `jsonPath("$.byCategory.ORDER").value(2)` and `jsonPath("$.byCategory.ACTIVITY").value(1)`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./gradlew test --tests "com.minhnbnt.fashionstore.features.notification.NotificationControllerTest"`
 Expected: FAIL (method `unreadSummary` not found on service).
 
-- [ ] **Step 3: Implement `unreadSummary` in `NotificationService` and update `NotificationController`**
+- [x] **Step 3: Implement `unreadSummary` in `NotificationService` and update `NotificationController`**
 
 1. In `NotificationService.java`:
 Add method:
@@ -122,12 +122,12 @@ public NotificationCountResponse unreadSummary(UUID userId, @Nullable List<Strin
 2. In `NotificationController.java`:
 Update `getUnreadNotificationCount` to call `notificationService.unreadSummary(userId, parseCategories(categories))`.
 
-- [ ] **Step 4: Run all notification tests to verify they pass**
+- [x] **Step 4: Run all notification tests to verify they pass**
 
 Run: `./gradlew test --tests "com.minhnbnt.fashionstore.features.notification.*"`
 Expected: All tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/minhnbnt/fashionstore/features/notification/NotificationService.java src/main/java/com/minhnbnt/fashionstore/features/notification/NotificationController.java src/test/java/com/minhnbnt/fashionstore/features/notification/NotificationControllerTest.java src/test/java/com/minhnbnt/fashionstore/features/notification/NotificationServiceTest.java
@@ -146,22 +146,22 @@ git commit -m "feat(notification): return unread summary with byCategory in cont
 - Consumes: Backend Springdoc OpenAPI definition via `OpenApiExportTest`.
 - Produces: Updated `NotificationCountResponse` TypeScript model containing `byCategory?: { [key: string]: number }`.
 
-- [ ] **Step 1: Run `OpenApiExportTest` to export updated `openapi.json`**
+- [x] **Step 1: Run `OpenApiExportTest` to export updated `openapi.json`**
 
 Run: `./gradlew test --tests "com.minhnbnt.fashionstore.OpenApiExportTest" --rerun`
 Expected: BUILD SUCCESSFUL, and `fashionstore-ui/docs/openapi.json` is updated containing `"byCategory"`.
 
-- [ ] **Step 2: Run codegen in `fashionstore-ui`**
+- [x] **Step 2: Run codegen in `fashionstore-ui`**
 
 In `fashionstore-ui`:
 Run: `pnpm build`
 Expected: Orval regenerates endpoints and models, TypeScript builds cleanly without errors.
 
-- [ ] **Step 3: Verify updated generated model**
+- [x] **Step 3: Verify updated generated model**
 
 Check `fashionstore-ui/generated/model/notificationCountResponse.ts` to ensure `byCategory` exists.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/openapi.json generated/
@@ -180,20 +180,20 @@ git commit -m "chore(api): update openapi spec and regenerate models with byCate
 - Consumes: `NotificationCountResponse.byCategory`.
 - Produces: Capsule pill badge on each tab when `count > 0`.
 
-- [ ] **Step 1: Write failing tests for tab unread badges in `NotificationBell.test.tsx`**
+- [x] **Step 1: Write failing tests for tab unread badges in `NotificationBell.test.tsx`**
 
 Add tests:
 1. `rendersUnreadBadgeOnTabsWhenCountsGreaterThanZero`: mock unread count response with `unread: 5, byCategory: { ORDER: 2, ACTIVITY: 3 }`, render with `categories: ['ORDER', 'ACTIVITY']`, verify HTML contains `2` and `3` inside tab elements with badge class.
 2. `hidesUnreadBadgeOnTabsWhenCountIsZero`: mock `byCategory: { ORDER: 0, ACTIVITY: 1 }`, verify `ORDER` tab does not have badge, while `ACTIVITY` tab shows `1`.
 3. `rendersCapAt99Plus`: mock `byCategory: { ORDER: 120 }`, verify tab badge text is `99+`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 In `fashionstore-ui`:
 Run: `pnpm test --run src/components/NotificationBell.test.tsx`
 Expected: FAIL (badges not rendered yet).
 
-- [ ] **Step 3: Implement category unread pill badges in `NotificationBell.tsx`**
+- [x] **Step 3: Implement category unread pill badges in `NotificationBell.tsx`**
 
 1. Read `byCategory` from `unreadQuery.data` (via `takeData`):
 ```tsx
@@ -229,7 +229,7 @@ Render pill badge next to `TAB_LABELS[cat]`:
 ```
 Ensure strictly NO ternary operators (`? :`) are used.
 
-- [ ] **Step 4: Run tests, lint, and build in `fashionstore-ui`**
+- [x] **Step 4: Run tests, lint, and build in `fashionstore-ui`**
 
 In `fashionstore-ui`:
 Run:
@@ -237,7 +237,7 @@ Run:
 `pnpm test --run` -> Expected: All tests pass.
 `pnpm build` -> Expected: Build succeeds.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/NotificationBell.tsx src/components/NotificationBell.test.tsx
