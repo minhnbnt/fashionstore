@@ -60,7 +60,15 @@ public class NotificationService {
         var title = "Lời mời tham gia shop " + shopName;
         var body = ownerName + " mời bạn làm " + roleName + " tại " + shopName + ".";
 
-        create(Set.of(userId), NotificationCategory.ACTIVITY, SHOP_INVITATION, title, body, "/invitations/" + token, invitationId);
+        create(
+            Set.of(userId),
+            NotificationCategory.ACTIVITY,
+            SHOP_INVITATION,
+            title,
+            body,
+            "/invitations/" + token,
+            invitationId
+        );
     }
 
     public void deleteByRefId(UUID refId) {

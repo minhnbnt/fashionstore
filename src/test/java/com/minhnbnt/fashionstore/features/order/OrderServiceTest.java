@@ -364,7 +364,11 @@ class OrderServiceTest {
             new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
         );
 
-        orders.sellerCancel(ownerId, created.id(), new com.minhnbnt.fashionstore.dto.order.CancelOrderRequest("Hết hàng", "Hết màu trắng"));
+        orders.sellerCancel(
+            ownerId,
+            created.id(),
+            new com.minhnbnt.fashionstore.dto.order.CancelOrderRequest("Hết hàng", "Hết màu trắng")
+        );
 
         var buyerPage = notifications.findPage(buyerId, null, 0, 10);
         assertThat(buyerPage).hasSize(1);
@@ -384,7 +388,14 @@ class OrderServiceTest {
 
         assertThatThrownBy(() -> orders.checkout(
             buyerId,
-            new CheckoutRequest(unapprovedShopId, List.of(new CheckoutItemRequest(UUID.randomUUID(), 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(
+                unapprovedShopId,
+                List.of(new CheckoutItemRequest(UUID.randomUUID(), 1)),
+                "An",
+                "0901",
+                "Ha Noi",
+                0L
+            )
         )).isInstanceOf(ResponseStatusException.class);
 
         assertThat(notifications.countByUser(ownerId)).isZero();

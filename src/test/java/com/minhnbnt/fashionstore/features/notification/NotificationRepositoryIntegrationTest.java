@@ -30,7 +30,9 @@ class NotificationRepositoryIntegrationTest {
     @Test
     void insertReturnsRowWithCategory() {
         var userId = user();
-        var row = notifications.insert(userId, NotificationCategory.ORDER, "ORDER_PLACED", "Đơn mới", "Chi tiết", "/account", null);
+        var row = notifications.insert(
+            userId, NotificationCategory.ORDER, "ORDER_PLACED", "Đơn mới", "Chi tiết", "/account", null
+        );
 
         assertThat(row.id()).isNotNull();
         assertThat(row.category()).isEqualTo("ORDER");
@@ -57,7 +59,9 @@ class NotificationRepositoryIntegrationTest {
     void unreadCountFiltersByCategories() {
         var userId = user();
         notifications.insert(userId, NotificationCategory.ORDER, "ORDER_PLACED", "Đơn 1", "Body", null, null);
-        notifications.insert(userId, NotificationCategory.ACTIVITY, "SHOP_INVITATION", "Hoạt động 1", "Body", null, null);
+        notifications.insert(
+            userId, NotificationCategory.ACTIVITY, "SHOP_INVITATION", "Hoạt động 1", "Body", null, null
+        );
 
         assertThat(notifications.countUnread(userId, List.of("ACTIVITY"))).isEqualTo(1);
         assertThat(notifications.countUnread(userId, null)).isEqualTo(2);
@@ -67,8 +71,12 @@ class NotificationRepositoryIntegrationTest {
     void countUnreadByCategoryGroupsCorrectly() {
         var userId = user();
         notifications.insert(userId, NotificationCategory.ORDER, "ORDER_PLACED", "Đơn 1", "Body", null, null);
-        notifications.insert(userId, NotificationCategory.ACTIVITY, "SHOP_INVITATION", "Hoạt động 1", "Body", null, null);
-        notifications.insert(userId, NotificationCategory.ACTIVITY, "SHOP_INVITATION", "Hoạt động 2", "Body", null, null);
+        notifications.insert(
+            userId, NotificationCategory.ACTIVITY, "SHOP_INVITATION", "Hoạt động 1", "Body", null, null
+        );
+        notifications.insert(
+            userId, NotificationCategory.ACTIVITY, "SHOP_INVITATION", "Hoạt động 2", "Body", null, null
+        );
 
         var counts = notifications.countUnreadByCategory(userId, null);
         assertThat(counts).containsEntry("ORDER", 1L);
@@ -83,7 +91,9 @@ class NotificationRepositoryIntegrationTest {
     void markAllReadScopedByCategories() {
         var userId = user();
         notifications.insert(userId, NotificationCategory.ORDER, "ORDER_PLACED", "Đơn 1", "Body", null, null);
-        notifications.insert(userId, NotificationCategory.ACTIVITY, "SHOP_INVITATION", "Hoạt động 1", "Body", null, null);
+        notifications.insert(
+            userId, NotificationCategory.ACTIVITY, "SHOP_INVITATION", "Hoạt động 1", "Body", null, null
+        );
 
         notifications.markAllRead(userId, List.of("ORDER"));
 
@@ -95,7 +105,9 @@ class NotificationRepositoryIntegrationTest {
     void deleteRemovesOwnNotificationOnly() {
         var owner = user();
         var stranger = user();
-        var row = notifications.insert(owner, NotificationCategory.ORDER, "ORDER_PLACED", "Đơn hàng", "Body", null, null);
+        var row = notifications.insert(
+            owner, NotificationCategory.ORDER, "ORDER_PLACED", "Đơn hàng", "Body", null, null
+        );
 
         notifications.delete(stranger, row.id());
         assertThat(notifications.findPage(owner, null, 0, 10)).hasSize(1);

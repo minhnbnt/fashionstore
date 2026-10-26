@@ -53,7 +53,7 @@ public class CartService {
             return new CartResponse(List.of(), 0, 0L);
         }
 
-        return toResponse(cart, items.findByCartIdOrderByCreatedAtAsc(cart.getId()));
+        return toResponse(items.findByCartIdOrderByCreatedAtAsc(cart.getId()));
     }
 
     @Transactional
@@ -75,7 +75,7 @@ public class CartService {
             items.save(existing);
         }
 
-        return toResponse(cart, items.findByCartIdOrderByCreatedAtAsc(cart.getId()));
+        return toResponse(items.findByCartIdOrderByCreatedAtAsc(cart.getId()));
     }
 
     @Transactional
@@ -91,7 +91,7 @@ public class CartService {
         cart.touch();
         carts.save(cart);
 
-        return toResponse(cart, items.findByCartIdOrderByCreatedAtAsc(cart.getId()));
+        return toResponse(items.findByCartIdOrderByCreatedAtAsc(cart.getId()));
     }
 
     @Transactional
@@ -106,7 +106,7 @@ public class CartService {
         cart.touch();
         carts.save(cart);
 
-        return toResponse(cart, items.findByCartIdOrderByCreatedAtAsc(cart.getId()));
+        return toResponse(items.findByCartIdOrderByCreatedAtAsc(cart.getId()));
     }
 
     @Transactional
@@ -116,7 +116,7 @@ public class CartService {
         carts.save(cart);
         items.deleteByCartId(cart.getId());
 
-        return toResponse(cart, List.of());
+        return toResponse(List.of());
     }
 
     @Transactional
@@ -217,7 +217,7 @@ public class CartService {
         return cart;
     }
 
-    private CartResponse toResponse(Cart cart, List<CartItem> lines) {
+    private CartResponse toResponse(List<CartItem> lines) {
         var responses = new ArrayList<CartItemResponse>();
         var itemCount = 0;
         var subtotal = 0L;

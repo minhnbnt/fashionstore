@@ -160,7 +160,9 @@ public class NotificationRepository {
     }
 
     public void markAllRead(UUID userId, @Nullable List<String> categories) {
-        var sql = new StringBuilder("UPDATE user_notification SET read_at = now() WHERE user_id = :user AND read_at IS NULL");
+        var sql = new StringBuilder(
+            "UPDATE user_notification SET read_at = now() WHERE user_id = :user AND read_at IS NULL"
+        );
         if (categories != null && !categories.isEmpty()) {
             sql.append(" AND category = ANY(:cats)");
         }

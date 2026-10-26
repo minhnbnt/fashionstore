@@ -292,7 +292,9 @@ class ReviewServiceTest {
         var productId = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-notif-1", "SKU-REV-NOTIF-1");
         var review = reviews.createReview(buyerId, productId, new CreateReviewRequest(5, "Tuyet voi"));
 
-        reviews.reply(ownerId, review.id(), new com.minhnbnt.fashionstore.dto.review.ReplyReviewRequest("Cam on ban da ung ho"));
+        reviews.reply(
+            ownerId, review.id(), new com.minhnbnt.fashionstore.dto.review.ReplyReviewRequest("Cam on ban da ung ho")
+        );
 
         var buyerPage = notifications.findPage(buyerId, List.of("ACTIVITY"), 0, 10);
         assertThat(buyerPage).hasSize(1);
