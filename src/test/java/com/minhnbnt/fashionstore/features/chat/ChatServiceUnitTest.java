@@ -27,9 +27,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -54,6 +58,9 @@ class ChatServiceUnitTest {
 
     @Mock
     private ChatRealtimePublisher realtime;
+
+    @Mock
+    private com.minhnbnt.fashionstore.features.notification.NotificationService notifications;
 
     @InjectMocks
     private ChatService chatService;
@@ -273,5 +280,56 @@ class ChatServiceUnitTest {
         verify(realtime).publishReadReceipt(recipientsCaptor.capture(), readEventCaptor.capture());
         assertThat(recipientsCaptor.getValue()).containsExactly(buyerId);
         assertThat(readEventCaptor.getValue().readerId()).isEqualTo(sellerId);
+    }
+
+    @Test
+    void sendMessageFromShopNotifiesBuyer() {
+        var buyerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var sellerId = UUID.randomUUID();
+        var conv = ChatConversation.create(shopId, buyerId);
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(shops.isMember(shopId, sellerId)).thenReturn(true);
+        when(shops.getShopName(shopId)).thenReturn("Fashion Hub");
+        when(shops.findActiveUserIdsByShop(shopId)).thenReturn(List.of(sellerId));
+
+        var req = new SendMessageRequest("Shop chao ban", null);
+        chatService.sendMessage(sellerId, convId, req);
+
+        verify(notifications).create(
+            eq(Set.of(buyerId)),
+            eq(NotificationCategory.ACTIVITY),
+            eq("CHAT_MESSAGE"),
+            eq("Tin nhắn mới từ Fashion Hub"),
+            eq("Shop chao ban"),
+            eq(null),
+            any()
+        );
+    }
+
+    @Test
+    void sendMessageFromBuyerDoesNotNotifySeller() {
+        var buyerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var conv = ChatConversation.create(shopId, buyerId);
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(shops.findActiveUserIdsByShop(shopId)).thenReturn(List.of(UUID.randomUUID()));
+
+        var req = new SendMessageRequest("Buyer chao shop", null);
+        chatService.sendMessage(buyerId, convId, req);
+
+        verify(notifications, never()).create(
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
     }
 }
