@@ -24,5 +24,6 @@ vietqr:
   base-url: ${VIETQR_BASE_URL:https://api.vietqr.io}
   client-id: ${VIETQR_CLIENT_ID:}
   api-key: ${VIETQR_API_KEY:}
+  mock-account-name: ${VIETQR_MOCK_ACCOUNT_NAME:}
   connect-timeout-ms: 5000
   read-timeout-ms: 8000

@@ -28,6 +28,7 @@ public class BankService {
     private final String clientId;
     private final String apiKey;
     private final String baseUrl;
+    private final String mockAccountName;
     private final RestClient restClient;
 
     private volatile @Nullable List<BankResponse> cachedBanks = null;
@@ -35,11 +36,13 @@ public class BankService {
     public BankService(
         @Value("${vietqr.client-id:}") String clientId,
         @Value("${vietqr.api-key:}") String apiKey,
-        @Value("${vietqr.base-url:https://api.vietqr.io}") String baseUrl
+        @Value("${vietqr.base-url:https://api.vietqr.io}") String baseUrl,
+        @Value("${vietqr.mock-account-name:}") String mockAccountName
     ) {
         this.clientId = clientId != null ? clientId.trim() : "";
         this.apiKey = apiKey != null ? apiKey.trim() : "";
         this.baseUrl = baseUrl != null && !baseUrl.isBlank() ? baseUrl.trim() : "https://api.vietqr.io";
+        this.mockAccountName = mockAccountName != null ? mockAccountName.trim().toUpperCase(Locale.ROOT) : "";
 
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(5));
@@ -49,6 +52,10 @@ public class BankService {
             .requestFactory(factory)
             .baseUrl(this.baseUrl)
             .build();
+    }
+
+    public BankService(String clientId, String apiKey, String baseUrl) {
+        this(clientId, apiKey, baseUrl, "");
     }
 
     public List<BankResponse> listBanks() {
@@ -100,9 +107,10 @@ public class BankService {
             if ("0000000000".equals(accountNumber.trim())) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tài khoản ngân hàng không tồn tại hoặc không hợp lệ");
             }
-            log.info("Chưa cấu hình VIETQR_CLIENT_ID / VIETQR_API_KEY. Trả về thông tin giả lập cho tài khoản: {}", accountNumber);
             var bankCode = resolveBankCode(bin);
-            return new LookupAccountResponse(bankCode, accountNumber.trim(), "NGUYEN VAN A");
+            var accountName = !this.mockAccountName.isBlank() ? this.mockAccountName : "NGUYEN VAN A";
+            log.info("Chưa cấu hình VIETQR_CLIENT_ID / VIETQR_API_KEY. Trả về thông tin giả lập ({}) cho tài khoản: {}", accountName, accountNumber);
+            return new LookupAccountResponse(bankCode, accountNumber.trim(), accountName);
         }
 
         try {
