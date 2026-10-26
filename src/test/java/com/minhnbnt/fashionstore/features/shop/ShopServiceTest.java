@@ -275,7 +275,10 @@ class ShopServiceTest {
         );
         assertThatThrownBy(() -> shops.register(ownerId, req))
             .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+            .satisfies(e -> {
+                var code = ((ResponseStatusException) e).getStatusCode();
+                assertThat(code).isEqualTo(HttpStatus.BAD_REQUEST);
+            });
     }
 
     @Test
@@ -283,7 +286,8 @@ class ShopServiceTest {
         var ownerId = mirroredUser();
         shops.register(ownerId, ShopTestFixtures.createRequest("Shop Truoc", "slug-trung"));
 
-        assertThatThrownBy(() -> shops.register(mirroredUser(), ShopTestFixtures.createRequest("Shop Sau", "slug-trung")))
+        var duplicateReq = ShopTestFixtures.createRequest("Shop Sau", "slug-trung");
+        assertThatThrownBy(() -> shops.register(mirroredUser(), duplicateReq))
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
     }

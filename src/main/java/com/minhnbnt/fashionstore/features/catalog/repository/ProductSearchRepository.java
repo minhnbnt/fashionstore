@@ -24,7 +24,8 @@ public class ProductSearchRepository {
     private static final String RANK = DOCUMENT + " <@> to_bm25query(:q, 'idx_product_bm25')";
 
     // Size chữ xếp theo thứ tự mặc thường gặp, size lạ (Freesize, 38, 40...) xếp sau theo A-Z.
-    private static final String SIZE_ORDER = "array_position(ARRAY['XS','S','M','L','XL','XXL','XXXL']::text[], v.size)";
+    private static final String SIZE_ORDER =
+        "array_position(ARRAY['XS','S','M','L','XL','XXL','XXXL']::text[], v.size)";
 
     private static final String BASE_FROM = """
         FROM product p

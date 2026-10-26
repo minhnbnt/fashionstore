@@ -20,14 +20,22 @@ public class LocationRepository {
 
     public List<ProvinceResponse> findProvinces() {
         return jdbc.sql("SELECT code, name, region FROM province ORDER BY name")
-            .query((rs, rowNum) -> new ProvinceResponse(rs.getString("code"), rs.getString("name"), rs.getString("region")))
+            .query((rs, rowNum) -> new ProvinceResponse(
+                rs.getString("code"),
+                rs.getString("name"),
+                rs.getString("region")
+            ))
             .list();
     }
 
     public Optional<ProvinceResponse> findProvince(String provinceCode) {
         return jdbc.sql("SELECT code, name, region FROM province WHERE code = :code")
             .param("code", provinceCode)
-            .query((rs, rowNum) -> new ProvinceResponse(rs.getString("code"), rs.getString("name"), rs.getString("region")))
+            .query((rs, rowNum) -> new ProvinceResponse(
+                rs.getString("code"),
+                rs.getString("name"),
+                rs.getString("region")
+            ))
             .optional();
     }
 

@@ -161,7 +161,8 @@ class ProductReportServiceTest {
         var ownerId = mirroredUser();
         var shopId = approvedShop(ownerId, "report-hidden");
         var product = product(ownerId, shopId, "report-hidden-ao");
-        catalog.updateProduct(ownerId, shopId, product.id(), new UpdateProductRequest(null, null, null, "HIDDEN", null));
+        var hideReq = new UpdateProductRequest(null, null, null, "HIDDEN", null);
+        catalog.updateProduct(ownerId, shopId, product.id(), hideReq);
 
         assertThatThrownBy(() -> reports.report(mirroredUser(), product.id(), report(ProductViolationType.SPAM)))
             .satisfies(e -> assertStatus(e, HttpStatus.NOT_FOUND));

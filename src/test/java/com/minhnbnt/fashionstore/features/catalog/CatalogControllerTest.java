@@ -133,7 +133,12 @@ class CatalogControllerTest {
         mockMvc.perform(post("/api/shops/{shopId}/products", shopId)
                 .with(jwt().jwt(builder -> builder.subject(userId.toString())))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Áo thun cao cấp\",\"slug\":\"ao-thun\",\"description\":\"Mô tả\",\"categoryId\":\"%s\",\"images\":[{\"s3Key\":\"1.jpg\",\"sortOrder\":0},{\"s3Key\":\"2.jpg\",\"sortOrder\":1},{\"s3Key\":\"3.jpg\",\"sortOrder\":2}],\"variants\":[]}".formatted(UUID.randomUUID())))
+                .content("""
+                    {"name":"Áo thun cao cấp","slug":"ao-thun","description":"Mô tả",
+                    "categoryId":"%s","images":[{"s3Key":"1.jpg","sortOrder":0},
+                    {"s3Key":"2.jpg","sortOrder":1},{"s3Key":"3.jpg","sortOrder":2}],
+                    "variants":[]}
+                    """.formatted(UUID.randomUUID())))
             .andExpect(status().isBadRequest());
     }
 

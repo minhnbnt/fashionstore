@@ -107,7 +107,9 @@ public class ShopMemberRepository {
     }
 
     public List<UUID> findShopIdsByUser(UUID userId) {
-        return jdbc.sql("SELECT shop_id FROM shop_member WHERE user_id = :user AND status = 'ACTIVE' ORDER BY joined_at")
+        var sql = "SELECT shop_id FROM shop_member WHERE user_id = :user AND status = 'ACTIVE' "
+            + "ORDER BY joined_at";
+        return jdbc.sql(sql)
             .param("user", userId)
             .query((rs, rowNum) -> (UUID) rs.getObject("shop_id"))
             .list();
@@ -188,7 +190,9 @@ public class ShopMemberRepository {
     }
 
     public List<UUID> findActiveUserIdsByShop(UUID shopId) {
-        return jdbc.sql("SELECT user_id FROM shop_member WHERE shop_id = :shop AND status = 'ACTIVE' ORDER BY joined_at")
+        var sql = "SELECT user_id FROM shop_member WHERE shop_id = :shop AND status = 'ACTIVE' "
+            + "ORDER BY joined_at";
+        return jdbc.sql(sql)
             .param("shop", shopId)
             .query((rs, rowNum) -> (UUID) rs.getObject("user_id"))
             .list();

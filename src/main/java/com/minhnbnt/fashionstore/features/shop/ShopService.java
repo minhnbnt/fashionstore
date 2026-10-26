@@ -168,7 +168,11 @@ public class ShopService {
     }
 
     @Transactional
-    public ShopResponse updateProfile(@NonNull UUID userId, @NonNull UUID id, @NonNull UpdateShopProfileRequest request) {
+    public ShopResponse updateProfile(
+        @NonNull UUID userId,
+        @NonNull UUID id,
+        @NonNull UpdateShopProfileRequest request
+    ) {
         var shop = shops.findById(id).orElse(null);
         if (shop == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found");

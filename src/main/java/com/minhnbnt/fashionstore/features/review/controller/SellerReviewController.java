@@ -35,7 +35,10 @@ public class SellerReviewController {
     private final ReviewService reviews;
 
     @GetMapping
-    @Operation(summary = "Xem đánh giá của shop", description = "Có thể lọc các đánh giá chưa phản hồi (unreplied=true).")
+    @Operation(
+        summary = "Xem đánh giá của shop",
+        description = "Có thể lọc các đánh giá chưa phản hồi (unreplied=true)."
+    )
     @ApiResponse(responseCode = "200", description = "Danh sách đánh giá")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền REVIEW_READ")
@@ -43,7 +46,8 @@ public class SellerReviewController {
     public List<SellerReviewResponse> list(
         @AuthenticationPrincipal Jwt jwt,
         @Parameter(description = "Id shop") @RequestParam UUID shopId,
-        @Parameter(description = "Chỉ xem đánh giá chưa phản hồi") @RequestParam(defaultValue = "false") boolean unreplied
+        @Parameter(description = "Chỉ xem đánh giá chưa phản hồi")
+        @RequestParam(defaultValue = "false") boolean unreplied
     ) {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var userId = UUID.fromString(subject);
@@ -52,7 +56,10 @@ public class SellerReviewController {
     }
 
     @PatchMapping("/{id}/reply")
-    @Operation(summary = "Phản hồi đánh giá", description = "Seller chỉ được phản hồi một lần duy nhất cho mỗi đánh giá.")
+    @Operation(
+        summary = "Phản hồi đánh giá",
+        description = "Seller chỉ được phản hồi một lần duy nhất cho mỗi đánh giá."
+    )
     @ApiResponse(responseCode = "200", description = "Đánh giá sau khi phản hồi")
     @ApiResponse(responseCode = "400", description = "Body không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
@@ -72,7 +79,10 @@ public class SellerReviewController {
     }
 
     @PostMapping("/{id}/report")
-    @Operation(summary = "Báo cáo đánh giá vi phạm", description = "Báo cáo nội dung vi phạm tiêu chuẩn cộng đồng để ban quản trị xử lý.")
+    @Operation(
+        summary = "Báo cáo đánh giá vi phạm",
+        description = "Báo cáo nội dung vi phạm tiêu chuẩn cộng đồng để ban quản trị xử lý."
+    )
     @ApiResponse(responseCode = "200", description = "Đã gửi báo cáo")
     @ApiResponse(responseCode = "400", description = "Body không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")

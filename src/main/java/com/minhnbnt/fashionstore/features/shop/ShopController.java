@@ -118,7 +118,10 @@ public class ShopController {
     }
 
     @PatchMapping("/{id}/profile")
-    @Operation(summary = "Cập nhật hồ sơ mở rộng của shop", description = "Cập nhật thông tin kho, SLA, tài khoản ngân hàng, giờ làm việc (OWNER/STAFF).")
+    @Operation(
+        summary = "Cập nhật hồ sơ mở rộng của shop",
+        description = "Cập nhật thông tin kho, SLA, tài khoản ngân hàng, giờ làm việc (OWNER/STAFF)."
+    )
     @ApiResponse(responseCode = "200", description = "Shop sau khi cập nhật hồ sơ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403", description = "Không phải thành viên shop")
