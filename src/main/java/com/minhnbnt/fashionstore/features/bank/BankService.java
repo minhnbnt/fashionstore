@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -33,6 +34,7 @@ public class BankService {
 
     private volatile @Nullable List<BankResponse> cachedBanks = null;
 
+    @Autowired
     public BankService(
         @Value("${vietqr.client-id:}") String clientId,
         @Value("${vietqr.api-key:}") String apiKey,
