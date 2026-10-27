@@ -176,6 +176,18 @@ public class Order implements Persistable<UUID> {
         updatedAt = Instant.now();
     }
 
+    public void cancelBySystem(String reason, @Nullable String note) {
+        if (status != OrderStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending orders can be cancelled by system");
+        }
+        status = OrderStatus.CANCELLED;
+        cancelReason = reason;
+        cancelNote = note;
+        cancelledBy = OrderCanceller.SYSTEM;
+        cancelledAt = Instant.now();
+        updatedAt = Instant.now();
+    }
+
     public void confirmReceipt() {
         if (status != OrderStatus.DELIVERED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only delivered orders can be confirmed");
