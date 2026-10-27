@@ -115,4 +115,55 @@ class SellerExcelReportBuilderTest {
         assertThat(csvString).startsWith("\uFEFFNgày,Doanh thu (VND),Số đơn hàng");
         assertThat(csvString).contains("2026-10-21,14200000,18");
     }
+
+    @Test
+    @DisplayName("Excel rỗng (shop chưa có đơn): đủ 4 sheet, chỉ có dòng header, không crash")
+    void buildsWorkbookWithOnlyHeadersWhenThereIsNoData() throws IOException {
+        var emptySummary = new ShopStatsRepository.OrderStatusSummaryRow(0L, 0L, 0L, 0L, 0L, 0L);
+
+        var builder = new SellerExcelReportBuilder();
+        var bytes = builder.buildExcelReport(
+            "Nét Boutique Rỗng",
+            "net-boutique-rong",
+            fromDate,
+            toDate,
+            emptySummary,
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            true
+        );
+
+        assertThat(bytes).isNotEmpty();
+
+        try (var workbook = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
+            assertThat(workbook.getNumberOfSheets()).isEqualTo(4);
+
+            // Sheet doanh thu: chỉ có header, không có dòng dữ liệu lẫn dòng tổng cộng
+            var periodSheet = workbook.getSheetAt(1);
+            assertThat(periodSheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("Ngày");
+            assertThat(periodSheet.getLastRowNum()).isZero();
+
+            var ordersSheet = workbook.getSheetAt(3);
+            assertThat(ordersSheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("Mã đơn hàng");
+            assertThat(ordersSheet.getLastRowNum()).isZero();
+        }
+    }
+
+    @Test
+    @DisplayName("CSV rỗng: chỉ có UTF-8 BOM và một dòng header")
+    void buildsCsvReportWithOnlyHeaderWhenThereIsNoData() {
+        var builder = new SellerExcelReportBuilder();
+        var bytes = builder.buildCsvReport(List.of());
+
+        assertThat(bytes).isNotEmpty();
+        assertThat(bytes[0]).isEqualTo((byte) 0xEF);
+        assertThat(bytes[1]).isEqualTo((byte) 0xBB);
+        assertThat(bytes[2]).isEqualTo((byte) 0xBF);
+
+        var csvString = new String(bytes, StandardCharsets.UTF_8);
+        assertThat(csvString).startsWith("\uFEFFNgày,Doanh thu (VND),Số đơn hàng\n");
+        assertThat(csvString.lines()).hasSize(1);
+    }
 }
