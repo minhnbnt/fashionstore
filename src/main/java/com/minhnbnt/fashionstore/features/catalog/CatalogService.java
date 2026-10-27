@@ -27,6 +27,7 @@ import com.minhnbnt.fashionstore.dto.catalog.SellerProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.StockMovementResponse;
 import com.minhnbnt.fashionstore.dto.catalog.WishlistProductCard;
 import com.minhnbnt.fashionstore.dto.common.PageResponse;
+import com.minhnbnt.fashionstore.dto.review.RatingSummary;
 import com.minhnbnt.fashionstore.features.catalog.repository.CategoryRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductAdminQueryRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductAuditLogRepository;
@@ -68,6 +69,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -558,6 +560,71 @@ public class CatalogService {
         }
 
         return toResponse(product);
+    }
+
+    /**
+     * Batch của getDetail cho một trang sản phẩm: cố định ~5 query thay vì
+     * 5 query mỗi sản phẩm. Thứ tự đầu vào được giữ nguyên; id không tìm thấy,
+     * không ACTIVE hoặc thuộc shop chưa duyệt bị bỏ qua (đúng ngữ nghĩa skip
+     * của getDetail).
+     */
+    @Transactional(readOnly = true)
+    public List<ProductResponse> getDetails(@NonNull List<UUID> productIds) {
+        if (productIds.isEmpty()) {
+            return List.of();
+        }
+
+        var productsById = new LinkedHashMap<UUID, Product>();
+        for (var product : products.findAllById(productIds)) {
+            if (product.getStatus() == ProductStatus.ACTIVE) {
+                productsById.put(product.getId(), product);
+            }
+        }
+
+        var approvedShopIds = new HashSet<UUID>();
+        for (var shopId : productsById.values().stream().map(Product::getShopId).distinct().toList()) {
+            if (shops.isShopApproved(shopId)) {
+                approvedShopIds.add(shopId);
+            }
+        }
+
+        var visibleProducts = new LinkedHashMap<UUID, Product>();
+        for (var id : productIds) {
+            var product = productsById.get(id);
+            if (product != null && approvedShopIds.contains(product.getShopId())) {
+                visibleProducts.put(id, product);
+            }
+        }
+
+        var variantsByProduct = new HashMap<UUID, List<ProductVariant>>();
+        for (var variant : variants.findByProductIdInOrderByCreatedAtAsc(visibleProducts.keySet())) {
+            variantsByProduct.computeIfAbsent(variant.getProductId(), k -> new ArrayList<>()).add(variant);
+        }
+
+        var imagesByProduct = new HashMap<UUID, List<ProductImage>>();
+        for (var image : images.findByProductIdInOrderBySortOrderAsc(visibleProducts.keySet())) {
+            imagesByProduct.computeIfAbsent(image.getProductId(), k -> new ArrayList<>()).add(image);
+        }
+
+        var ratings = reviews.ratingSummaries(visibleProducts.keySet());
+
+        var responses = new ArrayList<ProductResponse>();
+        for (var entry : visibleProducts.entrySet()) {
+            var id = entry.getKey();
+            var summary = ratings.getOrDefault(id, new RatingSummary(0, null));
+            responses.add(CatalogMapper.toResponse(
+                entry.getValue(),
+                variantsByProduct.getOrDefault(id, List.of()).stream()
+                    .map(CatalogMapper::toVariantResponse)
+                    .toList(),
+                imagesByProduct.getOrDefault(id, List.of()).stream()
+                    .map(CatalogMapper::toImageResponse)
+                    .toList(),
+                summary.averageRating(),
+                summary.reviewCount()
+            ));
+        }
+        return responses;
     }
 
     @Transactional(readOnly = true)
