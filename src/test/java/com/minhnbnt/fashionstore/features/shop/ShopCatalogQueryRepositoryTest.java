@@ -1,6 +1,7 @@
 package com.minhnbnt.fashionstore.features.shop;
 
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
+import com.minhnbnt.fashionstore.dto.shop.ShopCategorySummaryResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopProductCollectionType;
 import com.minhnbnt.fashionstore.dto.shop.ShopProductQueryRequest;
 import com.minhnbnt.fashionstore.dto.shop.ShopProductSort;
@@ -70,7 +71,8 @@ class ShopCatalogQueryRepositoryTest {
             .update();
 
         jdbc.sql("""
-            INSERT INTO product_variant (id, shop_id, product_id, sku, size, color, price, compare_at_price, stock_quantity, is_default)
+            INSERT INTO product_variant (id, shop_id, product_id, sku, size, color,
+                                         price, compare_at_price, stock_quantity, is_default)
             VALUES (:id, :shopId, :prodId, :sku, 'L', 'Đen', 250000, NULL, 50, true)
             """)
             .param("id", UUID.randomUUID())
@@ -93,7 +95,8 @@ class ShopCatalogQueryRepositoryTest {
             .update();
 
         jdbc.sql("""
-            INSERT INTO product_variant (id, shop_id, product_id, sku, size, color, price, compare_at_price, stock_quantity, is_default)
+            INSERT INTO product_variant (id, shop_id, product_id, sku, size, color,
+                                         price, compare_at_price, stock_quantity, is_default)
             VALUES (:id, :shopId, :prodId, :sku, 'M', 'Trắng', 150000, 300000, 20, true)
             """)
             .param("id", UUID.randomUUID())
@@ -140,6 +143,55 @@ class ShopCatalogQueryRepositoryTest {
         var cat = categories.stream().filter(c -> c.id().equals(categoryId)).findFirst();
         assertThat(cat).isPresent();
         assertThat(cat.get().productCount()).isEqualTo(2); // prod1 và prod2 (prod3 HIDDEN)
+    }
+
+    @Test
+    void filtersProductsByCategoryId() {
+        var otherCategory = insertCategory("Quần Nam");
+        var jeansId = insertProductInCategory(shopId, otherCategory, "Quần Jean Đen", "ACTIVE", 400000);
+
+        var filtered = new ShopProductQueryRequest(null, null, otherCategory, null, 0, 10);
+        assertThat(repository.findShopProductIds(shopId, filtered)).containsExactly(jeansId);
+        assertThat(repository.countShopProducts(shopId, filtered)).isEqualTo(1L);
+
+        var baseCategory = new ShopProductQueryRequest(null, null, categoryId, null, 0, 10);
+        // Created_at DESC: prod2 (mới hơn) đứng trước prod1
+        assertThat(repository.findShopProductIds(shopId, baseCategory)).containsExactly(prod2Id, prod1Id);
+        assertThat(repository.countShopProducts(shopId, baseCategory)).isEqualTo(2L);
+    }
+
+    @Test
+    void ordersShopCategoriesByProductCountDesc() {
+        var lowCategory = insertCategory("Danh Mục Ít Hàng");
+        insertProductInCategory(shopId, lowCategory, "SP Lẻ", "ACTIVE", 100000);
+        var highCategory = insertCategory("Danh Mục Nhiều Hàng");
+        insertProductInCategory(shopId, highCategory, "SP A", "ACTIVE", 100000);
+        insertProductInCategory(shopId, highCategory, "SP B", "ACTIVE", 100000);
+        insertProductInCategory(shopId, highCategory, "SP C", "ACTIVE", 100000);
+
+        var categories = repository.findShopCategories(shopId);
+
+        assertThat(categories).extracting(ShopCategorySummaryResponse::id)
+            .containsExactly(highCategory, categoryId, lowCategory);
+        assertThat(categories).extracting(ShopCategorySummaryResponse::productCount)
+            .containsExactly(3L, 2L, 1L);
+    }
+
+    @Test
+    void countsOnlyThisShopsActiveProductsPerCategory() {
+        var otherShopId = insertShop("Shop Khác");
+        var hiddenOnlyCategory = insertCategory("Danh Mục Chỉ Có Hàng Ẩn");
+        insertProductInCategory(shopId, hiddenOnlyCategory, "SP Ẩn", "HIDDEN", 100000);
+        var otherShopCategory = insertCategory("Danh Mục Của Shop Khác");
+        insertProductInCategory(otherShopId, otherShopCategory, "SP Của Shop Khác", "ACTIVE", 100000);
+        // Shop khác bán sản phẩm trong CÙNG danh mục (danh mục là taxonomy chung) — không được làm phồng count
+        insertProductInCategory(otherShopId, categoryId, "SP Khác Cùng Danh Mục", "ACTIVE", 100000);
+
+        var categories = repository.findShopCategories(shopId);
+
+        assertThat(categories).hasSize(1);
+        assertThat(categories.get(0).id()).isEqualTo(categoryId);
+        assertThat(categories.get(0).productCount()).isEqualTo(2L);
     }
 
     @Test
@@ -223,7 +275,8 @@ class ShopCatalogQueryRepositoryTest {
     void clampsLimitOverMaxToTwelve() {
         insertFillerProducts(13);
 
-        var productIds = repository.findShopProductIds(shopId, new ShopProductQueryRequest(null, null, null, null, 0, 51));
+        var productIds = repository.findShopProductIds(shopId,
+            new ShopProductQueryRequest(null, null, null, null, 0, 51));
 
         assertThat(productIds).hasSize(12);
     }
@@ -232,7 +285,8 @@ class ShopCatalogQueryRepositoryTest {
     void clampsNonPositiveLimitToTwelve() {
         insertFillerProducts(13);
 
-        var productIds = repository.findShopProductIds(shopId, new ShopProductQueryRequest(null, null, null, null, 0, 0));
+        var productIds = repository.findShopProductIds(shopId,
+            new ShopProductQueryRequest(null, null, null, null, 0, 0));
 
         assertThat(productIds).hasSize(12);
     }
@@ -275,7 +329,8 @@ class ShopCatalogQueryRepositoryTest {
 
     private void insertVariant(UUID prodId, long price, @Nullable Long compareAtPrice) {
         jdbc.sql("""
-            INSERT INTO product_variant (id, shop_id, product_id, sku, size, color, price, compare_at_price, stock_quantity, is_default)
+            INSERT INTO product_variant (id, shop_id, product_id, sku, size, color,
+                                         price, compare_at_price, stock_quantity, is_default)
             VALUES (:id, :shopId, :prodId, :sku, 'M', 'Đen', :price, :compareAtPrice, 10, true)
             """)
             .param("id", UUID.randomUUID())
@@ -285,6 +340,55 @@ class ShopCatalogQueryRepositoryTest {
             .param("price", price)
             .param("compareAtPrice", compareAtPrice)
             .update();
+    }
+
+    private UUID insertCategory(String name) {
+        var id = UUID.randomUUID();
+        jdbc.sql("INSERT INTO category (id, name, slug) VALUES (:id, :name, :slug)")
+            .param("id", id)
+            .param("name", name)
+            .param("slug", "cat-" + id)
+            .update();
+        return id;
+    }
+
+    private UUID insertShop(String name) {
+        var id = UUID.randomUUID();
+        jdbc.sql("INSERT INTO shop (id, name, slug, status) VALUES (:id, :name, :slug, 'APPROVED')")
+            .param("id", id)
+            .param("name", name)
+            .param("slug", "shop-" + id)
+            .update();
+        return id;
+    }
+
+    private UUID insertProductInCategory(UUID ownerShopId, UUID catId, String name, String status, long price) {
+        var productId = UUID.randomUUID();
+        jdbc.sql("""
+            INSERT INTO product (id, shop_id, category_id, name, slug, status, created_at)
+            VALUES (:id, :shopId, :catId, :name, :slug, :status, :createdAt)
+            """)
+            .param("id", productId)
+            .param("shopId", ownerShopId)
+            .param("catId", catId)
+            .param("name", name)
+            .param("slug", "prod-" + productId)
+            .param("status", status)
+            .param("createdAt", java.sql.Timestamp.from(Instant.now().minusSeconds(3000)))
+            .update();
+
+        jdbc.sql("""
+            INSERT INTO product_variant (id, shop_id, product_id, sku, size, color,
+                                         price, compare_at_price, stock_quantity, is_default)
+            VALUES (:id, :shopId, :prodId, :sku, 'M', 'Đen', :price, NULL, 10, true)
+            """)
+            .param("id", UUID.randomUUID())
+            .param("shopId", ownerShopId)
+            .param("prodId", productId)
+            .param("sku", "SKU-" + productId)
+            .param("price", price)
+            .update();
+        return productId;
     }
 
     private void insertFillerProducts(int count) {
