@@ -3,6 +3,7 @@ package com.minhnbnt.fashionstore.features.shop;
 import com.minhnbnt.fashionstore.dto.shop.ShopCategorySummaryResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopProductCollectionType;
 import com.minhnbnt.fashionstore.dto.shop.ShopProductQueryRequest;
+import com.minhnbnt.fashionstore.dto.shop.ShopProductSort;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -50,27 +51,26 @@ public class ShopCatalogQueryRepository {
             sql.append(" AND p.category_id = :categoryId");
         }
 
-        if (request.collection() != null) {
-            if (request.collection() == ShopProductCollectionType.SALE_OFF) {
-                sql.append("""
-                     AND EXISTS (
-                        SELECT 1 FROM product_variant pv
-                        WHERE pv.product_id = p.id
-                          AND pv.compare_at_price IS NOT NULL
-                          AND pv.compare_at_price > pv.price
-                    )
-                    """);
-            }
+        if (request.collection() == ShopProductCollectionType.SALE_OFF) {
+            sql.append("""
+                 AND EXISTS (
+                    SELECT 1 FROM product_variant pv
+                    WHERE pv.product_id = p.id
+                      AND pv.compare_at_price IS NOT NULL
+                      AND pv.compare_at_price > pv.price
+                )
+                """);
         }
 
         // Sắp xếp
-        if (request.collection() == ShopProductCollectionType.BEST_SELLER || "BEST_SELLER".equalsIgnoreCase(request.sort())) {
+        if (request.collection() == ShopProductCollectionType.BEST_SELLER
+            || request.sort() == ShopProductSort.BEST_SELLER) {
             sql.append(" ORDER BY total_sold DESC, p.created_at DESC");
         } else if (request.collection() == ShopProductCollectionType.SALE_OFF) {
             sql.append(" ORDER BY discount_rate DESC, p.created_at DESC");
-        } else if ("PRICE_ASC".equalsIgnoreCase(request.sort())) {
+        } else if (request.sort() == ShopProductSort.PRICE_ASC) {
             sql.append(" ORDER BY min_price ASC, p.created_at DESC");
-        } else if ("PRICE_DESC".equalsIgnoreCase(request.sort())) {
+        } else if (request.sort() == ShopProductSort.PRICE_DESC) {
             sql.append(" ORDER BY min_price DESC, p.created_at DESC");
         } else {
             // NEW_ARRIVALS hoặc NEWEST
@@ -95,7 +95,7 @@ public class ShopCatalogQueryRepository {
             .param("offset", offset);
 
         if (request.q() != null && !request.q().isBlank()) {
-            query.param("qLike", "%" + request.q().trim() + "%");
+            query.param("qLike", likePattern(request.q()));
         }
         if (request.categoryId() != null) {
             query.param("categoryId", request.categoryId());
@@ -120,33 +120,27 @@ public class ShopCatalogQueryRepository {
             sql.append(" AND p.category_id = :categoryId");
         }
 
-        if (request.collection() != null) {
-            if (request.collection() == ShopProductCollectionType.SALE_OFF) {
-                sql.append("""
-                     AND EXISTS (
-                        SELECT 1 FROM product_variant pv
-                        WHERE pv.product_id = p.id
-                          AND pv.compare_at_price IS NOT NULL
-                          AND pv.compare_at_price > pv.price
-                    )
-                    """);
-            }
+        if (request.collection() == ShopProductCollectionType.SALE_OFF) {
+            sql.append("""
+                 AND EXISTS (
+                    SELECT 1 FROM product_variant pv
+                    WHERE pv.product_id = p.id
+                      AND pv.compare_at_price IS NOT NULL
+                      AND pv.compare_at_price > pv.price
+                )
+                """);
         }
 
         var query = jdbc.sql(sql.toString()).param("shopId", shopId);
 
         if (request.q() != null && !request.q().isBlank()) {
-            query.param("qLike", "%" + request.q().trim() + "%");
+            query.param("qLike", likePattern(request.q()));
         }
         if (request.categoryId() != null) {
             query.param("categoryId", request.categoryId());
         }
 
-        var count = query.query(Long.class).single();
-        if (count == null) {
-            return 0L;
-        }
-        return count;
+        return query.query(Long.class).single();
     }
 
     public List<ShopCategorySummaryResponse> findShopCategories(@NonNull UUID shopId) {
@@ -157,7 +151,6 @@ public class ShopCatalogQueryRepository {
             WHERE p.shop_id = :shopId
               AND p.status = 'ACTIVE'
             GROUP BY c.id, c.name, c.slug
-            HAVING COUNT(p.id) > 0
             ORDER BY product_count DESC, c.name ASC
             """;
 
@@ -170,5 +163,13 @@ public class ShopCatalogQueryRepository {
                 rs.getLong("product_count")
             ))
             .list();
+    }
+
+    private String likePattern(String keyword) {
+        var escaped = keyword.trim()
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_");
+        return "%" + escaped + "%";
     }
 }

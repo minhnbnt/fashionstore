@@ -5,6 +5,7 @@ import com.minhnbnt.fashionstore.dto.common.PageResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopCategorySummaryResponse;
 import com.minhnbnt.fashionstore.dto.shop.ShopProductCollectionType;
 import com.minhnbnt.fashionstore.dto.shop.ShopProductQueryRequest;
+import com.minhnbnt.fashionstore.dto.shop.ShopProductSort;
 import com.minhnbnt.fashionstore.features.shop.ShopCatalogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -24,7 +25,10 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/shops/{shopId}")
 @RequiredArgsConstructor
-@Tag(name = "Shops - Catalog", description = "Xem sản phẩm và danh mục công khai của shop (kèm tìm kiếm nội bộ)")
+@Tag(
+    name = "Shops - Catalog",
+    description = "Xem sản phẩm và danh mục công khai của shop (kèm tìm kiếm nội bộ)"
+)
 public class ShopCatalogController {
 
     private final ShopCatalogService shopCatalog;
@@ -33,9 +37,13 @@ public class ShopCatalogController {
     @Operation(
         operationId = "getShopProducts",
         summary = "Danh sách sản phẩm của shop",
-        description = "Chỉ trả về sản phẩm ACTIVE của shop APPROVED. Hỗ trợ tìm kiếm từ khóa trong shop, lọc bộ sưu tập nổi bật và danh mục."
+        description = """
+            Chỉ trả về sản phẩm ACTIVE của shop APPROVED.
+            Hỗ trợ tìm kiếm từ khóa trong shop, lọc bộ sưu tập nổi bật và danh mục.
+            """
     )
     @ApiResponse(responseCode = "200", description = "Một trang sản phẩm của shop kèm tổng số kết quả")
+    @ApiResponse(responseCode = "400", description = "Tham số sort hoặc collection không hợp lệ")
     @ApiResponse(responseCode = "404", description = "Shop không tồn tại hoặc chưa được duyệt")
     public PageResponse<ProductResponse> getShopProducts(
         @Parameter(description = "Id shop") @PathVariable UUID shopId,
@@ -50,7 +58,7 @@ public class ShopCatalogController {
         @Nullable UUID categoryId,
         @Parameter(description = "Kiểu sắp xếp: NEWEST, BEST_SELLER, PRICE_ASC, PRICE_DESC")
         @RequestParam(required = false)
-        @Nullable String sort,
+        @Nullable ShopProductSort sort,
         @Parameter(description = "Số trang, đếm từ 0", example = "0")
         @RequestParam(defaultValue = "0")
         int page,

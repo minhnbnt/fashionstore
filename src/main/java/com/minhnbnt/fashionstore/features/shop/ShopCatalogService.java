@@ -28,7 +28,10 @@ public class ShopCatalogService {
     private final CatalogService catalogService;
 
     @Transactional(readOnly = true)
-    public PageResponse<ProductResponse> getShopProducts(@NonNull UUID shopId, @NonNull ShopProductQueryRequest request) {
+    public PageResponse<ProductResponse> getShopProducts(
+        @NonNull UUID shopId,
+        @NonNull ShopProductQueryRequest request
+    ) {
         var shop = shops.findById(shopId).orElse(null);
         if (shop == null || shop.getStatus() != ShopStatus.APPROVED) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Shop not found");

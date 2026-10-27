@@ -3,6 +3,7 @@ package com.minhnbnt.fashionstore.features.shop;
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.shop.ShopProductCollectionType;
 import com.minhnbnt.fashionstore.dto.shop.ShopProductQueryRequest;
+import com.minhnbnt.fashionstore.dto.shop.ShopProductSort;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -191,7 +192,7 @@ class ShopCatalogQueryRepositoryTest {
     void ordersByPriceAscWhenSortIsPriceAsc() {
         var midId = insertProduct("Áo Giá Trung Bình", null, "ACTIVE", 200000L, null, Instant.now().minusSeconds(300));
 
-        var req = new ShopProductQueryRequest(null, null, null, "PRICE_ASC", 0, 10);
+        var req = new ShopProductQueryRequest(null, null, null, ShopProductSort.PRICE_ASC, 0, 10);
         var productIds = repository.findShopProductIds(shopId, req);
 
         assertThat(productIds).containsExactly(prod2Id, midId, prod1Id);
@@ -201,7 +202,7 @@ class ShopCatalogQueryRepositoryTest {
     void ordersByPriceDescWhenSortIsPriceDesc() {
         var midId = insertProduct("Áo Giá Trung Bình", null, "ACTIVE", 200000L, null, Instant.now().minusSeconds(300));
 
-        var req = new ShopProductQueryRequest(null, null, null, "PRICE_DESC", 0, 10);
+        var req = new ShopProductQueryRequest(null, null, null, ShopProductSort.PRICE_DESC, 0, 10);
         var productIds = repository.findShopProductIds(shopId, req);
 
         assertThat(productIds).containsExactly(prod1Id, midId, prod2Id);
