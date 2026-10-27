@@ -35,6 +35,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -439,5 +440,65 @@ class SellerPermissionEnforcementTest {
 
         var dashboard = shopStats.getDashboard(staffId, shopId);
         assertThat(dashboard).isNotNull();
+    }
+
+    @Test
+    void staffWithoutRevenueReadIsDeniedOnEveryStatsOperation() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "perm-stats-every-deny-" + UUID.randomUUID());
+        var staffId = staffWith(ownerId, shopId, ShopPermission.ORDER_READ);
+
+        record StatsOperation(String name, Runnable call) {}
+
+        var operations = List.of(
+            new StatsOperation("getDashboard", () -> shopStats.getDashboard(staffId, shopId)),
+            new StatsOperation("getPerformance", () -> shopStats.getPerformance(staffId, shopId)),
+            new StatsOperation("getAlerts", () -> shopStats.getAlerts(staffId, shopId)),
+            new StatsOperation("getPeriodComparison", () -> shopStats.getPeriodComparison(staffId, shopId, "day")),
+            new StatsOperation(
+                "getRevenueDetail", () -> shopStats.getRevenueDetail(staffId, shopId, "day", null, null)
+            ),
+            new StatsOperation("getRevenueByCategory", () -> shopStats.getRevenueByCategory(staffId, shopId)),
+            new StatsOperation("getRevenueByPayment", () -> shopStats.getRevenueByPayment(staffId, shopId)),
+            new StatsOperation(
+                "getOrderStatusSummary", () -> shopStats.getOrderStatusSummary(staffId, shopId, null, null)
+            ),
+            new StatsOperation("getTopSellingProducts", () -> shopStats.getTopSellingProducts(staffId, shopId, 10)),
+            new StatsOperation(
+                "getLowConversionProducts", () -> shopStats.getLowConversionProducts(staffId, shopId, 10)
+            ),
+            new StatsOperation("getOutOfStockProducts", () -> shopStats.getOutOfStockProducts(staffId, shopId)),
+            new StatsOperation(
+                "getSlowMovingProducts", () -> shopStats.getSlowMovingProducts(staffId, shopId, 10)
+            ),
+            new StatsOperation("getCustomerOverview", () -> shopStats.getCustomerOverview(staffId, shopId)),
+            new StatsOperation("getTopCustomers", () -> shopStats.getTopCustomers(staffId, shopId, 10)),
+            new StatsOperation("getFollowerTrend", () -> shopStats.getFollowerTrend(staffId, shopId)),
+            new StatsOperation(
+                "exportRevenueReport", () -> shopStats.exportRevenueReport(staffId, shopId, "csv", null, null)
+            )
+        );
+
+        for (var operation : operations) {
+            assertThatThrownBy(operation.call()::run)
+                .as(operation.name())
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> assertPermissionDenied((ResponseStatusException) e));
+        }
+    }
+
+    @Test
+    void nonMemberIsDeniedStatsAccess() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "perm-stats-outsider-" + UUID.randomUUID());
+        var outsiderId = mirroredUser();
+
+        assertThatThrownBy(() -> shopStats.getDashboard(outsiderId, shopId))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> {
+                var rse = (ResponseStatusException) e;
+                assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                assertThat(rse.getReason()).isEqualTo("Not a member of this shop");
+            });
     }
 }

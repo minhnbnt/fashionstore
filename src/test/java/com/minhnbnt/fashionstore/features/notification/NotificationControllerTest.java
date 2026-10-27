@@ -129,6 +129,24 @@ class NotificationControllerTest {
     }
 
     @Test
+    void unreadCountRejectsUnknownCategory() throws Exception {
+        var userId = UUID.randomUUID();
+
+        mockMvc.perform(get("/api/notifications/unread-count?categories=BOGUS")
+                .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void markAllReadRejectsUnknownCategory() throws Exception {
+        var userId = UUID.randomUUID();
+
+        mockMvc.perform(patch("/api/notifications/read-all?categories=BOGUS")
+                .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void markReadRequiresOwnNotification() throws Exception {
         var userId = UUID.randomUUID();
         var notificationId = UUID.randomUUID();
