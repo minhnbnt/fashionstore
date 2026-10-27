@@ -5,6 +5,7 @@ import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
+import com.minhnbnt.fashionstore.dto.order.CancelOrderRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutItemRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
@@ -151,27 +152,19 @@ class OrderServiceTest {
     }
 
     @Test
-    void confirmWithoutStockFails() {
+    void sellerCancelPendingOrderRestocks() {
         var ownerId = mirroredUser();
         var buyerId = mirroredUser();
-        var shopId = approvedShop(ownerId, "shop-order-e");
-        var variantId = variantInShop(ownerId, shopId, "ao-order-e", "SKU-ORDER-E", 1);
+        var shopId = approvedShop(ownerId, "shop-order-sc");
+        var variantId = variantInShop(ownerId, shopId, "ao-order-sc", "SKU-ORDER-SC", 10);
         var created = orders.checkout(
             buyerId,
             new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 2)), "An", "0901", "Ha Noi", 0L)
         );
+        assertThat(catalog.findVariantById(variantId).orElseThrow().getStockQuantity()).isEqualTo(8);
 
-        assertThatThrownBy(() -> orders.confirm(ownerId, created.id()))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
-
-        var detail = catalog.getDetail(Objects.requireNonNull(created.items().get(0).productId()));
-        var untouched = detail.variants().stream()
-            .filter(v -> v.id().equals(variantId))
-            .findFirst()
-            .orElseThrow()
-            .stockQuantity();
-        assertThat(untouched).isEqualTo(1);
+        orders.sellerCancel(ownerId, created.id(), new CancelOrderRequest("Out of stock", ""));
+        assertThat(catalog.findVariantById(variantId).orElseThrow().getStockQuantity()).isEqualTo(10);
     }
 
     @Test
@@ -401,4 +394,52 @@ class OrderServiceTest {
         assertThat(notifications.countByUser(ownerId)).isZero();
         assertThat(notifications.countByUser(buyerId)).isZero();
     }
+
+    @Test
+    void checkoutDeductsStockImmediately() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-order-deduct");
+        var variantId = variantInShop(ownerId, shopId, "ao-order-deduct", "SKU-ORDER-DEDUCT", 10);
+
+        orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 3)), "An", "0901", "Ha Noi", 0L)
+        );
+
+        var variant = catalog.findVariantById(variantId).orElseThrow();
+        assertThat(variant.getStockQuantity()).isEqualTo(7);
+    }
+
+    @Test
+    void checkoutFailsWhenStockInsufficient() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-order-insuf");
+        var variantId = variantInShop(ownerId, shopId, "ao-order-insuf", "SKU-ORDER-INSUF", 2);
+
+        assertThatThrownBy(() -> orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 5)), "An", "0901", "Ha Noi", 0L)
+        )).isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void buyerCancelRestocksPendingOrder() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-order-rc");
+        var variantId = variantInShop(ownerId, shopId, "ao-order-rc", "SKU-ORDER-RC", 10);
+
+        var created = orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 4)), "An", "0901", "Ha Noi", 0L)
+        );
+        assertThat(catalog.findVariantById(variantId).orElseThrow().getStockQuantity()).isEqualTo(6);
+
+        orders.cancel(buyerId, created.id());
+        assertThat(catalog.findVariantById(variantId).orElseThrow().getStockQuantity()).isEqualTo(10);
+    }
 }
+

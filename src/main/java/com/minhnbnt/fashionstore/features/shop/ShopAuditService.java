@@ -34,7 +34,7 @@ public class ShopAuditService {
 
     public void record(
         UUID shopId,
-        UUID actorId,
+        @Nullable UUID actorId,
         String action,
         @Nullable String targetType,
         @Nullable UUID targetId,
@@ -54,7 +54,7 @@ public class ShopAuditService {
 
     private void recordInSavepoint(
         UUID shopId,
-        UUID actorId,
+        @Nullable UUID actorId,
         String action,
         @Nullable String targetType,
         @Nullable UUID targetId,
@@ -88,7 +88,7 @@ public class ShopAuditService {
      */
     private void insert(
         UUID shopId,
-        UUID actorId,
+        @Nullable UUID actorId,
         String action,
         @Nullable String targetType,
         @Nullable UUID targetId,

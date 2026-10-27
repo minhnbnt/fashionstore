@@ -29,6 +29,7 @@ import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -48,6 +49,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderService {
@@ -134,6 +136,16 @@ public class OrderService {
             ));
         }
 
+        for (var snapshot : snapshots) {
+            if (snapshot.variantId() != null) {
+                if (!productStock.decrementVariantStock(snapshot.variantId(), snapshot.quantity())) {
+                    throw new ResponseStatusException(
+                        HttpStatus.CONFLICT, "Insufficient stock for product " + snapshot.productName()
+                    );
+                }
+            }
+        }
+
         var order = Order.create(
             generateCode(),
             request.shopId(),
@@ -145,6 +157,18 @@ public class OrderService {
             request.shippingAddress()
         );
         orders.save(order);
+
+        for (var snapshot : snapshots) {
+            if (snapshot.variantId() != null) {
+                productStock.recordStockMovement(
+                    snapshot.variantId(),
+                    request.shopId(),
+                    snapshot.quantity(),
+                    "ORDER_CREATED",
+                    order.getId()
+                );
+            }
+        }
 
         var createdItems = snapshots.stream()
             .map(snapshot -> OrderItem.snapshot(
@@ -237,6 +261,7 @@ public class OrderService {
         );
 
         var orderItems = items.findByOrderId(order.getId());
+        restockOrderItems(order, orderItems);
         return toResponse(orders.save(order), orderItems);
     }
 
@@ -278,7 +303,7 @@ public class OrderService {
         var orderItems = items.findByOrderId(order.getId());
 
         order.cancelBySeller(request.reason(), request.note());
-        restockIfConfirmed(order, from, orderItems);
+        restockOrderItems(order, orderItems);
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CANCELLED, userId));
 
         var saved = orders.save(order);
@@ -300,6 +325,57 @@ public class OrderService {
         );
 
         return toResponse(saved, orderItems);
+    }
+
+    @Transactional
+    public void systemCancelExpiredOrder(@NonNull UUID orderId) {
+        var order = requireOrder(orderId);
+        if (order.getStatus() != OrderStatus.PENDING) {
+            return;
+        }
+
+        var from = order.getStatus();
+        var orderItems = items.findByOrderId(order.getId());
+
+        order.cancelBySystem("Hết thời hạn xác nhận đơn hàng (24 giờ)", null);
+        restockOrderItems(order, orderItems);
+        histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CANCELLED, null, "Quá hạn 24 giờ"));
+
+        var saved = orders.save(order);
+        var cancelDetail = "Hệ thống tự động hủy đơn hàng #" + saved.getCode()
+            + " do quá hạn 24 giờ chưa xác nhận | Khôi phục tồn kho cho " + orderItems.size() + " mặt hàng";
+        audit.record(saved.getShopId(), null, "ORDER_SYSTEM_CANCEL", "ORDER", saved.getId(), cancelDetail);
+
+        notifications.create(
+            Set.of(saved.getBuyerId()),
+            NotificationCategory.ORDER,
+            "ORDER_CANCELLED",
+            "Đơn #" + saved.getCode() + " đã bị hủy tự động",
+            "Đơn #" + saved.getCode() + " đã tự động hủy do người bán không xác nhận trong vòng 24 giờ.",
+            "/account",
+            saved.getId()
+        );
+
+        notifications.create(
+            shops.findActiveUserIdsByShop(saved.getShopId()),
+            NotificationCategory.SELLING,
+            "ORDER_CANCELLED",
+            "Đơn #" + saved.getCode() + " đã bị hủy tự động",
+            "Đơn #" + saved.getCode() + " đã quá hạn xác nhận 24 giờ và bị hệ thống tự động hủy.",
+            "/shop?shopId=" + saved.getShopId() + "&tab=orders&orderId=" + saved.getId(),
+            saved.getId()
+        );
+    }
+
+    public void cancelExpiredPendingOrders(@NonNull Instant cutoff) {
+        var expired = orders.findByStatusAndCreatedAtBefore(OrderStatus.PENDING, cutoff);
+        for (var order : expired) {
+            try {
+                systemCancelExpiredOrder(order.getId());
+            } catch (Exception ex) {
+                log.error("Failed to auto-cancel expired order {}: {}", order.getId(), ex.getMessage(), ex);
+            }
+        }
     }
 
     @Transactional(readOnly = true)
@@ -362,7 +438,7 @@ public class OrderService {
         var orderItems = items.findByOrderId(order.getId());
 
         order.cancelByAdmin(reason, note);
-        restockIfConfirmed(order, from, orderItems);
+        restockOrderItems(order, orderItems);
         orders.save(order);
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CANCELLED, adminId, note));
 
@@ -436,15 +512,6 @@ public class OrderService {
         var from = order.getStatus();
 
         var orderItems = items.findByOrderId(order.getId());
-        for (var item : orderItems) {
-            if (item.getVariantId() == null) {
-                continue;
-            }
-            if (!productStock.decrementVariantStock(item.getVariantId(), item.getQuantity())) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Insufficient stock");
-            }
-        }
-
         order.confirm();
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CONFIRMED, userId));
 
@@ -607,13 +674,9 @@ public class OrderService {
     }
 
     /**
-     * Đơn CONFIRMED đã trừ kho lúc xác nhận, hủy thì trả lại kho + ghi biến động. Gọi sau khi đơn đã đổi sang hủy.
+     * Hoàn kho nguyên tử và ghi nhận biến động khi đơn bị hủy ở bất kỳ trạng thái nào trước khi giao.
      */
-    private void restockIfConfirmed(Order order, OrderStatus from, List<OrderItem> orderItems) {
-        if (from != OrderStatus.CONFIRMED) {
-            return;
-        }
-
+    private void restockOrderItems(Order order, List<OrderItem> orderItems) {
         for (var item : orderItems) {
             if (item.getVariantId() == null) {
                 continue;
