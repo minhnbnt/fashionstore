@@ -51,3 +51,4 @@ tools/marketplace-browser/node_modules/
 # Local agent/spec tooling
 .agents/
 openspec/
+.worktrees/
