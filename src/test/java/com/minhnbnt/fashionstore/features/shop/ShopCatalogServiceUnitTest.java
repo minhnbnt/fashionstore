@@ -71,7 +71,7 @@ class ShopCatalogServiceUnitTest {
             prodId, shopId, null, "Áo Thun Test", "ao-thun-test", "mô tả", "ACTIVE",
             List.of(), List.of(), Instant.now(), 5.0, 10L
         );
-        when(catalogService.getDetail(prodId)).thenReturn(product);
+        when(catalogService.getDetails(List.of(prodId))).thenReturn(List.of(product));
 
         var response = shopCatalogService.getShopProducts(shopId, req);
 
@@ -113,8 +113,7 @@ class ShopCatalogServiceUnitTest {
 
         when(catalogQueries.findShopProductIds(eq(shopId), eq(req))).thenReturn(List.of(visibleId, unavailableId));
         when(catalogQueries.countShopProducts(eq(shopId), eq(req))).thenReturn(2L);
-        when(catalogService.getDetail(unavailableId)).thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
-        when(catalogService.getDetail(visibleId)).thenReturn(productResponse(visibleId, shopId));
+        when(catalogService.getDetails(any())).thenReturn(List.of(productResponse(visibleId, shopId)));
 
         var response = shopCatalogService.getShopProducts(shopId, req);
 
@@ -134,7 +133,7 @@ class ShopCatalogServiceUnitTest {
         when(shops.findById(shopId)).thenReturn(Optional.of(shop));
         when(catalogQueries.findShopProductIds(eq(shopId), eq(req))).thenReturn(List.of(prodId));
         when(catalogQueries.countShopProducts(eq(shopId), eq(req))).thenReturn(1L);
-        when(catalogService.getDetail(prodId)).thenReturn(productResponse(prodId, shopId));
+        when(catalogService.getDetails(any())).thenReturn(List.of(productResponse(prodId, shopId)));
 
         var response = shopCatalogService.getShopProducts(shopId, req);
 
