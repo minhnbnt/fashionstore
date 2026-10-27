@@ -343,11 +343,18 @@ public class OrderService {
 
         order.cancelBySystem("Hết thời hạn xác nhận đơn hàng (24 giờ)", null);
         restockOrderItems(order, orderItems);
-        histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CANCELLED, null, "Quá hạn 24 giờ"));
+        histories.save(OrderStatusHistory.record(
+            order.getId(),
+            from,
+            OrderStatus.CANCELLED,
+            null,
+            "Quá hạn 24 giờ"
+        ));
 
         var saved = orders.save(order);
         var cancelDetail = "Hệ thống tự động hủy đơn hàng #" + saved.getCode()
-            + " do quá hạn 24 giờ chưa xác nhận | Khôi phục tồn kho cho " + orderItems.size() + " mặt hàng";
+            + " do quá hạn 24 giờ chưa xác nhận | Khôi phục tồn kho cho "
+            + orderItems.size() + " mặt hàng";
         audit.record(saved.getShopId(), null, "ORDER_SYSTEM_CANCEL", "ORDER", saved.getId(), cancelDetail);
 
         notifications.create(
@@ -355,7 +362,8 @@ public class OrderService {
             NotificationCategory.ORDER,
             "ORDER_CANCELLED",
             "Đơn #" + saved.getCode() + " đã bị hủy tự động",
-            "Đơn #" + saved.getCode() + " đã tự động hủy do người bán không xác nhận trong vòng 24 giờ.",
+            "Đơn #" + saved.getCode()
+                + " đã tự động hủy do người bán không xác nhận trong vòng 24 giờ.",
             "/account",
             saved.getId()
         );
@@ -365,7 +373,8 @@ public class OrderService {
             NotificationCategory.SELLING,
             "ORDER_CANCELLED",
             "Đơn #" + saved.getCode() + " đã bị hủy tự động",
-            "Đơn #" + saved.getCode() + " đã quá hạn xác nhận 24 giờ và bị hệ thống tự động hủy.",
+            "Đơn #" + saved.getCode()
+                + " đã quá hạn xác nhận 24 giờ và bị hệ thống tự động hủy.",
             "/shop?shopId=" + saved.getShopId() + "&tab=orders&orderId=" + saved.getId(),
             saved.getId()
         );
@@ -432,7 +441,8 @@ public class OrderService {
     }
 
     /**
-     * Admin hủy can thiệp đơn chưa bàn giao vận chuyển, hoàn kho nếu shop đã xác nhận (đã trừ kho).
+     * Admin hủy can thiệp đơn chưa bàn giao vận chuyển,
+     * hoàn kho nếu shop đã xác nhận (đã trừ kho).
      */
     @Transactional
     public AdminOrderResponse cancelByAdmin(
@@ -518,13 +528,16 @@ public class OrderService {
         access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_PROCESS);
 
         if (order.getStatus() != OrderStatus.PENDING) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ có thể xác nhận đơn hàng đang ở trạng thái chờ xác nhận.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only pending orders can be confirmed");
         }
 
         var cutoff = clock.instant().minus(24, ChronoUnit.HOURS);
         if (order.getCreatedAt().isBefore(cutoff)) {
             systemCancelExpiredOrder(order.getId());
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Đơn hàng đã quá hạn 24 giờ xác nhận và đã bị hệ thống tự động hủy.");
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Order confirmation deadline (24h) has expired; order was cancelled by system"
+            );
         }
 
         var from = order.getStatus();
@@ -558,19 +571,27 @@ public class OrderService {
         for (var orderId : orderIds) {
             var orderOpt = orders.findById(orderId);
             if (orderOpt.isEmpty()) {
-                failures.add(new BulkConfirmFailureItem(orderId, "UNKNOWN", "Đơn hàng không tồn tại"));
+                failures.add(new BulkConfirmFailureItem(orderId, "UNKNOWN", "Order not found"));
                 continue;
             }
             var order = orderOpt.get();
             try {
                 access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_PROCESS);
             } catch (Exception ex) {
-                failures.add(new BulkConfirmFailureItem(orderId, order.getCode(), "Không có quyền xử lý đơn"));
+                failures.add(new BulkConfirmFailureItem(
+                    orderId,
+                    order.getCode(),
+                    "Insufficient permission to process order"
+                ));
                 continue;
             }
 
             if (order.getStatus() != OrderStatus.PENDING) {
-                failures.add(new BulkConfirmFailureItem(orderId, order.getCode(), "Đơn không ở trạng thái Chờ xác nhận"));
+                failures.add(new BulkConfirmFailureItem(
+                    orderId,
+                    order.getCode(),
+                    "Order is not in pending status"
+                ));
                 continue;
             }
 
@@ -580,7 +601,7 @@ public class OrderService {
             } catch (Exception ex) {
                 var reason = ex.getMessage();
                 if (reason == null || reason.isBlank()) {
-                    reason = "Xác nhận thất bại";
+                    reason = "Confirmation failed";
                 }
                 failures.add(new BulkConfirmFailureItem(orderId, order.getCode(), reason));
             }
@@ -716,7 +737,8 @@ public class OrderService {
     }
 
     /**
-     * Khóa dòng đơn: mọi chuyển trạng thái của shop/admin đi qua đây, người đến sau thấy trạng thái mới và nhận 409.
+     * Khóa dòng đơn: mọi chuyển trạng thái của shop/admin đi qua đây,
+     * người đến sau thấy trạng thái mới và nhận 409.
      */
     private Order requireOrder(UUID orderId) {
         var order = orders.findLockedById(orderId).orElse(null);
@@ -745,7 +767,8 @@ public class OrderService {
     }
 
     /**
-     * Hoàn kho nguyên tử và ghi nhận biến động khi đơn bị hủy ở bất kỳ trạng thái nào trước khi giao.
+     * Hoàn kho nguyên tử và ghi nhận biến động khi đơn bị hủy
+     * ở bất kỳ trạng thái nào trước khi giao.
      */
     private void restockOrderItems(Order order, List<OrderItem> orderItems) {
         for (var item : orderItems) {
