@@ -7,6 +7,9 @@ import com.minhnbnt.fashionstore.dto.admin.AdminOrderSummaryResponse;
 import com.minhnbnt.fashionstore.dto.admin.DailyOrderTotals;
 import com.minhnbnt.fashionstore.dto.admin.OrderRevenueTotals;
 import com.minhnbnt.fashionstore.dto.common.PageResponse;
+import com.minhnbnt.fashionstore.dto.admin.OrderTimelineResponse;
+import com.minhnbnt.fashionstore.dto.order.BulkConfirmFailureItem;
+import com.minhnbnt.fashionstore.dto.order.BulkConfirmOrderResponse;
 import com.minhnbnt.fashionstore.dto.order.CancelOrderRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderItemResponse;
@@ -533,6 +536,59 @@ public class OrderService {
         return toResponse(saved, orderItems);
     }
 
+    public BulkConfirmOrderResponse bulkConfirm(@NonNull UUID userId, @NonNull List<UUID> orderIds) {
+        var successList = new ArrayList<UUID>();
+        var failures = new ArrayList<BulkConfirmFailureItem>();
+
+        for (var orderId : orderIds) {
+            var orderOpt = orders.findById(orderId);
+            if (orderOpt.isEmpty()) {
+                failures.add(new BulkConfirmFailureItem(orderId, "UNKNOWN", "Đơn hàng không tồn tại"));
+                continue;
+            }
+            var order = orderOpt.get();
+            try {
+                access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_PROCESS);
+            } catch (Exception ex) {
+                failures.add(new BulkConfirmFailureItem(orderId, order.getCode(), "Không có quyền xử lý đơn"));
+                continue;
+            }
+
+            if (order.getStatus() != OrderStatus.PENDING) {
+                failures.add(new BulkConfirmFailureItem(orderId, order.getCode(), "Đơn không ở trạng thái Chờ xác nhận"));
+                continue;
+            }
+
+            try {
+                confirm(userId, orderId);
+                successList.add(orderId);
+            } catch (Exception ex) {
+                var reason = ex.getMessage();
+                if (reason == null || reason.isBlank()) {
+                    reason = "Xác nhận thất bại";
+                }
+                failures.add(new BulkConfirmFailureItem(orderId, order.getCode(), reason));
+            }
+        }
+
+        return new BulkConfirmOrderResponse(
+            orderIds.size(),
+            successList.size(),
+            failures.size(),
+            successList,
+            failures
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderTimelineResponse> getOrderTimeline(@NonNull UUID userId, @NonNull UUID orderId) {
+        var order = orders.findById(orderId).orElseThrow(() ->
+            new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found")
+        );
+        access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_READ);
+        return monitoring.timeline(orderId);
+    }
+
     @Transactional
     public OrderResponse ship(@NonNull UUID userId, @NonNull UUID orderId) {
         var order = requireOrder(orderId);
@@ -716,6 +772,11 @@ public class OrderService {
             .map(OrderService::toItemResponse)
             .toList();
 
+        String cancelledByName = null;
+        if (order.getCancelledBy() != null) {
+            cancelledByName = order.getCancelledBy().name();
+        }
+
         return new OrderResponse(
             order.getId(),
             order.getCode(),
@@ -723,12 +784,19 @@ public class OrderService {
             order.getBuyerId(),
             order.getStatus().name(),
             order.getPaymentStatus().name(),
+            order.getPaymentMethod(),
             order.getSubtotal(),
             order.getShippingFee(),
             order.getTotal(),
             order.getShippingName(),
             order.getShippingPhone(),
             order.getShippingAddress(),
+            order.getNote(),
+            order.getCancelReason(),
+            order.getCancelNote(),
+            cancelledByName,
+            order.getConfirmedAt(),
+            order.getCancelledAt(),
             itemResponses,
             order.getCreatedAt()
         );

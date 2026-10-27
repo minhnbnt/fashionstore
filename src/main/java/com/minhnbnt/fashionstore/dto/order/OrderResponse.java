@@ -1,6 +1,7 @@
 package com.minhnbnt.fashionstore.dto.order;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.List;
@@ -21,6 +22,8 @@ public record OrderResponse(
     @Schema(example = "UNPAID")
     String paymentStatus,
 
+    String paymentMethod,
+
     long subtotal,
 
     long shippingFee,
@@ -32,6 +35,24 @@ public record OrderResponse(
     String shippingPhone,
 
     String shippingAddress,
+
+    @Nullable
+    String note,
+
+    @Nullable
+    String cancelReason,
+
+    @Nullable
+    String cancelNote,
+
+    @Nullable
+    String cancelledBy,
+
+    @Nullable
+    Instant confirmedAt,
+
+    @Nullable
+    Instant cancelledAt,
 
     List<OrderItemResponse> items,
 
