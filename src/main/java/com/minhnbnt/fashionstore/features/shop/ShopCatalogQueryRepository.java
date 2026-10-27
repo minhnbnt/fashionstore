@@ -19,25 +19,43 @@ public class ShopCatalogQueryRepository {
     private final JdbcClient jdbc;
 
     public List<UUID> findShopProductIds(@NonNull UUID shopId, @NonNull ShopProductQueryRequest request) {
-        var sql = new StringBuilder("""
-            SELECT p.id,
-                   (SELECT COALESCE(SUM(oi.quantity), 0)
-                    FROM order_item oi
-                    JOIN orders o ON oi.order_id = o.id
-                    WHERE oi.product_id = p.id AND o.status != 'CANCELLED'
-                   ) AS total_sold,
-                   (SELECT COALESCE(MIN(pv.price), 0)
-                    FROM product_variant pv
-                    WHERE pv.product_id = p.id
-                   ) AS min_price,
-                   (SELECT COALESCE(MAX(
-                       CASE WHEN pv.compare_at_price IS NOT NULL AND pv.compare_at_price > pv.price
-                            THEN (pv.compare_at_price - pv.price)::float / pv.compare_at_price
-                            ELSE 0
-                       END), 0)
-                    FROM product_variant pv
-                    WHERE pv.product_id = p.id
-                   ) AS discount_rate
+        // Aggregate chỉ dùng làm sort key nên chỉ tính đúng cái mode sắp xếp cần:
+        // đường mặc định (NEWEST) không phải trả giá 3 correlated subquery trên
+        // toàn bộ sản phẩm của shop cho mỗi lần xem trang.
+        var totalSoldNeeded = request.collection() == ShopProductCollectionType.BEST_SELLER
+            || request.sort() == ShopProductSort.BEST_SELLER;
+        var discountRateNeeded = request.collection() == ShopProductCollectionType.SALE_OFF;
+        var minPriceNeeded = request.sort() == ShopProductSort.PRICE_ASC
+            || request.sort() == ShopProductSort.PRICE_DESC;
+
+        var sql = new StringBuilder("SELECT p.id");
+        if (totalSoldNeeded) {
+            sql.append('\n').append("""
+                     , (SELECT COALESCE(SUM(oi.quantity), 0)
+                        FROM order_item oi
+                        JOIN orders o ON oi.order_id = o.id
+                        WHERE oi.product_id = p.id AND o.status != 'CANCELLED'
+                       ) AS total_sold""");
+        }
+        if (minPriceNeeded) {
+            sql.append('\n').append("""
+                     , (SELECT COALESCE(MIN(pv.price), 0)
+                        FROM product_variant pv
+                        WHERE pv.product_id = p.id
+                       ) AS min_price""");
+        }
+        if (discountRateNeeded) {
+            sql.append('\n').append("""
+                     , (SELECT COALESCE(MAX(
+                            CASE WHEN pv.compare_at_price IS NOT NULL AND pv.compare_at_price > pv.price
+                                 THEN (pv.compare_at_price - pv.price)::float / pv.compare_at_price
+                                 ELSE 0
+                            END), 0)
+                        FROM product_variant pv
+                        WHERE pv.product_id = p.id
+                       ) AS discount_rate""");
+        }
+        sql.append('\n').append("""
             FROM product p
             WHERE p.shop_id = :shopId
               AND p.status = 'ACTIVE'
@@ -63,10 +81,9 @@ public class ShopCatalogQueryRepository {
         }
 
         // Sắp xếp
-        if (request.collection() == ShopProductCollectionType.BEST_SELLER
-            || request.sort() == ShopProductSort.BEST_SELLER) {
+        if (totalSoldNeeded) {
             sql.append(" ORDER BY total_sold DESC, p.created_at DESC");
-        } else if (request.collection() == ShopProductCollectionType.SALE_OFF) {
+        } else if (discountRateNeeded) {
             sql.append(" ORDER BY discount_rate DESC, p.created_at DESC");
         } else if (request.sort() == ShopProductSort.PRICE_ASC) {
             sql.append(" ORDER BY min_price ASC, p.created_at DESC");
