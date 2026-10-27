@@ -43,6 +43,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -372,9 +373,13 @@ public class OrderService {
 
     public void cancelExpiredPendingOrders(@NonNull Instant cutoff) {
         var expired = orders.findByStatusAndCreatedAtBefore(OrderStatus.PENDING, cutoff);
+        if (!expired.isEmpty()) {
+            log.info("Found {} expired pending orders to cancel (cutoff: {})", expired.size(), cutoff);
+        }
         for (var order : expired) {
             try {
                 systemCancelExpiredOrder(order.getId());
+                log.info("Successfully auto-cancelled expired order {} ({})", order.getCode(), order.getId());
             } catch (Exception ex) {
                 log.error("Failed to auto-cancel expired order {}: {}", order.getId(), ex.getMessage(), ex);
             }
@@ -507,10 +512,20 @@ public class OrderService {
             .toList();
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public OrderResponse confirm(@NonNull UUID userId, @NonNull UUID orderId) {
         var order = requireOrder(orderId);
         access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_PROCESS);
+
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ có thể xác nhận đơn hàng đang ở trạng thái chờ xác nhận.");
+        }
+
+        var cutoff = clock.instant().minus(24, ChronoUnit.HOURS);
+        if (order.getCreatedAt().isBefore(cutoff)) {
+            systemCancelExpiredOrder(order.getId());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Đơn hàng đã quá hạn 24 giờ xác nhận và đã bị hệ thống tự động hủy.");
+        }
 
         var from = order.getStatus();
 

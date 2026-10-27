@@ -46,6 +46,9 @@ class OrderServiceTest {
     @Autowired
     private com.minhnbnt.fashionstore.features.notification.NotificationRepository notifications;
 
+    @Autowired
+    private org.springframework.jdbc.core.simple.JdbcClient jdbc;
+
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
         users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U", null));
@@ -254,6 +257,31 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orders.confirm(strangerId, created.id()))
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.FORBIDDEN));
+    }
+
+    @Test
+    void confirmRejectsExpiredPendingOrderAndCancelsBySystem() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-expired-confirm");
+        var variantId = variantInShop(ownerId, shopId, "ao-expired", "SKU-EXPIRED", 10);
+        var created = orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+        );
+
+        jdbc.sql("UPDATE orders SET created_at = NOW() - INTERVAL '25 hours' WHERE id = ?")
+            .param(created.id())
+            .update();
+
+        assertThatThrownBy(() -> orders.confirm(ownerId, created.id()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+
+        var cancelled = orders.getDetail(buyerId, created.id());
+        assertThat(cancelled.status()).isEqualTo("CANCELLED");
+        assertThat(cancelled.cancelledBy()).isEqualTo("SYSTEM");
+        assertThat(cancelled.cancelReason()).contains("24 giờ");
     }
 
     @Test
