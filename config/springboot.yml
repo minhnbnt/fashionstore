@@ -1,15 +1,23 @@
 spring:
+  aot:
+    enabled: false
+
   docker:
     compose:
       enabled: false
 
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:6432/fashionstore?prepareThreshold=0}
+    connection-fetch: lazy
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/fashionstore}
     username: ${DATABASE_USERNAME:postgres}
     password: ${DATABASE_PASSWORD:postgres}
 
   flyway:
     out-of-order: true
+
+  main:
+    banner-mode: off
+    lazy-initialization: true
 
   security:
     oauth2:
