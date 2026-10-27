@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -142,6 +143,19 @@ class NotificationServiceTest {
         assertThat(page.size()).isEqualTo(100);
         assertThat(page.total()).isEqualTo(2);
         assertThat(page.items()).hasSize(2);
+    }
+
+    @Test
+    void pageTotalRespectsCategoryFilter() {
+        var owner = user();
+        notifications.create(Set.of(owner), NotificationCategory.ORDER, "ORDER_PLACED", "Đơn", "Body", null, null);
+        notifications.notifyInvitation(owner, UUID.randomUUID(), "Shop A", "Nhân viên", "Chủ shop", "token-a");
+
+        var page = notifications.page(owner, List.of("ORDER"), 0, 10);
+
+        assertThat(page.total()).isEqualTo(1);
+        assertThat(page.items()).hasSize(1);
+        assertThat(page.items().getFirst().category()).isEqualTo("ORDER");
     }
 
     @Test
