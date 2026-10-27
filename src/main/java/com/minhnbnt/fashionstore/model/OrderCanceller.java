@@ -6,5 +6,6 @@ package com.minhnbnt.fashionstore.model;
 public enum OrderCanceller {
     BUYER,
     SELLER,
-    ADMIN
+    ADMIN,
+    SYSTEM
 }

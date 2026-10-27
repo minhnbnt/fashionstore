@@ -58,10 +58,15 @@ Chi tiết luồng này xem `docs/catalog.md`.
 | [x] | 19 | GET | `/api/orders/{id}` | Buyer xem chi tiết (chỉ khi `PENDING` mới cancel được) |
 | [x] | 19b | PATCH | `/api/orders/{id}/cancel` | Buyer hủy đơn (chỉ khi `PENDING`) |
 | [x] | 20 | GET | `/api/seller/orders` | Seller xem đơn mọi shop mình tham gia |
-| [x] | 21 | PATCH | `/api/seller/orders/{id}/confirm` | Confirm + trừ kho nguyên tử (`UPDATE ... WHERE stock >= qty`) |
-| [x] | 22 | PATCH | `/api/seller/orders/{id}/ship` | Chuyển sang `SHIPPING` |
+| [x] | 21 | PATCH | `/api/seller/orders/{id}/confirm` | Confirm đơn hàng (`PENDING -> CONFIRMED`) |
+| [x] | 22 | PATCH | `/api/seller/orders/{id}/ship` | Chuyển sang `SHIPPING` (bàn giao cho ĐVVC) |
 | [x] | 23 | PATCH | `/api/seller/orders/{id}/deliver` | `DELIVERED` = thu COD (`payment_status='COLLECTED'`) |
-| [x] | 23b | PATCH | `/api/seller/orders/{id}/cancel` | Seller hủy đơn kèm lý do, tự động hoàn trả tồn kho nguyên tử |
+| [x] | 23b | PATCH | `/api/seller/orders/{id}/cancel` | Seller hủy đơn kèm lý do + ghi chú, tự động hoàn trả tồn kho nguyên tử |
+| [x] | 23c | POST | `/api/seller/orders/bulk-confirm` | Seller xác nhận hàng loạt đơn hàng PENDING → CONFIRMED, báo cáo chi tiết từng đơn (partial success) |
+| [x] | 23d | GET | `/api/seller/orders/{id}/timeline` | Seller xem dòng thời gian (timeline) chuyển trạng thái của đơn hàng |
+
+*Chu trình tồn kho chuẩn hóa sàn TMĐT*: Trừ kho nguyên tử ngay lúc checkout (triệt tiêu race conditions overselling), lúc confirm chỉ chuyển trạng thái, hoàn trả tồn kho nguyên tử kèm nhật ký biến động kho khi đơn bị hủy ở mọi trạng thái trước giao (BUYER hủy, SELLER hủy, ADMIN hủy, hoặc SYSTEM tự động hủy sau 24 giờ).
+
 
 ## Flow 5 — Quản trị tài khoản
 

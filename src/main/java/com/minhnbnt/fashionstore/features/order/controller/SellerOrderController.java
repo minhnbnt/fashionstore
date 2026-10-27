@@ -1,5 +1,8 @@
 package com.minhnbnt.fashionstore.features.order.controller;
 
+import com.minhnbnt.fashionstore.dto.admin.OrderTimelineResponse;
+import com.minhnbnt.fashionstore.dto.order.BulkConfirmOrderRequest;
+import com.minhnbnt.fashionstore.dto.order.BulkConfirmOrderResponse;
 import com.minhnbnt.fashionstore.dto.order.CancelOrderRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
 import com.minhnbnt.fashionstore.features.order.OrderService;
@@ -15,6 +18,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -136,5 +140,45 @@ public class SellerOrderController {
         var userId = UUID.fromString(subject);
 
         return orders.sellerCancel(userId, id, request);
+    }
+
+    @PostMapping("/bulk-confirm")
+    @Operation(
+        summary = "Xác nhận hàng loạt",
+        description = "Chấp nhận danh sách id đơn hàng ở trạng thái PENDING -> CONFIRMED. "
+            + "Báo cáo kết quả chi tiết từng đơn (partial success)."
+    )
+    @ApiResponse(responseCode = "200", description = "Kết quả xác nhận hàng loạt")
+    @ApiResponse(responseCode = "400", description = "Body không hợp lệ")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @SecurityRequirement(name = "bearerAuth")
+    public BulkConfirmOrderResponse bulkConfirm(
+        @AuthenticationPrincipal Jwt jwt,
+        @Valid @RequestBody BulkConfirmOrderRequest request
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return orders.bulkConfirm(userId, request.orderIds());
+    }
+
+    @GetMapping("/{id}/timeline")
+    @Operation(
+        summary = "Lịch sử trạng thái đơn hàng",
+        description = "Lấy dòng thời gian chuyển trạng thái (timeline) của đơn hàng."
+    )
+    @ApiResponse(responseCode = "200", description = "Dòng thời gian đơn hàng")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Thiếu quyền ORDER_READ ở shop của đơn")
+    @ApiResponse(responseCode = "404", description = "Đơn không tồn tại")
+    @SecurityRequirement(name = "bearerAuth")
+    public List<OrderTimelineResponse> timeline(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id đơn") @PathVariable UUID id
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return orders.getOrderTimeline(userId, id);
     }
 }

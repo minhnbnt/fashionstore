@@ -1,11 +1,13 @@
 package com.minhnbnt.fashionstore.features.order.repository;
 
 import com.minhnbnt.fashionstore.model.Order;
+import com.minhnbnt.fashionstore.model.OrderStatus;
 import org.springframework.data.jdbc.repository.query.Query;
 import org.springframework.data.relational.core.sql.LockMode;
 import org.springframework.data.relational.repository.Lock;
 import org.springframework.data.repository.CrudRepository;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -16,6 +18,8 @@ public interface OrderRepository extends CrudRepository<Order, UUID> {
     List<Order> findByBuyerIdOrderByCreatedAtDesc(UUID buyerId);
 
     List<Order> findByShopIdOrderByCreatedAtDesc(UUID shopId);
+
+    List<Order> findByStatusAndCreatedAtBefore(OrderStatus status, Instant cutoff);
 
     /**
      * SELECT ... FOR UPDATE: shop chuyển trạng thái và admin hủy can thiệp đi qua đây để không ghi đè nhau.
