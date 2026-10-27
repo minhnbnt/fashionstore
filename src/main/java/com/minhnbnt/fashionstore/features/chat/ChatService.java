@@ -7,8 +7,6 @@ import com.minhnbnt.fashionstore.dto.chat.ConversationEvent;
 import com.minhnbnt.fashionstore.dto.chat.SendMessageRequest;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatConversationRepository;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatMessageRepository;
-import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
-import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.infrastructure.realtime.ChatRealtimePublisher;
@@ -46,8 +44,6 @@ public class ChatService {
     private final ShopAuditService audit;
 
     private final ChatRealtimePublisher realtime;
-
-    private final NotificationService notifications;
 
     @Transactional
     public ChatConversationResponse startConversation(@NonNull UUID buyerId, @NonNull UUID shopId) {
@@ -150,18 +146,6 @@ public class ChatService {
                 chatDetail = chatDetail + ": \"" + preview + "\"";
             }
             audit.record(conv.getShopId(), userId, "CHAT_REPLY", "CONVERSATION", conv.getId(), chatDetail);
-
-            var shopName = shops.getShopName(conv.getShopId());
-            // Client opens chat widget via CustomEvent, so link is null
-            notifications.create(
-                Set.of(conv.getBuyerId()),
-                NotificationCategory.ACTIVITY,
-                "CHAT_MESSAGE",
-                "Tin nhắn mới từ " + shopName,
-                request.content(),
-                null,
-                msg.getId()
-            );
         }
 
         realtime.publishChatMessage(recipients, toMessageResponse(msg));
@@ -255,18 +239,6 @@ public class ChatService {
         realtime.publishConversationEvent(
             recipients,
             new ConversationEvent(conv.getId(), ConversationEvent.Type.NEW_MESSAGE)
-        );
-
-        var shopName = shops.getShopName(conv.getShopId());
-        // Client opens chat widget via CustomEvent, so link is null
-        notifications.create(
-            Set.of(conv.getBuyerId()),
-            NotificationCategory.ACTIVITY,
-            "CHAT_MESSAGE",
-            "Tin nhắn mới từ " + shopName,
-            autoReplyText,
-            null,
-            autoMsg.getId()
         );
     }
 
