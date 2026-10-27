@@ -149,11 +149,11 @@ Expected: FAIL.
 Run: `.\gradlew.bat test --tests "com.minhnbnt.fashionstore.features.shop.ShopCatalogControllerTest"`  
 Expected: PASS.
 
-- [ ] **Step 5: Xuất bản OpenAPI spec mới sang Frontend Worktree**
+- [x] **Step 5: Xuất bản OpenAPI spec mới sang Frontend Worktree**
 
 Tải hoặc xuất file `docs/openapi.json` mới có chứa `getShopProducts` và `getShopCategories`, sau đó tại frontend worktree chạy `pnpm codegen`.
 
-- [ ] **Step 6: Commit code Task 2**
+- [x] **Step 6: Commit code Task 2**
 
 ```bash
 git add src/main/java/com/minhnbnt/fashionstore/features/shop/ShopCatalogService.java src/main/java/com/minhnbnt/fashionstore/features/shop/controller/ShopCatalogController.java src/test/java/com/minhnbnt/fashionstore/features/shop/ShopCatalogControllerTest.java docs/openapi.json
@@ -175,17 +175,17 @@ git commit -m "feat(shop): add ShopCatalogController for public shop products an
 - Consumes: HTML5 Drag & Drop events (`onDragStart`, `onDragOver`, `onDragLeave`, `onDrop`, `onDragEnd`), `useSaveDraft`, `usePublish`.
 - Produces: Studio giao diện người bán hỗ trợ kéo thả trực quan các section, hiển thị đường kẻ highlight điểm thả, loại bỏ hoàn toàn block `VOUCHER_CAROUSEL`.
 
-- [ ] **Step 1: Viết failing test cho kéo-thả và loại bỏ voucher trong `SellerDecorationTab.test.tsx`**
+- [x] **Step 1: Viết failing test cho kéo-thả và loại bỏ voucher trong `SellerDecorationTab.test.tsx`**
 
 1. Kiểm tra không còn tùy chọn `VOUCHER_CAROUSEL` trong modal thêm module.
 2. Kiểm tra các thẻ module có thuộc tính `draggable="true"` và các hàm xử lý sự kiện kéo thả.
 
-- [ ] **Step 2: Chạy test để xác nhận fail**
+- [x] **Step 2: Chạy test để xác nhận fail**
 
 Run: `pnpm test -- SellerDecorationTab`  
 Expected: FAIL.
 
-- [ ] **Step 3: Triển khai kéo thả HTML5 và làm sạch module voucher trong `SellerDecorationTab.tsx`**
+- [x] **Step 3: Triển khai kéo thả HTML5 và làm sạch module voucher trong `SellerDecorationTab.tsx`**
 
 1. Khai báo state: `draggedIdx: number | null`, `dragOverIdx: number | null`.
 2. Viết các handler kéo thả HTML5 (`handleDragStart`, `handleDragOver`, `handleDrop`, `handleDragEnd`).
@@ -193,12 +193,12 @@ Expected: FAIL.
 4. Duy trì các nút bấm `handleMoveUp` và `handleMoveDown` dự phòng.
 5. Xóa bỏ hoàn toàn option `VOUCHER_CAROUSEL` khỏi modal `handleAddBlock` và danh sách selector.
 
-- [ ] **Step 4: Chạy test và lint để xác nhận pass**
+- [x] **Step 4: Chạy test và lint để xác nhận pass**
 
 Run: `pnpm lint && pnpm test -- SellerDecorationTab`  
 Expected: PASS (0 lint error/warning).
 
-- [ ] **Step 5: Commit code Task 3**
+- [x] **Step 5: Commit code Task 3**
 
 ```bash
 git add src/components/seller-dashboard-tab/SellerDecorationTab.tsx src/components/seller-dashboard-tab/SellerDecorationTab.test.tsx src/lib/sellerAdapters.ts
@@ -220,18 +220,18 @@ git commit -m "feat(seller): implement native HTML5 drag and drop in decoration 
 - Consumes: `useBySlug` từ `@generated/endpoints/shops/shops`, prop `shopId: string`.
 - Produces: Component `PdpShopCard` hiển thị avatar, tên shop, đánh giá, DTS 1-3 ngày, nút "Xem Shop" dẫn đến `/shops/:slug`, nút "Chat ngay".
 
-- [ ] **Step 1: Viết test cho `PdpShopCard.test.tsx`**
+- [x] **Step 1: Viết test cho `PdpShopCard.test.tsx`**
 
 1. Render avatar, tên shop, số lượng đánh giá, thời gian chuẩn bị hàng (DTS).
 2. Kiểm tra link "Xem Shop" có `href="/shops/shop-slug"`.
 3. Kiểm tra tuân thủ JSX: không dùng ternary operator `? :`.
 
-- [ ] **Step 2: Chạy test để xác nhận fail**
+- [x] **Step 2: Chạy test để xác nhận fail**
 
 Run: `pnpm test -- PdpShopCard`  
 Expected: FAIL.
 
-- [ ] **Step 3: Triển khai component `PdpShopCard.tsx` và gắn vào `ProductDetail.tsx`**
+- [x] **Step 3: Triển khai component `PdpShopCard.tsx` và gắn vào `ProductDetail.tsx`**
 
 1. Tạo `PdpShopCard.tsx`:
    - Nhận prop `{ shopId: string }`.
@@ -240,12 +240,12 @@ Expected: FAIL.
 2. Tích hợp `PdpShopCard` vào `ProductDetail.tsx` (ngay dưới khu vực `ProductGallery` + `ProductInfo` và trên `ProductTabs`).
 3. Đảm bảo 100% điều kiện hiển thị dùng `&&` hoặc xử lý biến bên ngoài JSX.
 
-- [ ] **Step 4: Chạy test và lint để xác nhận pass**
+- [x] **Step 4: Chạy test và lint để xác nhận pass**
 
 Run: `pnpm lint && pnpm test -- PdpShopCard`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit code Task 4**
+- [x] **Step 5: Commit code Task 4**
 
 ```bash
 git add src/components/pdp/PdpShopCard.tsx src/components/pdp/PdpShopCard.test.tsx src/pages/ProductDetail.tsx
@@ -272,18 +272,18 @@ git commit -m "feat(pdp): add PdpShopCard with storefront navigation and seller 
   - Loại bỏ hoàn toàn khối `VOUCHER_CAROUSEL`.
   - Thanh tìm kiếm nội bộ: Nhập từ khóa tại Header hoặc Tab sản phẩm, tự động chuyển tab và lọc theo `q`.
 
-- [ ] **Step 1: Viết test cho tìm kiếm nội bộ và tự động ẩn bộ sưu tập rỗng trong `ShopStorefront.test.tsx`**
+- [x] **Step 1: Viết test cho tìm kiếm nội bộ và tự động ẩn bộ sưu tập rỗng trong `ShopStorefront.test.tsx`**
 
 1. Test thanh tìm kiếm nội bộ: Nhập từ khóa, nhấn Enter -> chuyển activeTab sang `PRODUCTS` và truyền `searchQuery`.
 2. Test bộ sưu tập: Khi API trả về mảng rỗng -> không hiển thị tiêu đề bộ sưu tập (khối bị ẩn).
 3. Test khối voucher đã bị gỡ bỏ hoàn toàn.
 
-- [ ] **Step 2: Chạy test để xác nhận fail**
+- [x] **Step 2: Chạy test để xác nhận fail**
 
 Run: `pnpm test -- ShopStorefront`  
 Expected: FAIL.
 
-- [ ] **Step 3: Cập nhật `ShopDecorationRenderer.tsx`, `ShopStorefrontHeader.tsx`, `ShopStorefront.tsx`**
+- [x] **Step 3: Cập nhật `ShopDecorationRenderer.tsx`, `ShopStorefrontHeader.tsx`, `ShopStorefront.tsx`**
 
 1. Trong `ShopDecorationRenderer.tsx`:
    - Thay thế mock data trong `ProductCollectionBlock` bằng hook gọi API `useGetShopProducts({ shopId, collection: block.collectionType, limit: block.itemLimit ?? 8 })`.
@@ -297,12 +297,12 @@ Expected: FAIL.
    - Quản lý state `searchKeyword: string` và `selectedCategoryId: string | null`.
    - Khi tìm kiếm hoặc chọn danh mục, tự động `setActiveTab('PRODUCTS')`.
 
-- [ ] **Step 4: Chạy test và lint để xác nhận pass**
+- [x] **Step 4: Chạy test và lint để xác nhận pass**
 
 Run: `pnpm lint && pnpm test -- ShopStorefront`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit code Task 5**
+- [x] **Step 5: Commit code Task 5**
 
 ```bash
 git add src/components/shop-storefront/ShopDecorationRenderer.tsx src/components/shop-storefront/ShopStorefrontHeader.tsx src/pages/ShopStorefront.tsx src/pages/ShopStorefront.test.tsx
@@ -323,18 +323,18 @@ git commit -m "feat(storefront): integrate real shop catalog API, internal searc
 - Consumes: `useGetShopProducts`, `useGetShopCategories`, props `shopId`, `initialSearchQuery`, `initialCategoryId`.
 - Produces: Giao diện tab sản phẩm hoàn chỉnh: Ô tìm kiếm từ khóa, danh mục lọc nhanh, sắp xếp giá/mới nhất, phân trang và empty state khi không tìm thấy hàng.
 
-- [ ] **Step 1: Viết test cho `ShopProductsTab` với dữ liệu API thật và bộ lọc**
+- [x] **Step 1: Viết test cho `ShopProductsTab` với dữ liệu API thật và bộ lọc**
 
 1. Hiển thị danh sách sản phẩm lấy từ API.
 2. Khi có từ khóa tìm kiếm: Hiển thị badge *"Kết quả tìm kiếm cho: '[từ khóa]' "* kèm nút *"Xóa bộ lọc"*.
 3. Khi danh sách rỗng: Hiển thị thông báo *"Không tìm thấy sản phẩm nào trong shop phù hợp với tiêu chí lọc"*.
 
-- [ ] **Step 2: Chạy test để xác nhận fail**
+- [x] **Step 2: Chạy test để xác nhận fail**
 
 Run: `pnpm test -- ShopProductsTab`  
 Expected: FAIL.
 
-- [ ] **Step 3: Triển khai cập nhật trong `ShopProductsTab.tsx`**
+- [x] **Step 3: Triển khai cập nhật trong `ShopProductsTab.tsx`**
 
 1. Xóa bỏ hoàn toàn mảng `products` hardcoded mock.
 2. Gọi hook `useGetShopProducts` với các tham số `{ shopId, q: searchQuery, categoryId, sort, page, limit: 12 }`.
@@ -345,12 +345,12 @@ Expected: FAIL.
 7. Xử lý empty state khi không có sản phẩm.
 8. Tuân thủ 100% quy tắc JSX: Không dùng toán tử ba ngôi `? :`.
 
-- [ ] **Step 4: Chạy test và lint để xác nhận pass**
+- [x] **Step 4: Chạy test và lint để xác nhận pass**
 
 Run: `pnpm lint && pnpm test -- ShopProductsTab`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit code Task 6**
+- [x] **Step 5: Commit code Task 6**
 
 ```bash
 git add src/components/shop-storefront/ShopProductsTab.tsx src/components/shop-storefront/__tests__/ShopProductsTab.test.tsx
@@ -364,17 +364,17 @@ git commit -m "feat(storefront): integrate real product catalog, pagination, and
 **Files:**
 - Toàn bộ các file đã tạo và chỉnh sửa ở Backend và Frontend Worktrees.
 
-- [ ] **Step 1: Chạy toàn bộ kiểm thử tự động Backend trong worktree**
+- [x] **Step 1: Chạy toàn bộ kiểm thử tự động Backend trong worktree**
 
-Run: `.\gradlew.bat test -x processTestAot`  
+Run: `.\gradlew.bat test`  
 Expected: 100% test pass xanh, 0 lỗi, không vi phạm ternary và NullAway.
 
-- [ ] **Step 2: Chạy kiểm thử tự động và Build Frontend trong worktree**
+- [x] **Step 2: Chạy kiểm thử tự động và Build Frontend trong worktree**
 
 Run: `pnpm format:check && pnpm lint && pnpm test && pnpm build`  
 Expected: 0 lint errors, 0 lint warnings, toàn bộ unit test frontend pass, build bundle thành công.
 
-- [ ] **Step 3: Kiểm thử trực quan trên Trình duyệt bằng Browser Subagent**
+- [x] **Step 3: Kiểm thử trực quan trên Trình duyệt bằng Browser Subagent**
 
 1. Mở Kênh Người Bán -> Tab Trang Trí Gian Hàng:
    - Thử kéo thả di chuyển vị trí các block Banner Slider và Bộ sưu tập nổi bật.
