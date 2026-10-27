@@ -141,6 +141,18 @@ class NotificationControllerTest {
     }
 
     @Test
+    void markReadReturns204() throws Exception {
+        var userId = UUID.randomUUID();
+        var notificationId = UUID.randomUUID();
+
+        mockMvc.perform(patch("/api/notifications/{id}/read", notificationId)
+                .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+            .andExpect(status().isNoContent());
+
+        verify(notificationService).markRead(userId, notificationId);
+    }
+
+    @Test
     void markAllReturns204() throws Exception {
         var userId = UUID.randomUUID();
 
