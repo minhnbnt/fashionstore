@@ -7,6 +7,9 @@ import com.minhnbnt.fashionstore.dto.admin.AdminOrderSummaryResponse;
 import com.minhnbnt.fashionstore.dto.admin.DailyOrderTotals;
 import com.minhnbnt.fashionstore.dto.admin.OrderRevenueTotals;
 import com.minhnbnt.fashionstore.dto.common.PageResponse;
+import com.minhnbnt.fashionstore.dto.admin.OrderTimelineResponse;
+import com.minhnbnt.fashionstore.dto.order.BulkConfirmFailureItem;
+import com.minhnbnt.fashionstore.dto.order.BulkConfirmOrderResponse;
 import com.minhnbnt.fashionstore.dto.order.CancelOrderRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderItemResponse;
@@ -29,7 +32,9 @@ import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
@@ -39,6 +44,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -48,6 +54,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderService {
@@ -79,6 +86,11 @@ public class OrderService {
     private final OrderSlaPolicy sla;
 
     private final NotificationService notifications;
+
+    // Single source of truth for the pending-order confirmation timeout. Both the
+    // seller-facing confirm() deadline check and the background auto-cancel job read this.
+    @Value("${fashionstore.order.pending-timeout-hours:24}")
+    private long pendingTimeoutHours;
 
     @Transactional
     public OrderResponse checkout(@NonNull UUID buyerId, @NonNull CheckoutRequest request) {
@@ -134,6 +146,16 @@ public class OrderService {
             ));
         }
 
+        for (var snapshot : snapshots) {
+            if (snapshot.variantId() != null) {
+                if (!productStock.decrementVariantStock(snapshot.variantId(), snapshot.quantity())) {
+                    throw new ResponseStatusException(
+                        HttpStatus.CONFLICT, "Insufficient stock for product " + snapshot.productName()
+                    );
+                }
+            }
+        }
+
         var order = Order.create(
             generateCode(),
             request.shopId(),
@@ -145,6 +167,18 @@ public class OrderService {
             request.shippingAddress()
         );
         orders.save(order);
+
+        for (var snapshot : snapshots) {
+            if (snapshot.variantId() != null) {
+                productStock.recordStockMovement(
+                    snapshot.variantId(),
+                    request.shopId(),
+                    snapshot.quantity(),
+                    "ORDER_CREATED",
+                    order.getId()
+                );
+            }
+        }
 
         var createdItems = snapshots.stream()
             .map(snapshot -> OrderItem.snapshot(
@@ -237,6 +271,7 @@ public class OrderService {
         );
 
         var orderItems = items.findByOrderId(order.getId());
+        restockOrderItems(order, orderItems);
         return toResponse(orders.save(order), orderItems);
     }
 
@@ -278,7 +313,7 @@ public class OrderService {
         var orderItems = items.findByOrderId(order.getId());
 
         order.cancelBySeller(request.reason(), request.note());
-        restockIfConfirmed(order, from, orderItems);
+        restockOrderItems(order, orderItems);
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CANCELLED, userId));
 
         var saved = orders.save(order);
@@ -300,6 +335,66 @@ public class OrderService {
         );
 
         return toResponse(saved, orderItems);
+    }
+
+    @Transactional
+    public void systemCancelExpiredOrder(@NonNull UUID orderId) {
+        var order = requireOrder(orderId);
+        if (order.getStatus() != OrderStatus.PENDING) {
+            return;
+        }
+
+        var from = order.getStatus();
+        var orderItems = items.findByOrderId(order.getId());
+
+        order.cancelBySystem("Hết thời hạn xác nhận đơn hàng (" + pendingTimeoutHours + " giờ)", null);
+        restockOrderItems(order, orderItems);
+        histories.save(OrderStatusHistory.record(
+            order.getId(),
+            from,
+            OrderStatus.CANCELLED,
+            null,
+            "Quá hạn " + pendingTimeoutHours + " giờ"
+        ));
+
+        var saved = orders.save(order);
+        var cancelDetail = "Hệ thống tự động hủy đơn hàng #" + saved.getCode()
+            + " do quá hạn " + pendingTimeoutHours + " giờ chưa xác nhận | Khôi phục tồn kho cho "
+            + orderItems.size() + " mặt hàng";
+        audit.record(saved.getShopId(), null, "ORDER_SYSTEM_CANCEL", "ORDER", saved.getId(), cancelDetail);
+
+        notifications.create(
+            Set.of(saved.getBuyerId()),
+            NotificationCategory.ORDER,
+            "ORDER_CANCELLED",
+            "Đơn #" + saved.getCode() + " đã bị hủy tự động",
+            "Đơn #" + saved.getCode()
+                + " đã tự động hủy do người bán không xác nhận trong vòng " + pendingTimeoutHours + " giờ.",
+            "/account",
+            saved.getId()
+        );
+
+        notifications.create(
+            shops.findActiveUserIdsByShop(saved.getShopId()),
+            NotificationCategory.SELLING,
+            "ORDER_CANCELLED",
+            "Đơn #" + saved.getCode() + " đã bị hủy tự động",
+            "Đơn #" + saved.getCode()
+                + " đã quá hạn xác nhận " + pendingTimeoutHours + " giờ và bị hệ thống tự động hủy.",
+            "/shop?shopId=" + saved.getShopId() + "&tab=orders&orderId=" + saved.getId(),
+            saved.getId()
+        );
+    }
+
+    /**
+     * Đơn PENDING đã quá thời hạn xác nhận theo cấu hình {@code pending-timeout-hours}.
+     * Job hẹn giờ gọi phương thức này rồi tự gọi {@link #systemCancelExpiredOrder} qua proxy
+     * để mỗi đơn được hủy trong một transaction riêng, lỗi của một đơn không ảnh hưởng đơn khác.
+     */
+    @Transactional(readOnly = true)
+    public List<Order> findExpiredPendingOrders() {
+        var cutoff = clock.instant().minus(pendingTimeoutHours, ChronoUnit.HOURS);
+        return orders.findByStatusAndCreatedAtBefore(OrderStatus.PENDING, cutoff);
     }
 
     @Transactional(readOnly = true)
@@ -348,7 +443,8 @@ public class OrderService {
     }
 
     /**
-     * Admin hủy can thiệp đơn chưa bàn giao vận chuyển, hoàn kho nếu shop đã xác nhận (đã trừ kho).
+     * Admin hủy can thiệp đơn chưa bàn giao vận chuyển,
+     * hoàn kho nếu shop đã xác nhận (đã trừ kho).
      */
     @Transactional
     public AdminOrderResponse cancelByAdmin(
@@ -362,7 +458,7 @@ public class OrderService {
         var orderItems = items.findByOrderId(order.getId());
 
         order.cancelByAdmin(reason, note);
-        restockIfConfirmed(order, from, orderItems);
+        restockOrderItems(order, orderItems);
         orders.save(order);
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CANCELLED, adminId, note));
 
@@ -428,23 +524,27 @@ public class OrderService {
             .toList();
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public OrderResponse confirm(@NonNull UUID userId, @NonNull UUID orderId) {
         var order = requireOrder(orderId);
         access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_PROCESS);
 
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only pending orders can be confirmed");
+        }
+
+        var cutoff = clock.instant().minus(pendingTimeoutHours, ChronoUnit.HOURS);
+        if (order.getCreatedAt().isBefore(cutoff)) {
+            systemCancelExpiredOrder(order.getId());
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Order confirmation deadline (" + pendingTimeoutHours + "h) has expired; order was cancelled by system"
+            );
+        }
+
         var from = order.getStatus();
 
         var orderItems = items.findByOrderId(order.getId());
-        for (var item : orderItems) {
-            if (item.getVariantId() == null) {
-                continue;
-            }
-            if (!productStock.decrementVariantStock(item.getVariantId(), item.getQuantity())) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Insufficient stock");
-            }
-        }
-
         order.confirm();
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CONFIRMED, userId));
 
@@ -464,6 +564,67 @@ public class OrderService {
         );
 
         return toResponse(saved, orderItems);
+    }
+
+    public BulkConfirmOrderResponse bulkConfirm(@NonNull UUID userId, @NonNull List<UUID> orderIds) {
+        var successList = new ArrayList<UUID>();
+        var failures = new ArrayList<BulkConfirmFailureItem>();
+
+        for (var orderId : orderIds) {
+            var orderOpt = orders.findById(orderId);
+            if (orderOpt.isEmpty()) {
+                failures.add(new BulkConfirmFailureItem(orderId, "UNKNOWN", "Order not found"));
+                continue;
+            }
+            var order = orderOpt.get();
+            try {
+                access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_PROCESS);
+            } catch (Exception ex) {
+                failures.add(new BulkConfirmFailureItem(
+                    orderId,
+                    order.getCode(),
+                    "Insufficient permission to process order"
+                ));
+                continue;
+            }
+
+            if (order.getStatus() != OrderStatus.PENDING) {
+                failures.add(new BulkConfirmFailureItem(
+                    orderId,
+                    order.getCode(),
+                    "Order is not in pending status"
+                ));
+                continue;
+            }
+
+            try {
+                confirm(userId, orderId);
+                successList.add(orderId);
+            } catch (Exception ex) {
+                var reason = ex.getMessage();
+                if (reason == null || reason.isBlank()) {
+                    reason = "Confirmation failed";
+                }
+                failures.add(new BulkConfirmFailureItem(orderId, order.getCode(), reason));
+            }
+        }
+
+        return new BulkConfirmOrderResponse(
+            orderIds.size(),
+            successList.size(),
+            failures.size(),
+            successList,
+            failures
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderTimelineResponse> getOrderTimeline(@NonNull UUID userId, @NonNull UUID orderId) {
+        var order = orders.findById(orderId).orElseThrow(() ->
+            new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found")
+        );
+        access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_READ);
+        return monitoring.timeline(orderId);
     }
 
     @Transactional
@@ -578,7 +739,8 @@ public class OrderService {
     }
 
     /**
-     * Khóa dòng đơn: mọi chuyển trạng thái của shop/admin đi qua đây, người đến sau thấy trạng thái mới và nhận 409.
+     * Khóa dòng đơn: mọi chuyển trạng thái của shop/admin đi qua đây,
+     * người đến sau thấy trạng thái mới và nhận 409.
      */
     private Order requireOrder(UUID orderId) {
         var order = orders.findLockedById(orderId).orElse(null);
@@ -607,13 +769,10 @@ public class OrderService {
     }
 
     /**
-     * Đơn CONFIRMED đã trừ kho lúc xác nhận, hủy thì trả lại kho + ghi biến động. Gọi sau khi đơn đã đổi sang hủy.
+     * Hoàn kho nguyên tử và ghi nhận biến động khi đơn bị hủy
+     * ở bất kỳ trạng thái nào trước khi giao.
      */
-    private void restockIfConfirmed(Order order, OrderStatus from, List<OrderItem> orderItems) {
-        if (from != OrderStatus.CONFIRMED) {
-            return;
-        }
-
+    private void restockOrderItems(Order order, List<OrderItem> orderItems) {
         for (var item : orderItems) {
             if (item.getVariantId() == null) {
                 continue;
@@ -653,6 +812,11 @@ public class OrderService {
             .map(OrderService::toItemResponse)
             .toList();
 
+        String cancelledByName = null;
+        if (order.getCancelledBy() != null) {
+            cancelledByName = order.getCancelledBy().name();
+        }
+
         return new OrderResponse(
             order.getId(),
             order.getCode(),
@@ -660,12 +824,19 @@ public class OrderService {
             order.getBuyerId(),
             order.getStatus().name(),
             order.getPaymentStatus().name(),
+            order.getPaymentMethod(),
             order.getSubtotal(),
             order.getShippingFee(),
             order.getTotal(),
             order.getShippingName(),
             order.getShippingPhone(),
             order.getShippingAddress(),
+            order.getNote(),
+            order.getCancelReason(),
+            order.getCancelNote(),
+            cancelledByName,
+            order.getConfirmedAt(),
+            order.getCancelledAt(),
             itemResponses,
             order.getCreatedAt()
         );
