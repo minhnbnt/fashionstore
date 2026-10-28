@@ -71,6 +71,14 @@ class ShopCatalogControllerTest {
     }
 
     @Test
+    void rejectsUnknownSortValueWith400() throws Exception {
+        var shopId = UUID.randomUUID();
+
+        mockMvc.perform(get("/api/shops/{shopId}/products", shopId).param("sort", "banana"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void getShopCategoriesReturnsCategoryList() throws Exception {
         var shopId = UUID.randomUUID();
         var catId = UUID.randomUUID();

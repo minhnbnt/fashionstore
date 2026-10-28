@@ -102,6 +102,26 @@ class NotificationRepositoryIntegrationTest {
     }
 
     @Test
+    void markReadSetsReadAtExactlyOnce() {
+        var userId = user();
+        var row = notifications.insert(
+            userId, NotificationCategory.ORDER, "ORDER_PLACED", "Đơn hàng", "Body", null, null
+        );
+        assertThat(notifications.findPage(userId, null, 0, 10).getFirst().readAt()).isNull();
+
+        notifications.markRead(userId, row.id());
+        var firstReadAt = notifications.findPage(userId, null, 0, 10).getFirst().readAt();
+
+        assertThat(firstReadAt).isNotNull();
+        assertThat(notifications.countUnread(userId, null)).isZero();
+
+        notifications.markRead(userId, row.id());
+        var secondReadAt = notifications.findPage(userId, null, 0, 10).getFirst().readAt();
+
+        assertThat(secondReadAt).isEqualTo(firstReadAt);
+    }
+
+    @Test
     void deleteRemovesOwnNotificationOnly() {
         var owner = user();
         var stranger = user();

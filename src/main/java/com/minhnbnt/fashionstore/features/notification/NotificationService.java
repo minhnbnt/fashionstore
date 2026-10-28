@@ -87,7 +87,7 @@ public class NotificationService {
     ) {
         var targetPage = Math.max(0, page);
         var targetSize = Math.clamp(size, 1, 100);
-        var total = notifications.countByUser(userId);
+        var total = notifications.countByUser(userId, categories);
         var rows = notifications.findPage(userId, categories, targetPage, targetSize);
         var items = rows.stream()
             .map(this::toResponse)

@@ -17,7 +17,7 @@ public record ShopProductQueryRequest(
     @Nullable UUID categoryId,
 
     @Schema(description = "Kiểu sắp xếp: NEWEST, BEST_SELLER, PRICE_ASC, PRICE_DESC", nullable = true)
-    @Nullable String sort,
+    @Nullable ShopProductSort sort,
 
     @Schema(description = "Số trang, đếm từ 0")
     int page,

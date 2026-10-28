@@ -42,11 +42,6 @@ class OpenApiExportTest {
             Files.writeString(worktreeUi, response);
         }
 
-        var sellerOrderUi = Paths.get("..", "..", "fashionstore-ui", ".worktrees", "seller-order-processing", "docs", "openapi.json");
-        if (Files.exists(sellerOrderUi.getParent())) {
-            Files.writeString(sellerOrderUi, response);
-        }
-
         // Write to fashionstore-ui docs if exists
         var targetMainUi = Paths.get("..", "fashionstore-ui", "docs", "openapi.json");
         if (Files.exists(targetMainUi.getParent())) {

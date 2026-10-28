@@ -210,4 +210,183 @@ class ShopStatsRepositoryTest {
         assertThat(summary.cancelledOrders()).isEqualTo(1L);
         assertThat(summary.cancelledValue()).isEqualTo(300000L);
     }
+
+    @Test
+    void orderStatusSummaryCountsOrderWithApprovedReturnsOnce() {
+        var from = Instant.now().minus(2, ChronoUnit.DAYS);
+        var to = Instant.now().plus(1, ChronoUnit.DAYS);
+
+        var orderId = UUID.randomUUID();
+        createOrder(
+            orderId, buyer1Id, "DELIVERED", 500000L, Instant.now(), prod1Id, variantIdOf(prod1Id), 1, 500000L
+        );
+        createReturnRequest(orderId, "APPROVED", 250000L);
+        createReturnRequest(orderId, "APPROVED", 100000L);
+        createReturnRequest(orderId, "REJECTED", 999999L);
+
+        var summary = statsRepository.orderStatusSummary(shopId, from, to);
+
+        assertThat(summary.completedOrders()).isEqualTo(5L);
+        assertThat(summary.completedValue()).isEqualTo(1800000L);
+        assertThat(summary.cancelledOrders()).isEqualTo(1L);
+        assertThat(summary.cancelledValue()).isEqualTo(300000L);
+        assertThat(summary.returnedOrders()).isEqualTo(1L);
+        assertThat(summary.returnedValue()).isEqualTo(350000L);
+    }
+
+    @Test
+    void emptyShopAggregatesReturnZeroes() {
+        var emptyShopId = UUID.randomUUID();
+        jdbc.sql("""
+            INSERT INTO shop (id, name, slug, status)
+            VALUES (:id, :name, :slug, 'APPROVED')
+            """)
+            .param("id", emptyShopId)
+            .param("name", "Empty Shop " + emptyShopId)
+            .param("slug", "empty-shop-" + emptyShopId)
+            .update();
+
+        var from = Instant.now().minus(1, ChronoUnit.DAYS);
+        var to = Instant.now().plus(1, ChronoUnit.DAYS);
+
+        var today = statsRepository.todayStats(emptyShopId);
+        assertThat(today.todayRevenue()).isZero();
+        assertThat(today.todayOrders()).isZero();
+        assertThat(today.yesterdayRevenue()).isZero();
+        assertThat(today.yesterdayOrders()).isZero();
+
+        var summary = statsRepository.orderStatusSummary(emptyShopId, from, to);
+        assertThat(summary.completedOrders()).isZero();
+        assertThat(summary.completedValue()).isZero();
+        assertThat(summary.cancelledOrders()).isZero();
+        assertThat(summary.cancelledValue()).isZero();
+        assertThat(summary.returnedOrders()).isZero();
+        assertThat(summary.returnedValue()).isZero();
+
+        var customers = statsRepository.customerOverview(emptyShopId);
+        assertThat(customers.totalCustomers()).isZero();
+        assertThat(customers.newCustomers()).isZero();
+        assertThat(customers.returningCustomers()).isZero();
+
+        assertThat(statsRepository.topSellingProducts(emptyShopId, 10)).isEmpty();
+        assertThat(statsRepository.revenueByCategory(emptyShopId)).isEmpty();
+        assertThat(statsRepository.revenueByPayment(emptyShopId)).isEmpty();
+        assertThat(statsRepository.revenueByPeriod(emptyShopId, "day", from, to)).isEmpty();
+
+        var performance = statsRepository.shopPerformance(emptyShopId);
+        assertThat(performance.cancelRate()).isZero();
+        assertThat(performance.onTimeDeliveryRate()).isEqualTo(1.0);
+        assertThat(performance.avgRating()).isEqualTo(5.0);
+    }
+
+    @Test
+    void revenueByPeriodBucketsByDay() {
+        createOrder(
+            UUID.randomUUID(), buyer1Id, "DELIVERED", 100000L,
+            Instant.parse("2026-10-05T02:00:00Z"), prod1Id, variantIdOf(prod1Id), 1, 100000L
+        );
+        createOrder(
+            UUID.randomUUID(), buyer1Id, "DELIVERED", 200000L,
+            Instant.parse("2026-10-06T02:00:00Z"), prod1Id, variantIdOf(prod1Id), 1, 200000L
+        );
+        createOrder(
+            UUID.randomUUID(), buyer1Id, "CANCELLED", 50000L,
+            Instant.parse("2026-10-05T03:00:00Z"), prod1Id, variantIdOf(prod1Id), 1, 50000L
+        );
+
+        var rows = statsRepository.revenueByPeriod(
+            shopId, "day", Instant.parse("2026-10-01T00:00:00Z"), Instant.parse("2026-10-10T00:00:00Z")
+        );
+
+        assertThat(rows).extracting(ShopStatsRepository.RevenuePeriodRow::periodLabel)
+            .containsExactly("2026-10-05", "2026-10-06");
+        assertThat(rows).extracting(ShopStatsRepository.RevenuePeriodRow::revenue)
+            .containsExactly(100000L, 200000L);
+        assertThat(rows).extracting(ShopStatsRepository.RevenuePeriodRow::orders)
+            .containsExactly(1L, 1L);
+    }
+
+    @Test
+    void revenueByPeriodBucketsByWeek() {
+        createOrder(
+            UUID.randomUUID(), buyer1Id, "DELIVERED", 100000L,
+            Instant.parse("2026-10-06T02:00:00Z"), prod1Id, variantIdOf(prod1Id), 1, 100000L
+        );
+        createOrder(
+            UUID.randomUUID(), buyer1Id, "DELIVERED", 200000L,
+            Instant.parse("2026-10-13T02:00:00Z"), prod1Id, variantIdOf(prod1Id), 1, 200000L
+        );
+
+        var rows = statsRepository.revenueByPeriod(
+            shopId, "week", Instant.parse("2026-10-01T00:00:00Z"), Instant.parse("2026-10-20T00:00:00Z")
+        );
+
+        assertThat(rows).extracting(ShopStatsRepository.RevenuePeriodRow::periodLabel)
+            .containsExactly("2026-W41", "2026-W42");
+        assertThat(rows).extracting(ShopStatsRepository.RevenuePeriodRow::revenue)
+            .containsExactly(100000L, 200000L);
+    }
+
+    @Test
+    void revenueByPeriodBucketsByMonth() {
+        createOrder(
+            UUID.randomUUID(), buyer1Id, "DELIVERED", 100000L,
+            Instant.parse("2026-03-15T02:00:00Z"), prod1Id, variantIdOf(prod1Id), 1, 100000L
+        );
+        createOrder(
+            UUID.randomUUID(), buyer1Id, "DELIVERED", 200000L,
+            Instant.parse("2026-04-15T02:00:00Z"), prod1Id, variantIdOf(prod1Id), 1, 200000L
+        );
+
+        var rows = statsRepository.revenueByPeriod(
+            shopId, "month", Instant.parse("2026-03-01T00:00:00Z"), Instant.parse("2026-05-01T00:00:00Z")
+        );
+
+        assertThat(rows).extracting(ShopStatsRepository.RevenuePeriodRow::periodLabel)
+            .containsExactly("2026-03", "2026-04");
+        assertThat(rows).extracting(ShopStatsRepository.RevenuePeriodRow::revenue)
+            .containsExactly(100000L, 200000L);
+    }
+
+    @Test
+    void revenueByPeriodBucketsByYear() {
+        createOrder(
+            UUID.randomUUID(), buyer1Id, "DELIVERED", 100000L,
+            Instant.parse("2025-03-15T02:00:00Z"), prod1Id, variantIdOf(prod1Id), 1, 100000L
+        );
+        createOrder(
+            UUID.randomUUID(), buyer1Id, "DELIVERED", 200000L,
+            Instant.parse("2026-03-15T02:00:00Z"), prod1Id, variantIdOf(prod1Id), 1, 200000L
+        );
+
+        var rows = statsRepository.revenueByPeriod(
+            shopId, "year", Instant.parse("2025-01-01T00:00:00Z"), Instant.parse("2026-07-01T00:00:00Z")
+        );
+
+        assertThat(rows).extracting(ShopStatsRepository.RevenuePeriodRow::periodLabel)
+            .containsExactly("2025", "2026");
+        assertThat(rows).extracting(ShopStatsRepository.RevenuePeriodRow::revenue)
+            .containsExactly(100000L, 200000L);
+    }
+
+    private UUID variantIdOf(UUID productId) {
+        return jdbc.sql("SELECT id FROM product_variant WHERE product_id = :product LIMIT 1")
+            .param("product", productId)
+            .query(UUID.class)
+            .single();
+    }
+
+    private void createReturnRequest(UUID orderId, String status, long refundAmount) {
+        jdbc.sql("""
+            INSERT INTO return_request (id, order_id, shop_id, buyer_id, reason, status, refund_amount)
+            VALUES (:id, :orderId, :shopId, :buyerId, 'Damaged item', :status, :refund)
+            """)
+            .param("id", UUID.randomUUID())
+            .param("orderId", orderId)
+            .param("shopId", shopId)
+            .param("buyerId", buyer1Id)
+            .param("status", status)
+            .param("refund", refundAmount)
+            .update();
+    }
 }

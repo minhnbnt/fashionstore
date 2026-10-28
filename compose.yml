@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: postgres
 
     ports:
-      - "5434:5432"
+      - "5432:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql
@@ -19,20 +19,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-
-  pgbouncer:
-    image: registry.access.redhat.com/hi/pgbouncer:1.25
-
-    ports:
-      - "6432:6432"
-
-    volumes:
-      - ./config/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
-      - ./config/userlist.txt:/etc/pgbouncer/userlist.txt:ro
-
-    depends_on:
-      postgres:
-        condition: service_healthy
 
   gotrue:
     image: ghcr.io/supabase/gotrue:v2.197.0

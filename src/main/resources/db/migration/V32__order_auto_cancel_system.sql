@@ -1,4 +1,4 @@
--- V31__order_auto_cancel_system.sql
+-- V32__order_auto_cancel_system.sql
 -- Cho phép SYSTEM trong cột cancelled_by của bảng orders
 ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_cancelled_by_check;
 ALTER TABLE orders ADD CONSTRAINT orders_cancelled_by_check 

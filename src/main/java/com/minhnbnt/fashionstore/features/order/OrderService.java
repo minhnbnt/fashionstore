@@ -34,6 +34,7 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
@@ -85,6 +86,11 @@ public class OrderService {
     private final OrderSlaPolicy sla;
 
     private final NotificationService notifications;
+
+    // Single source of truth for the pending-order confirmation timeout. Both the
+    // seller-facing confirm() deadline check and the background auto-cancel job read this.
+    @Value("${fashionstore.order.pending-timeout-hours:24}")
+    private long pendingTimeoutHours;
 
     @Transactional
     public OrderResponse checkout(@NonNull UUID buyerId, @NonNull CheckoutRequest request) {
@@ -341,19 +347,19 @@ public class OrderService {
         var from = order.getStatus();
         var orderItems = items.findByOrderId(order.getId());
 
-        order.cancelBySystem("Hết thời hạn xác nhận đơn hàng (24 giờ)", null);
+        order.cancelBySystem("Hết thời hạn xác nhận đơn hàng (" + pendingTimeoutHours + " giờ)", null);
         restockOrderItems(order, orderItems);
         histories.save(OrderStatusHistory.record(
             order.getId(),
             from,
             OrderStatus.CANCELLED,
             null,
-            "Quá hạn 24 giờ"
+            "Quá hạn " + pendingTimeoutHours + " giờ"
         ));
 
         var saved = orders.save(order);
         var cancelDetail = "Hệ thống tự động hủy đơn hàng #" + saved.getCode()
-            + " do quá hạn 24 giờ chưa xác nhận | Khôi phục tồn kho cho "
+            + " do quá hạn " + pendingTimeoutHours + " giờ chưa xác nhận | Khôi phục tồn kho cho "
             + orderItems.size() + " mặt hàng";
         audit.record(saved.getShopId(), null, "ORDER_SYSTEM_CANCEL", "ORDER", saved.getId(), cancelDetail);
 
@@ -363,7 +369,7 @@ public class OrderService {
             "ORDER_CANCELLED",
             "Đơn #" + saved.getCode() + " đã bị hủy tự động",
             "Đơn #" + saved.getCode()
-                + " đã tự động hủy do người bán không xác nhận trong vòng 24 giờ.",
+                + " đã tự động hủy do người bán không xác nhận trong vòng " + pendingTimeoutHours + " giờ.",
             "/account",
             saved.getId()
         );
@@ -374,25 +380,21 @@ public class OrderService {
             "ORDER_CANCELLED",
             "Đơn #" + saved.getCode() + " đã bị hủy tự động",
             "Đơn #" + saved.getCode()
-                + " đã quá hạn xác nhận 24 giờ và bị hệ thống tự động hủy.",
+                + " đã quá hạn xác nhận " + pendingTimeoutHours + " giờ và bị hệ thống tự động hủy.",
             "/shop?shopId=" + saved.getShopId() + "&tab=orders&orderId=" + saved.getId(),
             saved.getId()
         );
     }
 
-    public void cancelExpiredPendingOrders(@NonNull Instant cutoff) {
-        var expired = orders.findByStatusAndCreatedAtBefore(OrderStatus.PENDING, cutoff);
-        if (!expired.isEmpty()) {
-            log.info("Found {} expired pending orders to cancel (cutoff: {})", expired.size(), cutoff);
-        }
-        for (var order : expired) {
-            try {
-                systemCancelExpiredOrder(order.getId());
-                log.info("Successfully auto-cancelled expired order {} ({})", order.getCode(), order.getId());
-            } catch (Exception ex) {
-                log.error("Failed to auto-cancel expired order {}: {}", order.getId(), ex.getMessage(), ex);
-            }
-        }
+    /**
+     * Đơn PENDING đã quá thời hạn xác nhận theo cấu hình {@code pending-timeout-hours}.
+     * Job hẹn giờ gọi phương thức này rồi tự gọi {@link #systemCancelExpiredOrder} qua proxy
+     * để mỗi đơn được hủy trong một transaction riêng, lỗi của một đơn không ảnh hưởng đơn khác.
+     */
+    @Transactional(readOnly = true)
+    public List<Order> findExpiredPendingOrders() {
+        var cutoff = clock.instant().minus(pendingTimeoutHours, ChronoUnit.HOURS);
+        return orders.findByStatusAndCreatedAtBefore(OrderStatus.PENDING, cutoff);
     }
 
     @Transactional(readOnly = true)
@@ -531,12 +533,12 @@ public class OrderService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only pending orders can be confirmed");
         }
 
-        var cutoff = clock.instant().minus(24, ChronoUnit.HOURS);
+        var cutoff = clock.instant().minus(pendingTimeoutHours, ChronoUnit.HOURS);
         if (order.getCreatedAt().isBefore(cutoff)) {
             systemCancelExpiredOrder(order.getId());
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
-                "Order confirmation deadline (24h) has expired; order was cancelled by system"
+                "Order confirmation deadline (" + pendingTimeoutHours + "h) has expired; order was cancelled by system"
             );
         }
 

@@ -25,7 +25,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -72,6 +75,36 @@ public class ReviewService {
         }
 
         return new RatingSummary(all.size(), (double) sum / all.size());
+    }
+
+    /**
+     * Batch của ratingSummary cho một trang sản phẩm: 1 query thay vì N.
+     * Kết quả luôn chứa đủ key của đầu vào; sản phẩm chưa có review nhận
+     * RatingSummary(0, null) giống hệt ratingSummary.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, RatingSummary> ratingSummaries(@NonNull Collection<UUID> productIds) {
+        var counts = new HashMap<UUID, Long>();
+        var starSums = new HashMap<UUID, Long>();
+        for (var id : productIds) {
+            counts.put(id, 0L);
+            starSums.put(id, 0L);
+        }
+        for (var review : reviews.findByProductIdIn(productIds)) {
+            counts.merge(review.getProductId(), 1L, Long::sum);
+            starSums.merge(review.getProductId(), (long) review.getStars(), Long::sum);
+        }
+
+        var summaries = new HashMap<UUID, RatingSummary>();
+        for (var id : productIds) {
+            var count = counts.getOrDefault(id, 0L);
+            if (count == 0) {
+                summaries.put(id, new RatingSummary(0, null));
+            } else {
+                summaries.put(id, new RatingSummary(count, (double) starSums.getOrDefault(id, 0L) / count));
+            }
+        }
+        return summaries;
     }
 
     @Transactional

@@ -23,6 +23,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -65,6 +66,46 @@ class SellerStatsControllerTest {
     void getDashboardReturns401WithoutJwt() throws Exception {
         mockMvc.perform(get("/api/seller/shops/{shopId}/stats/dashboard", shopId))
             .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void revenueDetailRejectsUnknownPeriod() throws Exception {
+        mockMvc.perform(get("/api/seller/shops/{shopId}/stats/revenue/detail", shopId)
+                .param("period", "hourly")
+                .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+            .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(stats);
+    }
+
+    @Test
+    void topSellingRejectsLimitBelowMinimum() throws Exception {
+        mockMvc.perform(get("/api/seller/shops/{shopId}/stats/products/top-selling", shopId)
+                .param("limit", "0")
+                .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+            .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(stats);
+    }
+
+    @Test
+    void topSellingRejectsLimitAboveMaximum() throws Exception {
+        mockMvc.perform(get("/api/seller/shops/{shopId}/stats/products/top-selling", shopId)
+                .param("limit", "101")
+                .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+            .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(stats);
+    }
+
+    @Test
+    void exportRejectsUnknownFormat() throws Exception {
+        mockMvc.perform(get("/api/seller/shops/{shopId}/stats/revenue/export", shopId)
+                .param("format", "pdf")
+                .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+            .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(stats);
     }
 
     @Test

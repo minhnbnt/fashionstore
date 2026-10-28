@@ -130,10 +130,19 @@ public class NotificationRepository {
     }
 
     public long countByUser(UUID userId) {
-        return jdbc.sql("SELECT count(*) FROM user_notification WHERE user_id = :user")
-            .param("user", userId)
-            .query(Long.class)
-            .single();
+        return countByUser(userId, null);
+    }
+
+    public long countByUser(UUID userId, @Nullable List<String> categories) {
+        var sql = new StringBuilder("SELECT count(*) FROM user_notification WHERE user_id = :user");
+        if (categories != null && !categories.isEmpty()) {
+            sql.append(" AND category = ANY(:cats)");
+        }
+        var spec = jdbc.sql(sql.toString()).param("user", userId);
+        if (categories != null && !categories.isEmpty()) {
+            spec.param("cats", categories.toArray(new String[0]));
+        }
+        return spec.query(Long.class).single();
     }
 
     public boolean exists(UUID userId, UUID id) {

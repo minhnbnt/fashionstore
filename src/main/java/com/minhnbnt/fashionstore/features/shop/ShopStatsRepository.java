@@ -378,11 +378,15 @@ public class ShopStatsRepository {
                 COALESCE(SUM(CASE WHEN o.status = 'DELIVERED' THEN o.total ELSE 0 END), 0) AS completed_value,
                 COALESCE(COUNT(CASE WHEN o.status = 'CANCELLED' THEN 1 END), 0) AS cancelled_orders,
                 COALESCE(SUM(CASE WHEN o.status = 'CANCELLED' THEN o.total ELSE 0 END), 0) AS cancelled_value,
-                COALESCE(COUNT(rr.id), 0) AS returned_orders,
-                COALESCE(SUM(CASE
-                    WHEN rr.id IS NOT NULL THEN COALESCE(rr.refund_amount, 0) ELSE 0 END), 0) AS returned_value
+                COALESCE(COUNT(rr.order_id), 0) AS returned_orders,
+                COALESCE(SUM(COALESCE(rr.refunded_value, 0)), 0) AS returned_value
             FROM orders o
-            LEFT JOIN return_request rr ON rr.order_id = o.id AND rr.status = 'APPROVED'
+            LEFT JOIN (
+                SELECT order_id, COALESCE(SUM(refund_amount), 0) AS refunded_value
+                FROM return_request
+                WHERE status = 'APPROVED'
+                GROUP BY order_id
+            ) rr ON rr.order_id = o.id
             WHERE o.shop_id = :shopId
               AND o.created_at >= :from
               AND o.created_at < :to

@@ -4,6 +4,7 @@ import com.minhnbnt.fashionstore.model.Review;
 import org.springframework.data.jdbc.repository.query.Query;
 import org.springframework.data.repository.CrudRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -11,6 +12,8 @@ import java.util.UUID;
 public interface ReviewRepository extends CrudRepository<Review, UUID> {
 
     List<Review> findByProductIdOrderByCreatedAtDesc(UUID productId);
+
+    List<Review> findByProductIdIn(Collection<UUID> productIds);
 
     Optional<Review> findByProductIdAndBuyerId(UUID productId, UUID buyerId);
 
