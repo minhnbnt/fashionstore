@@ -10,7 +10,8 @@ public record ProductSummaryResponse(
     @Schema UUID shopId,
     @Schema String name,
     @Schema String slug,
-    @Schema Long minPrice,
+    @Schema(description = "Giá variant thấp nhất (VND), null nếu chưa có variant", nullable = true)
+    @Nullable Long minPrice,
     @Schema(description = "S3 key ảnh đại diện, null nếu chưa có", nullable = true)
     @Nullable String defaultImageKey,
     @Schema(description = "Khoảng cách BM25, càng nhỏ càng khớp. Null khi không có từ khóa", nullable = true)

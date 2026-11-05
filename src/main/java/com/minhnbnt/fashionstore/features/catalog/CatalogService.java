@@ -12,6 +12,7 @@ import com.minhnbnt.fashionstore.dto.catalog.ProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSearchRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSearchResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSort;
+import com.minhnbnt.fashionstore.dto.catalog.ProductSummaryResponse;
 import com.minhnbnt.fashionstore.dto.catalog.SearchFacetsResponse;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateVariantRequest;
@@ -569,8 +570,7 @@ public class CatalogService {
      * của getDetail).
      */
     @Transactional(readOnly = true)
-    public List<ProductResponse> getDetails(@NonNull List<UUID> productIds) {
-        if (productIds.isEmpty()) {
+    public List<ProductResponse> getDetails(@NonNull List<UUID> productIds) {        if (productIds.isEmpty()) {
             return List.of();
         }
 
@@ -581,12 +581,9 @@ public class CatalogService {
             }
         }
 
-        var approvedShopIds = new HashSet<UUID>();
-        for (var shopId : productsById.values().stream().map(Product::getShopId).distinct().toList()) {
-            if (shops.isShopApproved(shopId)) {
-                approvedShopIds.add(shopId);
-            }
-        }
+        var approvedShopIds = shops.findApprovedShopIds(
+            productsById.values().stream().map(Product::getShopId).distinct().toList()
+        );
 
         var visibleProducts = new LinkedHashMap<UUID, Product>();
         for (var id : productIds) {
@@ -625,6 +622,13 @@ public class CatalogService {
             ));
         }
         return responses;
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductSummaryResponse> getSummaries(@NonNull List<UUID> productIds) {
+        return getDetails(productIds).stream()
+            .map(CatalogMapper::toSummary)
+            .toList();
     }
 
     @Transactional(readOnly = true)

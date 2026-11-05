@@ -31,6 +31,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -239,6 +241,39 @@ class CatalogControllerTest {
         mockMvc.perform(get("/api/products/{id}", id))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.slug").value("ao-thun"));
+    }
+
+    @Test
+    void batchSummariesIsPublicAndKeepsInputOrder() throws Exception {
+        var id1 = UUID.randomUUID();
+        var id2 = UUID.randomUUID();
+        when(catalog.getSummaries(any())).thenReturn(List.of(
+            new ProductSummaryResponse(id1, UUID.randomUUID(), "Áo thun", "ao-thun", 100000L, null, null),
+            new ProductSummaryResponse(id2, UUID.randomUUID(), "Váy hoa", "vay-hoa", 250000L, "v/vay.jpg", null)
+        ));
+
+        mockMvc.perform(get("/api/products/batch").param("ids", id1 + "," + id2))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(id1.toString()))
+            .andExpect(jsonPath("$[0].slug").value("ao-thun"))
+            .andExpect(jsonPath("$[1].id").value(id2.toString()))
+            .andExpect(jsonPath("$[1].slug").value("vay-hoa"));
+    }
+
+    @Test
+    void batchSummariesRejectsMoreThan20Ids() throws Exception {
+        var ids = new StringBuilder();
+        for (int i = 0; i < 21; i++) {
+            if (i > 0) {
+                ids.append(",");
+            }
+            ids.append(UUID.randomUUID());
+        }
+
+        mockMvc.perform(get("/api/products/batch").param("ids", ids.toString()))
+            .andExpect(status().isBadRequest());
+
+        verify(catalog, never()).getSummaries(any());
     }
 
     private static ProductSearchResponse searchPage() {

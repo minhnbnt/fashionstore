@@ -13,6 +13,7 @@ import com.minhnbnt.fashionstore.model.ProductVariant;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
 
 public final class CatalogMapper {
 
@@ -86,6 +87,33 @@ public final class CatalogMapper {
             hit.defaultImageKey(),
             hit.rank()
         );
+    }
+
+    public static ProductSummaryResponse toSummary(ProductResponse product) {
+        return new ProductSummaryResponse(
+            product.id(),
+            product.shopId(),
+            product.name(),
+            product.slug(),
+            minVariantPrice(product.variants()),
+            firstImageKey(product.images()),
+            null
+        );
+    }
+
+    private static @Nullable Long minVariantPrice(List<VariantResponse> variants) {
+        return variants.stream()
+            .map(VariantResponse::price)
+            .filter(Objects::nonNull)
+            .min(Long::compare)
+            .orElse(null);
+    }
+
+    private static @Nullable String firstImageKey(List<ImageResponse> images) {
+        if (images.isEmpty()) {
+            return null;
+        }
+        return images.get(0).s3Key();
     }
 
     public static CategoryResponse toCategoryResponse(Category category) {
