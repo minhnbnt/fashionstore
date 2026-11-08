@@ -15,6 +15,8 @@ Base: `com.minhnbnt.fashionstore` — shop | catalog | order | identity (mỗi d
 |------|---|--------|------|-------|
 | [x] | 1 | POST | `/api/users` | Mirror GoTrue user vào `user_profile` (authenticated, id từ JWT sub) |
 | [x] | 2 | GET | `/api/users/me` | Profile của user đang login |
+| [x] | 2b | PUT | `/api/users/me/avatar` | Đổi ảnh đại diện (nhận S3 key ảnh từ `/api/uploads/presign`) |
+| [x] | 2c | DELETE | `/api/users/me/avatar` | Xóa ảnh đại diện |
 
 ## Flow 2 — Shop (đăng ký + duyệt)
 

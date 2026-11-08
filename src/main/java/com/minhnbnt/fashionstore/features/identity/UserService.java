@@ -42,7 +42,10 @@ public class UserService {
             var profile = existing.get();
             profile.changeEmail(request.email());
             profile.rename(request.displayName());
-            profile.changeAvatar(request.avatarKey());
+            // Avatar chỉ đổi qua /api/users/me/avatar; mirror sau login không được xóa ảnh.
+            if (request.avatarKey() != null) {
+                profile.changeAvatar(request.avatarKey());
+            }
             return toResponse(users.save(profile));
         }
 
@@ -68,6 +71,22 @@ public class UserService {
         }
 
         return toResponse(profile);
+    }
+
+    @Transactional
+    public UserResponse changeAvatar(@NonNull UUID id, @NonNull String avatarKey) {
+        var profile = lockedProfile(id);
+
+        profile.changeAvatar(avatarKey);
+        return toResponse(users.save(profile));
+    }
+
+    @Transactional
+    public UserResponse clearAvatar(@NonNull UUID id) {
+        var profile = lockedProfile(id);
+
+        profile.changeAvatar(null);
+        return toResponse(users.save(profile));
     }
 
     @Transactional

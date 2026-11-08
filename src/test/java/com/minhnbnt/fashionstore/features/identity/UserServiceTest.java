@@ -58,6 +58,45 @@ class UserServiceTest {
     }
 
     @Test
+    void changeAvatarStoresKey() {
+        var id = mirroredUser();
+        var key = UUID.randomUUID() + ".png";
+
+        var updated = userService.changeAvatar(id, key);
+
+        assertThat(updated.avatarKey()).isEqualTo(key);
+        assertThat(userService.getById(id).avatarKey()).isEqualTo(key);
+    }
+
+    @Test
+    void clearAvatarRemovesKey() {
+        var id = mirroredUser();
+        userService.changeAvatar(id, UUID.randomUUID() + ".png");
+
+        var cleared = userService.clearAvatar(id);
+
+        assertThat(cleared.avatarKey()).isNull();
+        assertThat(userService.getById(id).avatarKey()).isNull();
+    }
+
+    @Test
+    void changeAvatarUnknownUserIsNotFound() {
+        assertThatThrownBy(() -> userService.changeAvatar(UUID.randomUUID(), "key.png"))
+            .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void upsertKeepsAvatarWhenKeyOmitted() {
+        var id = mirroredUser();
+        var key = UUID.randomUUID() + ".png";
+        userService.changeAvatar(id, key);
+
+        var updated = userService.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U", null));
+
+        assertThat(updated.avatarKey()).isEqualTo(key);
+    }
+
+    @Test
     void lockStoresReasonAndHistory() {
         var adminId = mirroredUser();
         var userId = mirroredUser();

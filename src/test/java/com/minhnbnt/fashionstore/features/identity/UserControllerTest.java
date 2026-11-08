@@ -17,8 +17,10 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(UserController.class)
@@ -88,5 +90,49 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"not-an-email\",\"displayName\":\"An\"}"))
             .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void changeAvatarWithoutAuthIsUnauthorized() throws Exception {
+        mockMvc.perform(put("/api/users/me/avatar")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"avatarKey\":\"key.png\"}"))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void changeAvatarReturnsProfile() throws Exception {
+        var id = UUID.randomUUID();
+        var key = UUID.randomUUID() + ".png";
+        var response = new UserResponse(id, "a@t.local", "An", key, "CUSTOMER", "ACTIVE", null, Instant.now());
+        when(userService.changeAvatar(id, key)).thenReturn(response);
+
+        mockMvc.perform(put("/api/users/me/avatar")
+                .with(jwt().jwt(builder -> builder.subject(id.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"avatarKey\":\"" + key + "\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.avatarKey").value(key));
+    }
+
+    @Test
+    void changeAvatarRejectsNonImageKey() throws Exception {
+        mockMvc.perform(put("/api/users/me/avatar")
+                .with(jwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"avatarKey\":\"https://evil.example/a.png\"}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void clearAvatarReturnsProfileWithoutKey() throws Exception {
+        var id = UUID.randomUUID();
+        var response = new UserResponse(id, "a@t.local", "An", null, "CUSTOMER", "ACTIVE", null, Instant.now());
+        when(userService.clearAvatar(id)).thenReturn(response);
+
+        mockMvc.perform(delete("/api/users/me/avatar")
+                .with(jwt().jwt(builder -> builder.subject(id.toString()))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.avatarKey").doesNotExist());
     }
 }
