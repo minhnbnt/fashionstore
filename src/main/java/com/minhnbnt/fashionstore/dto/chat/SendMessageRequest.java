@@ -13,7 +13,7 @@ public record SendMessageRequest(
     @Nullable
     String imageKey
 ) {
-    @AssertTrue(message = "Tin nhắn phải có nội dung văn bản hoặc ảnh đính kèm")
+    @AssertTrue(message = "Message must have text content or an attached image")
     public boolean hasContentOrImage() {
         return (content != null && !content.isBlank())
             || (imageKey != null && !imageKey.isBlank());

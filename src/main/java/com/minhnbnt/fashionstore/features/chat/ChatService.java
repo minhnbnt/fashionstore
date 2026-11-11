@@ -5,6 +5,7 @@ import com.minhnbnt.fashionstore.dto.chat.ChatMessageResponse;
 import com.minhnbnt.fashionstore.dto.chat.ChatReadEvent;
 import com.minhnbnt.fashionstore.dto.chat.ConversationEvent;
 import com.minhnbnt.fashionstore.dto.chat.SendMessageRequest;
+import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatConversationRepository;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatMessageRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
@@ -36,11 +37,13 @@ import java.util.regex.Pattern;
 public class ChatService {
 
     private static final Pattern PRODUCT_LINK_PATTERN =
-        Pattern.compile("(?:https?://[^\\s/]+)?/products?/[a-zA-Z0-9_-]+");
+        Pattern.compile("(?:https?://[^\\s/]+)?/products?/([a-zA-Z0-9_-]+)");
 
     private final ChatConversationRepository conversations;
 
     private final ChatMessageRepository messages;
+
+    private final ProductRepository products;
 
     private final ShopService shops;
 
@@ -129,9 +132,11 @@ public class ChatService {
 
         var recipients = realtimeRecipients(conv);
 
-        var textContent = (request.content() != null && !request.content().isBlank())
-            ? request.content().trim()
-            : "";
+        var textContent = "";
+        if (request.content() != null && !request.content().isBlank()) {
+            textContent = request.content().trim();
+        }
+        validateProductLinks(conv.getShopId(), textContent);
         var previewText = buildPreviewText(textContent, request.imageKey());
 
         var msg = ChatMessage.of(
@@ -284,13 +289,53 @@ public class ChatService {
         );
     }
 
+    private void validateProductLinks(UUID conversationShopId, String textContent) {
+        if (textContent.isBlank()) {
+            return;
+        }
+        var matcher = PRODUCT_LINK_PATTERN.matcher(textContent);
+        while (matcher.find()) {
+            var ref = matcher.group(1);
+            if (ref == null || ref.isBlank()) {
+                continue;
+            }
+            var productId = tryParseUuid(ref);
+            if (productId != null) {
+                var product = products.findById(productId).orElse(null);
+                if (product != null && !product.getShopId().equals(conversationShopId)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product does not belong to this shop");
+                }
+                continue;
+            }
+            var matchedBySlug = products.findBySlug(ref);
+            if (!matchedBySlug.isEmpty()
+                && matchedBySlug.stream().noneMatch(p -> p.getShopId().equals(conversationShopId))) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product does not belong to this shop");
+            }
+        }
+    }
+
+    private static @Nullable UUID tryParseUuid(String raw) {
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
     private static String buildPreviewText(String textContent, @Nullable String imageKey) {
         if (textContent.isBlank()) {
-            return imageKey != null ? "[Hình ảnh]" : "";
+            if (imageKey != null) {
+                return "[Hình ảnh]";
+            }
+            return "";
         }
         if (PRODUCT_LINK_PATTERN.matcher(textContent).find()) {
             var stripped = PRODUCT_LINK_PATTERN.matcher(textContent).replaceAll("").trim();
-            return stripped.isBlank() ? "[Sản phẩm]" : stripped;
+            if (stripped.isBlank()) {
+                return "[Sản phẩm]";
+            }
+            return stripped;
         }
         return textContent;
     }

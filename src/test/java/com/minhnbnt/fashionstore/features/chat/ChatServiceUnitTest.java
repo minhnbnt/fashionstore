@@ -4,6 +4,7 @@ import com.minhnbnt.fashionstore.dto.chat.ChatMessageResponse;
 import com.minhnbnt.fashionstore.dto.chat.ChatReadEvent;
 import com.minhnbnt.fashionstore.dto.chat.ConversationEvent;
 import com.minhnbnt.fashionstore.dto.chat.SendMessageRequest;
+import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatConversationRepository;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatMessageRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
@@ -44,6 +45,9 @@ class ChatServiceUnitTest {
 
     @Mock
     private ChatMessageRepository messages;
+
+    @Mock
+    private ProductRepository products;
 
     @Mock
     private ShopService shops;
@@ -297,5 +301,85 @@ class ChatServiceUnitTest {
         verify(realtime).publishReadReceipt(recipientsCaptor.capture(), readEventCaptor.capture());
         assertThat(recipientsCaptor.getValue()).containsExactly(buyerId);
         assertThat(readEventCaptor.getValue().readerId()).isEqualTo(sellerId);
+    }
+
+    @Test
+    void sendMessageWithOtherShopProductLinkThrowsBadRequest() {
+        var buyerId = UUID.randomUUID();
+        var convShopId = UUID.randomUUID();
+        var otherShopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var otherProductId = UUID.randomUUID();
+        var conv = ChatConversation.create(convShopId, buyerId);
+
+        var otherProduct = com.minhnbnt.fashionstore.model.Product.create(
+            otherShopId, null, "Áo Shop Khác", "ao-shop-khac", "Mô tả",
+            com.minhnbnt.fashionstore.model.ProductStatus.ACTIVE,
+            null, null, false, null, null, null, null, null, null, null, null, null
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(otherProduct, "id", otherProductId);
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(shops.isMember(convShopId, buyerId)).thenReturn(false);
+        when(products.findById(otherProductId)).thenReturn(Optional.of(otherProduct));
+
+        var req = new SendMessageRequest("/product/" + otherProductId, null);
+
+        assertThatThrownBy(() -> chatService.sendMessage(buyerId, convId, req))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(org.springframework.http.HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void sendMessageWithOtherShopProductSlugThrowsBadRequest() {
+        var buyerId = UUID.randomUUID();
+        var convShopId = UUID.randomUUID();
+        var otherShopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var conv = ChatConversation.create(convShopId, buyerId);
+
+        var otherProduct = com.minhnbnt.fashionstore.model.Product.create(
+            otherShopId, null, "Áo Shop Khác", "ao-shop-khac", "Mô tả",
+            com.minhnbnt.fashionstore.model.ProductStatus.ACTIVE,
+            null, null, false, null, null, null, null, null, null, null, null, null
+        );
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(shops.isMember(convShopId, buyerId)).thenReturn(false);
+        when(products.findBySlug("ao-shop-khac")).thenReturn(List.of(otherProduct));
+
+        var req = new SendMessageRequest("/product/ao-shop-khac", null);
+
+        assertThatThrownBy(() -> chatService.sendMessage(buyerId, convId, req))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(org.springframework.http.HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void sendMessageWithSameShopProductLinkSucceeds() {
+        var buyerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var ownProductId = UUID.randomUUID();
+        var conv = ChatConversation.create(shopId, buyerId);
+
+        var ownProduct = com.minhnbnt.fashionstore.model.Product.create(
+            shopId, null, "Áo Cùng Shop", "ao-cung-shop", "Mô tả",
+            com.minhnbnt.fashionstore.model.ProductStatus.ACTIVE,
+            null, null, false, null, null, null, null, null, null, null, null, null
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(ownProduct, "id", ownProductId);
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(shops.isMember(shopId, buyerId)).thenReturn(false);
+        when(products.findById(ownProductId)).thenReturn(Optional.of(ownProduct));
+
+        var req = new SendMessageRequest("/product/" + ownProductId, null);
+        var resp = chatService.sendMessage(buyerId, convId, req);
+
+        assertThat(resp.content()).isEqualTo("/product/" + ownProductId);
+        assertThat(conv.getLastMessageText()).isEqualTo("[Sản phẩm]");
     }
 }

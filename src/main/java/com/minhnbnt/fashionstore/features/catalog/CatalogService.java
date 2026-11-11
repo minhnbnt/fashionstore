@@ -12,9 +12,11 @@ import com.minhnbnt.fashionstore.dto.catalog.ProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSearchRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSearchResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSort;
+import com.minhnbnt.fashionstore.dto.catalog.ProductSummaryResponse;
 import com.minhnbnt.fashionstore.dto.catalog.SearchFacetsResponse;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateVariantRequest;
+import com.minhnbnt.fashionstore.dto.catalog.VariantResponse;
 import com.minhnbnt.fashionstore.dto.catalog.AdjustStockRequest;
 import com.minhnbnt.fashionstore.dto.catalog.BulkDeleteProductsRequest;
 import com.minhnbnt.fashionstore.dto.catalog.BulkImportResult;
@@ -595,6 +597,9 @@ public class CatalogService {
                 visibleProducts.put(id, product);
             }
         }
+        if (visibleProducts.isEmpty()) {
+            return List.of();
+        }
 
         var variantsByProduct = new HashMap<UUID, List<ProductVariant>>();
         for (var variant : variants.findByProductIdInOrderByCreatedAtAsc(visibleProducts.keySet())) {
@@ -625,6 +630,41 @@ public class CatalogService {
             ));
         }
         return responses;
+    }
+
+    /**
+     * Batch tóm tắt sản phẩm công khai cho trợ lý AI / hiển thị nhiều thẻ sản phẩm cùng lúc.
+     * Dùng chung điều kiện hiển thị với {@link #getDetails(List)}: giữ nguyên thứ tự id đầu vào
+     * và bỏ qua id không tìm thấy, không ACTIVE hoặc thuộc shop chưa duyệt.
+     */
+    @Transactional(readOnly = true)
+    public List<ProductSummaryResponse> getSummaryBatch(@NonNull List<UUID> productIds) {
+        return getDetails(productIds).stream()
+            .map(CatalogService::toSummaryResponse)
+            .toList();
+    }
+
+    private static ProductSummaryResponse toSummaryResponse(ProductResponse detail) {
+        var minPrice = 0L;
+        if (!detail.variants().isEmpty()) {
+            minPrice = detail.variants().stream()
+                .mapToLong(VariantResponse::price)
+                .min()
+                .orElse(0L);
+        }
+        String defaultImageKey = null;
+        if (!detail.images().isEmpty()) {
+            defaultImageKey = detail.images().getFirst().s3Key();
+        }
+        return new ProductSummaryResponse(
+            detail.id(),
+            detail.shopId(),
+            detail.name(),
+            detail.slug(),
+            minPrice,
+            defaultImageKey,
+            null
+        );
     }
 
     @Transactional(readOnly = true)

@@ -241,6 +241,44 @@ class CatalogControllerTest {
             .andExpect(jsonPath("$.slug").value("ao-thun"));
     }
 
+    @Test
+    void batchSummariesIsPublicAndPreservesOrder() throws Exception {
+        var id1 = UUID.randomUUID();
+        var id2 = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var items = List.of(
+            new ProductSummaryResponse(id1, shopId, "Áo Khoác Parka", "ao-khoac-parka", 450000L, "p1.jpg", null),
+            new ProductSummaryResponse(id2, shopId, "Quần Jeans", "quan-jeans", 320000L, "p2.jpg", null)
+        );
+        when(catalog.getSummaryBatch(List.of(id1, id2))).thenReturn(items);
+
+        mockMvc.perform(get("/api/products/batch")
+                .param("ids", id1.toString(), id2.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[0].id").value(id1.toString()))
+            .andExpect(jsonPath("$[0].name").value("Áo Khoác Parka"))
+            .andExpect(jsonPath("$[0].minPrice").value(450000))
+            .andExpect(jsonPath("$[0].defaultImageKey").value("p1.jpg"))
+            .andExpect(jsonPath("$[1].id").value(id2.toString()));
+    }
+
+    @Test
+    void batchSummariesRejectsMoreThanTwentyIds() throws Exception {
+        var ids = java.util.stream.IntStream.range(0, 21)
+            .mapToObj(i -> UUID.randomUUID().toString())
+            .toArray(String[]::new);
+
+        mockMvc.perform(get("/api/products/batch").param("ids", ids))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void batchSummariesWithoutIdsIsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/products/batch"))
+            .andExpect(status().isBadRequest());
+    }
+
     private static ProductSearchResponse searchPage() {
         var summary = new ProductSummaryResponse(
             UUID.randomUUID(),

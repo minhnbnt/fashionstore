@@ -1017,4 +1017,39 @@ class CatalogServiceTest {
         assertThat(page1).hasSize(1);
         assertThat(page0.getFirst().id()).isNotEqualTo(page1.getFirst().id());
     }
+
+    @Test
+    void getSummaryBatchPreservesOrderComputesMinPriceAndSkipsHidden() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-batch-summary");
+        var pendingOwnerId = mirroredUser();
+        var pendingShop = shops.register(
+            pendingOwnerId,
+            ShopTestFixtures.createRequest("Shop Pending Batch", "shop-pending-batch")
+        );
+
+        var active1 = catalog.createProduct(ownerId, shopId, productRequest("batch-p1"));
+        var active2 = catalog.createProduct(ownerId, shopId, productRequest("batch-p2"));
+        catalog.bulkUpdatePrices(ownerId, shopId, new BulkUpdatePriceRequest(List.of(active2.id()), "FIXED", 275000.0));
+
+        var hiddenDraft = catalog.createProduct(ownerId, shopId, productRequest("batch-hidden"));
+        catalog.bulkUpdateProductStatus(
+            ownerId, shopId, new BulkUpdateProductStatusRequest(List.of(hiddenDraft.id()), "HIDDEN")
+        );
+
+        var missingId = UUID.randomUUID();
+
+        var summaries = catalog.getSummaryBatch(List.of(active2.id(), hiddenDraft.id(), missingId, active1.id()));
+
+        assertThat(summaries).hasSize(2);
+        assertThat(summaries.get(0).id()).isEqualTo(active2.id());
+        assertThat(summaries.get(0).shopId()).isEqualTo(shopId);
+        assertThat(summaries.get(0).minPrice()).isEqualTo(275000L);
+        assertThat(summaries.get(0).defaultImageKey()).isEqualTo("img1.jpg");
+        assertThat(summaries.get(0).rank()).isNull();
+        assertThat(summaries.get(1).id()).isEqualTo(active1.id());
+        assertThat(summaries.get(1).minPrice()).isEqualTo(100000L);
+        assertThat(catalog.getSummaryBatch(List.of(missingId, pendingShop.id()))).isEmpty();
+        assertThat(catalog.getSummaryBatch(List.<UUID>of())).isEmpty();
+    }
 }

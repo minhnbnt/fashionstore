@@ -37,11 +37,17 @@ public class AiChatService {
 
     @Transactional
     public AiConversationResponse createConversation(UUID userId, CreateAiConversationRequest request) {
-        String rawTitle = request != null ? request.title() : null;
-        String title = (rawTitle != null && !rawTitle.isBlank()) ? rawTitle.trim() : DEFAULT_TITLE;
+        String rawTitle = null;
+        if (request != null) {
+            rawTitle = request.title();
+        }
+        var title = DEFAULT_TITLE;
+        if (rawTitle != null && !rawTitle.isBlank()) {
+            title = rawTitle.trim();
+        }
 
-        AiConversation conv = AiConversation.of(userId, title);
-        AiConversation saved = conversationRepo.save(conv);
+        var conv = AiConversation.of(userId, title);
+        var saved = conversationRepo.save(conv);
         return toConversationResponse(saved);
     }
 
@@ -67,11 +73,14 @@ public class AiChatService {
 
     @Transactional
     public AiMessageResponse saveMessage(UUID userId, UUID conversationId, SaveAiMessageRequest request) {
-        AiConversation conv = conversationRepo.findByIdAndUserId(conversationId, userId)
+        var conv = conversationRepo.findByIdAndUserId(conversationId, userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "AI conversation not found"));
 
-        String safeContent = request.content() != null ? request.content() : "";
-        AiMessage msg = AiMessage.of(conversationId, request.role(), safeContent, request.metadata());
+        var safeContent = "";
+        if (request.content() != null) {
+            safeContent = request.content();
+        }
+        var msg = AiMessage.of(conversationId, request.role(), safeContent, request.metadata());
         messageRepo.insertMessage(
             msg.getId(),
             msg.getConversationId(),
