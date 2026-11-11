@@ -1052,4 +1052,34 @@ class CatalogServiceTest {
         assertThat(catalog.getSummaryBatch(List.of(missingId, pendingShop.id()))).isEmpty();
         assertThat(catalog.getSummaryBatch(List.<UUID>of())).isEmpty();
     }
+
+    @Test
+    void getDetailByIdentifierResolvesUuidAndSlugAndHidesHiddenOrUnapproved() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-detail-ident");
+        var active = catalog.createProduct(ownerId, shopId, productRequest("ao-parka-ident"));
+        var hidden = catalog.createProduct(ownerId, shopId, productRequest("ao-hidden-ident"));
+        catalog.bulkUpdateProductStatus(
+            ownerId, shopId, new BulkUpdateProductStatusRequest(List.of(hidden.id()), "HIDDEN")
+        );
+
+        var adminId = mirroredUser();
+        var suspendedOwner = mirroredUser();
+        var suspendedShopId = approvedShop(suspendedOwner, "shop-suspend-ident");
+        var unapproved = catalog.createProduct(suspendedOwner, suspendedShopId, productRequest("ao-suspend-ident"));
+        shops.suspend(adminId, suspendedShopId, "tam khoa kiem tra");
+
+        assertThat(catalog.getDetailByIdentifier(active.id().toString()).id()).isEqualTo(active.id());
+        assertThat(catalog.getDetailByIdentifier(" " + active.slug() + " ").id()).isEqualTo(active.id());
+
+        assertThatThrownBy(() -> catalog.getDetailByIdentifier(hidden.slug()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        assertThatThrownBy(() -> catalog.getDetailByIdentifier(unapproved.slug()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        assertThatThrownBy(() -> catalog.getDetailByIdentifier("khong-ton-tai"))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+    }
 }

@@ -564,6 +564,30 @@ public class CatalogService {
         return toResponse(product);
     }
 
+    private static final Pattern UUID_STRING_PATTERN = Pattern.compile(
+        "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    );
+
+    @Transactional(readOnly = true)
+    public ProductResponse getDetailByIdentifier(@NonNull String idOrSlug) {
+        var trimmed = idOrSlug.trim();
+        if (trimmed.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        if (UUID_STRING_PATTERN.matcher(trimmed).matches()) {
+            return getDetail(UUID.fromString(trimmed));
+        }
+
+        var matches = products.findBySlug(trimmed).stream()
+            .filter(p -> p.getStatus() == ProductStatus.ACTIVE && shops.isShopApproved(p.getShopId()))
+            .sorted(Comparator.comparing(Product::getCreatedAt).thenComparing(Product::getId))
+            .toList();
+        if (matches.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
+        }
+        return toResponse(matches.getFirst());
+    }
+
     /**
      * Batch của getDetail cho một trang sản phẩm: cố định ~5 query thay vì
      * 5 query mỗi sản phẩm. Thứ tự đầu vào được giữ nguyên; id không tìm thấy,

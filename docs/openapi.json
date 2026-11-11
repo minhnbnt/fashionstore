@@ -17903,17 +17903,16 @@
       "get": {
         "tags": ["Products"],
         "summary": "Chi tiết sản phẩm",
-        "description": "Chỉ product ACTIVE của shop APPROVED mới xem được, còn lại 404.",
+        "description": "Chỉ product ACTIVE của shop APPROVED mới xem được, nhận UUID hoặc slug; còn lại 404.",
         "operationId": "detail_1",
         "parameters": [
           {
             "name": "id",
             "in": "path",
-            "description": "Id product",
+            "description": "Id (UUID) hoặc slug của product",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "uuid"
+              "type": "string"
             }
           }
         ],
