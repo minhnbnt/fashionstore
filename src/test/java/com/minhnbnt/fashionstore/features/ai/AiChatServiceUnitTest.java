@@ -26,6 +26,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,9 +44,6 @@ class AiChatServiceUnitTest {
 
     @Captor
     private ArgumentCaptor<AiConversation> conversationCaptor;
-
-    @Captor
-    private ArgumentCaptor<AiMessage> messageCaptor;
 
     @Test
     void listConversations_returnsListOrderedByUpdatedAt() {
@@ -147,17 +145,18 @@ class AiChatServiceUnitTest {
 
         when(conversationRepo.findByIdAndUserId(convId, userId))
             .thenReturn(Optional.of(conv));
-        when(messageRepo.save(any(AiMessage.class)))
-            .thenAnswer(inv -> inv.getArgument(0));
 
         var req = new SaveAiMessageRequest("user", "Tìm áo khoác nam", "{\"parts\":[]}");
         var res = service.saveMessage(userId, convId, req);
 
-        verify(messageRepo).save(messageCaptor.capture());
-        var savedMsg = messageCaptor.getValue();
-        assertThat(savedMsg.getContent()).isEqualTo("Tìm áo khoác nam");
-        assertThat(savedMsg.getRole()).isEqualTo("user");
-        assertThat(savedMsg.getMetadata()).isEqualTo("{\"parts\":[]}");
+        verify(messageRepo).insertMessage(
+            any(UUID.class),
+            eq(convId),
+            eq("user"),
+            eq("Tìm áo khoác nam"),
+            eq("{\"parts\":[]}"),
+            any(Instant.class)
+        );
 
         verify(conversationRepo).save(conversationCaptor.capture());
         var savedConv = conversationCaptor.getValue();

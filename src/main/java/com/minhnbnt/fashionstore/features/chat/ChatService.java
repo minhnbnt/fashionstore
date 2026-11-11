@@ -17,6 +17,7 @@ import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,10 +29,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 public class ChatService {
+
+    private static final Pattern PRODUCT_LINK_PATTERN =
+        Pattern.compile("(?:https?://[^\\s/]+)?/products?/[a-zA-Z0-9_-]+");
 
     private final ChatConversationRepository conversations;
 
@@ -127,9 +132,7 @@ public class ChatService {
         var textContent = (request.content() != null && !request.content().isBlank())
             ? request.content().trim()
             : "";
-        var previewText = textContent.isBlank()
-            ? (request.imageKey() != null ? "[Hình ảnh]" : "")
-            : textContent;
+        var previewText = buildPreviewText(textContent, request.imageKey());
 
         var msg = ChatMessage.of(
             conversationId,
@@ -279,6 +282,17 @@ public class ChatService {
             unread,
             c.getCreatedAt()
         );
+    }
+
+    private static String buildPreviewText(String textContent, @Nullable String imageKey) {
+        if (textContent.isBlank()) {
+            return imageKey != null ? "[Hình ảnh]" : "";
+        }
+        if (PRODUCT_LINK_PATTERN.matcher(textContent).find()) {
+            var stripped = PRODUCT_LINK_PATTERN.matcher(textContent).replaceAll("").trim();
+            return stripped.isBlank() ? "[Sản phẩm]" : stripped;
+        }
+        return textContent;
     }
 
     private static ChatMessageResponse toMessageResponse(ChatMessage m) {

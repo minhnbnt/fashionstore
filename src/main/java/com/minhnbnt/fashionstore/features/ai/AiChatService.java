@@ -70,14 +70,21 @@ public class AiChatService {
         AiConversation conv = conversationRepo.findByIdAndUserId(conversationId, userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "AI conversation not found"));
 
-        AiMessage msg = AiMessage.of(conversationId, request.role(), request.content(), request.metadata());
-        AiMessage savedMsg = messageRepo.save(msg);
+        String safeContent = request.content() != null ? request.content() : "";
+        AiMessage msg = AiMessage.of(conversationId, request.role(), safeContent, request.metadata());
+        messageRepo.insertMessage(
+            msg.getId(),
+            msg.getConversationId(),
+            msg.getRole(),
+            msg.getContent(),
+            msg.getMetadata(),
+            msg.getSentAt()
+        );
 
         if (DEFAULT_TITLE.equals(conv.getTitle())
             && "user".equalsIgnoreCase(request.role())
-            && request.content() != null
-            && !request.content().isBlank()) {
-            String title = request.content().trim();
+            && !safeContent.isBlank()) {
+            String title = safeContent.trim();
             if (title.length() > MAX_TITLE_LENGTH) {
                 title = title.substring(0, MAX_TITLE_LENGTH).trim() + "...";
             }
@@ -87,7 +94,7 @@ public class AiChatService {
         }
         conversationRepo.save(conv);
 
-        return toMessageResponse(savedMsg);
+        return toMessageResponse(msg);
     }
 
     private AiConversationResponse toConversationResponse(AiConversation conv) {
