@@ -1,0 +1,50 @@
+# Reverse proxy for an OpenAI-compatible API. Mounted read-only into the caddy
+# container as /etc/caddy/Caddyfile (see compose.yml). Values come from env vars
+# so no config edit is needed to retarget the proxy:
+#
+#   OPENAI_URL       - upstream base URL, scheme://host[:port] (no path:
+#                      Caddy does not accept a path in proxy upstreams)
+#   OPENAI_BASE_PATH - optional upstream path prefix, e.g. /api/gateway,
+#                      prepended to the request path; empty/unset = none
+#   OPENAI_TOKEN     - bearer token sent to the upstream (without the "Bearer" prefix)
+#
+# /ai/* (prefix stripped) and the bare paths both proxy to
+# <OPENAI_URL><OPENAI_BASE_PATH><request path>, so http://localhost:8081/ai/v1/...
+# and http://localhost:8081/v1/... reach the same upstream endpoint.
+#
+# CORS is answered here so preflight never depends on the upstream:
+# OPTIONS returns 204 locally and every response gets Access-Control-Allow-Origin.
+{
+	admin off
+}
+
+:8080 {
+	@preflight method OPTIONS
+	handle @preflight {
+		header {
+			Access-Control-Allow-Origin "*"
+			Access-Control-Allow-Methods "GET, POST, OPTIONS"
+			Access-Control-Allow-Headers "{http.request.header.Access-Control-Request-Headers}"
+			Access-Control-Max-Age "86400"
+		}
+		respond 204
+	}
+
+	handle_path /ai/* {
+		header Access-Control-Allow-Origin "*"
+		rewrite * {$OPENAI_BASE_PATH}{uri}
+		reverse_proxy {$OPENAI_URL:https://api.openai.com} {
+			header_up Host {upstream_hostport}
+			header_up Authorization "Bearer {$OPENAI_TOKEN}"
+		}
+	}
+
+	handle {
+		header Access-Control-Allow-Origin "*"
+		rewrite * {$OPENAI_BASE_PATH}{uri}
+		reverse_proxy {$OPENAI_URL:https://api.openai.com} {
+			header_up Host {upstream_hostport}
+			header_up Authorization "Bearer {$OPENAI_TOKEN}"
+		}
+	}
+}
