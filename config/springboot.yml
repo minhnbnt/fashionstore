@@ -8,7 +8,7 @@ spring:
 
   datasource:
     connection-fetch: lazy
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/fashionstore}
+    url: ${SPRING_DATASOURCE_URL:${DATABASE_URL:jdbc:postgresql://localhost:5434/fashionstore}}
     username: ${DATABASE_USERNAME:postgres}
     password: ${DATABASE_PASSWORD:postgres}
 
