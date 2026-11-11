@@ -241,6 +241,26 @@ class ChatServiceUnitTest {
     }
 
     @Test
+    void sendMessageFromBuyerWithImageOnly_savesAndRecordsPreviewAsImageTag() {
+        var buyerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var conv = ChatConversation.create(shopId, buyerId);
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(shops.isMember(shopId, buyerId)).thenReturn(false);
+
+        var req = new SendMessageRequest(null, "chat/photo.jpg");
+        chatService.sendMessage(buyerId, convId, req);
+
+        verify(messages).save(captor.capture());
+        var savedMessage = captor.getValue();
+        assertThat(savedMessage.getContent()).isEqualTo("");
+        assertThat(savedMessage.getImageKey()).isEqualTo("chat/photo.jpg");
+        assertThat(conv.getLastMessageText()).isEqualTo("[Hình ảnh]");
+    }
+
+    @Test
     void markReadByBuyerSendsReadReceiptToShop() {
         var buyerId = UUID.randomUUID();
         var shopId = UUID.randomUUID();

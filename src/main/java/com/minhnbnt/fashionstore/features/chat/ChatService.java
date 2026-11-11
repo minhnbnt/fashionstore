@@ -124,25 +124,32 @@ public class ChatService {
 
         var recipients = realtimeRecipients(conv);
 
+        var textContent = (request.content() != null && !request.content().isBlank())
+            ? request.content().trim()
+            : "";
+        var previewText = textContent.isBlank()
+            ? (request.imageKey() != null ? "[Hình ảnh]" : "")
+            : textContent;
+
         var msg = ChatMessage.of(
             conversationId,
             userId,
             senderType,
-            request.content(),
+            textContent,
             request.imageKey()
         );
         messages.save(msg);
 
-        conv.recordNewMessage(request.content(), !isSeller);
+        conv.recordNewMessage(previewText, !isSeller);
         conversations.save(conv);
 
         if (isSeller) {
             var chatDetail = "Phản hồi tin nhắn trong hội thoại #" + conv.getId();
-            if (request.content() != null && !request.content().isBlank()) {
-                var preview = request.content().trim();
-                if (preview.length() > 50) {
-                    preview = preview.substring(0, 50) + "...";
-                }
+            var preview = previewText;
+            if (preview.length() > 50) {
+                preview = preview.substring(0, 50) + "...";
+            }
+            if (!preview.isBlank()) {
                 chatDetail = chatDetail + ": \"" + preview + "\"";
             }
             audit.record(conv.getShopId(), userId, "CHAT_REPLY", "CONVERSATION", conv.getId(), chatDetail);
