@@ -8,14 +8,21 @@ import com.minhnbnt.fashionstore.dto.order.CheckoutItemRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.review.CreateReviewRequest;
 import com.minhnbnt.fashionstore.dto.review.ReplyReviewRequest;
+import com.minhnbnt.fashionstore.dto.review.SaveReviewReplyTemplateRequest;
 import com.minhnbnt.fashionstore.dto.review.UpdateReviewRequest;
 import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.notification.NotificationRepository;
 import com.minhnbnt.fashionstore.features.order.OrderService;
+import com.minhnbnt.fashionstore.features.shop.ShopMemberAuditRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopRoleRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.ReviewSort;
 import com.minhnbnt.fashionstore.model.ReviewTag;
+import com.minhnbnt.fashionstore.model.ShopMember;
+import com.minhnbnt.fashionstore.model.ShopPermission;
+import com.minhnbnt.fashionstore.model.ShopRole;
 import com.minhnbnt.fashionstore.test.ProductTestFixtures;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
@@ -23,8 +30,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -53,6 +65,27 @@ class ReviewServiceTest {
 
     @Autowired
     private NotificationRepository notifications;
+
+    @Autowired
+    private ShopMemberRepository shopMembers;
+
+    @Autowired
+    private ShopRoleRepository shopRoles;
+
+    @Autowired
+    private ShopMemberAuditRepository shopAudits;
+
+    @Autowired
+    private JdbcClient jdbc;
+
+    private UUID staffWith(UUID ownerId, UUID shopId, ShopPermission... granted) {
+        var staffId = mirroredUser();
+        var permissions = Arrays.stream(granted).map(Enum::name).toArray(String[]::new);
+        var role = ShopRole.create(shopId, "Staff " + UUID.randomUUID(), permissions, false);
+        shopRoles.save(role);
+        shopMembers.add(ShopMember.staff(shopId, staffId, role.getId(), ownerId));
+        return staffId;
+    }
 
     private record PurchasedItem(UUID orderId, UUID productId, UUID variantId) {
     }
@@ -479,5 +512,185 @@ class ReviewServiceTest {
         var buyerPage = notifications.findPage(buyerId, List.of("ACTIVITY"), 0, 10);
         assertThat(buyerPage).hasSize(1);
         assertThat(buyerPage.getFirst().type()).isEqualTo("REVIEW_REPLIED");
+    }
+
+    @Test
+    void sellerReviewsFilterByStarsProductAndUnrepliedAndRejectsInvalidStars() {
+        var ownerId = mirroredUser();
+        var buyerA = mirroredUser();
+        var buyerB = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-rev-filter");
+        var variantA = variantInShop(ownerId, shopId, "ao-filter-a", "SKU-FLT-A");
+        var variantB = variantInShop(ownerId, shopId, "quan-filter-b", "SKU-FLT-B");
+
+        var itemA5 = purchaseVariant(ownerId, buyerA, shopId, variantA);
+        var itemA3 = purchaseVariant(ownerId, buyerB, shopId, variantA);
+        var itemB1 = purchaseVariant(ownerId, buyerA, shopId, variantB);
+
+        var revA5 = reviews.createReview(buyerA, itemA5.productId(), validRequest(itemA5.orderId(), 5, "Sản phẩm A rất ưng ý."));
+        var revA3 = reviews.createReview(buyerB, itemA3.productId(), validRequest(itemA3.orderId(), 3, "Sản phẩm A ở mức ổn."));
+        var revB1 = reviews.createReview(buyerA, itemB1.productId(), validRequest(itemB1.orderId(), 1, "Sản phẩm B chưa đạt kỳ vọng."));
+
+        reviews.reply(ownerId, revA5.id(), new ReplyReviewRequest("Cảm ơn bạn đã ủng hộ sản phẩm A!"));
+
+        var all = reviews.listForShop(ownerId, shopId, false, null, null);
+        assertThat(all).hasSize(3);
+        assertThat(all).allSatisfy(item -> assertThat(item.productName()).isNotBlank());
+
+        var onlyFive = reviews.listForShop(ownerId, shopId, false, 5, null);
+        assertThat(onlyFive).extracting(r -> r.id()).containsExactly(revA5.id());
+
+        var onlyProductAUnreplied = reviews.listForShop(ownerId, shopId, true, null, itemA5.productId());
+        assertThat(onlyProductAUnreplied).extracting(r -> r.id()).containsExactly(revA3.id());
+
+        var productBOneStar = reviews.listForShop(ownerId, shopId, true, 1, itemB1.productId());
+        assertThat(productBOneStar).extracting(r -> r.id()).containsExactly(revB1.id());
+
+        assertThatThrownBy(() -> reviews.listForShop(ownerId, shopId, false, 0, null))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+        assertThatThrownBy(() -> reviews.listForShop(ownerId, shopId, false, 6, null))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void sellerReviewProductOptionsIncludesDeletedProductWithReviewsAndWorksForCskhStaff() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-rev-cskh");
+        var cskhId = staffWith(ownerId, shopId, ShopPermission.REVIEW_READ, ShopPermission.REVIEW_REPLY);
+
+        var variantActive = variantInShop(ownerId, shopId, "sp-active-cskh", "SKU-CSKH-1");
+        var variantDeleted = variantInShop(ownerId, shopId, "sp-deleted-cskh", "SKU-CSKH-2");
+
+        var purchasedActive = purchaseVariant(ownerId, buyerId, shopId, variantActive);
+        var purchasedDeleted = purchaseVariant(ownerId, buyerId, shopId, variantDeleted);
+        reviews.createReview(buyerId, purchasedActive.productId(), validRequest(purchasedActive.orderId(), 5, "Sản phẩm đang bán rất đẹp."));
+        reviews.createReview(buyerId, purchasedDeleted.productId(), validRequest(purchasedDeleted.orderId(), 4, "Sản phẩm sắp ngừng bán vẫn tốt."));
+
+        catalog.deleteProduct(ownerId, shopId, purchasedDeleted.productId());
+
+        var options = reviews.listShopReviewProducts(cskhId, shopId);
+        assertThat(options).extracting(o -> o.id())
+            .containsExactlyInAnyOrder(purchasedActive.productId(), purchasedDeleted.productId());
+        assertThat(options).allSatisfy(o -> assertThat(o.reviewCount()).isEqualTo(1L));
+
+        var list = reviews.listForShop(cskhId, shopId, false, null, purchasedDeleted.productId());
+        assertThat(list).hasSize(1);
+        assertThat(list.getFirst().productName()).contains("sp-deleted-cskh");
+
+        var trend = reviews.shopReviewTrend(cskhId, shopId, "day", null, null);
+        assertThat(trend.points()).isNotEmpty();
+
+        var template = reviews.createReplyTemplate(cskhId, shopId, new SaveReviewReplyTemplateRequest("Cảm ơn", "Cảm ơn bạn đã ủng hộ shop!"));
+        assertThat(reviews.listReplyTemplates(cskhId, shopId)).hasSize(1);
+        assertThat(template.title()).isEqualTo("Cảm ơn");
+    }
+
+    @Test
+    void sellerReviewTrendAggregatesByDayWeekMonthAndValidatesDates() {
+        var ownerId = mirroredUser();
+        var buyerA = mirroredUser();
+        var buyerB = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-rev-trend");
+        var variantId = variantInShop(ownerId, shopId, "sp-trend", "SKU-TREND-1");
+        var p1 = purchaseVariant(ownerId, buyerA, shopId, variantId);
+        var p2 = purchaseVariant(ownerId, buyerB, shopId, variantId);
+
+        var r1 = reviews.createReview(buyerA, p1.productId(), validRequest(p1.orderId(), 5, "Đánh giá ngày đầu rất hài lòng."));
+        var r2 = reviews.createReview(buyerB, p2.productId(), validRequest(p2.orderId(), 3, "Đánh giá ngày sau ở mức trung bình."));
+
+        var zone = ZoneId.of("Asia/Ho_Chi_Minh");
+        var oct10 = LocalDate.of(2026, 10, 10).atTime(10, 0).atZone(zone).toInstant();
+        var oct11 = LocalDate.of(2026, 10, 11).atTime(14, 0).atZone(zone).toInstant();
+        jdbc.sql("UPDATE review SET created_at = :ts WHERE id = :id")
+            .param("ts", java.sql.Timestamp.from(oct10))
+            .param("id", r1.id())
+            .update();
+        jdbc.sql("UPDATE review SET created_at = :ts WHERE id = :id")
+            .param("ts", java.sql.Timestamp.from(oct11))
+            .param("id", r2.id())
+            .update();
+
+        var byDay = reviews.shopReviewTrend(ownerId, shopId, "day", LocalDate.of(2026, 10, 9), LocalDate.of(2026, 10, 12));
+        assertThat(byDay.period()).isEqualTo("day");
+        assertThat(byDay.points()).hasSize(2);
+        assertThat(byDay.points().get(0).label()).isEqualTo("2026-10-10");
+        assertThat(byDay.points().get(0).reviewCount()).isEqualTo(1L);
+        assertThat(byDay.points().get(0).averageRating()).isEqualTo(5.0);
+        assertThat(byDay.points().get(1).label()).isEqualTo("2026-10-11");
+        assertThat(byDay.points().get(1).averageRating()).isEqualTo(3.0);
+
+        var byWeek = reviews.shopReviewTrend(ownerId, shopId, "week", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31));
+        assertThat(byWeek.points()).hasSize(1);
+        assertThat(byWeek.points().getFirst().reviewCount()).isEqualTo(2L);
+        assertThat(byWeek.points().getFirst().averageRating()).isEqualTo(4.0);
+
+        var byMonth = reviews.shopReviewTrend(ownerId, shopId, "month", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31));
+        assertThat(byMonth.points()).hasSize(1);
+        assertThat(byMonth.points().getFirst().label()).isEqualTo("2026-10");
+        assertThat(byMonth.points().getFirst().averageRating()).isEqualTo(4.0);
+
+        assertThatThrownBy(() -> reviews.shopReviewTrend(ownerId, shopId, "year", null, null))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+        assertThatThrownBy(() -> reviews.shopReviewTrend(ownerId, shopId, "day", LocalDate.of(2026, 10, 12), LocalDate.of(2026, 10, 10)))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void replyTemplatesCrudEnforcesPermissionsDuplicatesLimitAndAudit() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-rev-tpl");
+        var readOnlyStaff = staffWith(ownerId, shopId, ShopPermission.REVIEW_READ);
+        var outsider = mirroredUser();
+
+        assertThatThrownBy(() -> reviews.createReplyTemplate(readOnlyStaff, shopId, new SaveReviewReplyTemplateRequest("Mẫu 1", "Nội dung mẫu 1")))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.FORBIDDEN));
+
+        assertThatThrownBy(() -> reviews.listReplyTemplates(outsider, shopId))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.FORBIDDEN));
+
+        var created = reviews.createReplyTemplate(ownerId, shopId, new SaveReviewReplyTemplateRequest("  Cảm ơn  ", "  Cảm ơn bạn đã ủng hộ shop!  "));
+        assertThat(created.title()).isEqualTo("Cảm ơn");
+        assertThat(created.content()).isEqualTo("Cảm ơn bạn đã ủng hộ shop!");
+
+        assertThat(reviews.listReplyTemplates(readOnlyStaff, shopId)).hasSize(1);
+
+        assertThatThrownBy(() -> reviews.createReplyTemplate(ownerId, shopId, new SaveReviewReplyTemplateRequest("cảm ơn", "Trùng tên không phân biệt hoa thường")))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+
+        var second = reviews.createReplyTemplate(ownerId, shopId, new SaveReviewReplyTemplateRequest("Đổi trả", "Nhắn shop để được hỗ trợ đổi size nhé."));
+
+        var updatedSameTitle = reviews.updateReplyTemplate(ownerId, created.id(), new SaveReviewReplyTemplateRequest("Cảm ơn", "Nội dung cảm ơn mới."));
+        assertThat(updatedSameTitle.content()).isEqualTo("Nội dung cảm ơn mới.");
+
+        assertThatThrownBy(() -> reviews.updateReplyTemplate(ownerId, created.id(), new SaveReviewReplyTemplateRequest("đổi trả", "Trùng với mẫu khác")))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+
+        for (var i = 3; i <= 50; i++) {
+            reviews.createReplyTemplate(ownerId, shopId, new SaveReviewReplyTemplateRequest("Mẫu " + i, "Nội dung " + i));
+        }
+
+        assertThatThrownBy(() -> reviews.createReplyTemplate(ownerId, shopId, new SaveReviewReplyTemplateRequest("Mẫu 51", "Vượt quá 50")))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+
+        reviews.deleteReplyTemplate(ownerId, second.id());
+        assertThat(reviews.listReplyTemplates(ownerId, shopId)).hasSize(49);
+
+        assertThatThrownBy(() -> reviews.deleteReplyTemplate(ownerId, second.id()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.NOT_FOUND));
+
+        var audits = shopAudits.findByShopIdOrderByCreatedAtDesc(shopId);
+        assertThat(audits).extracting(a -> a.getAction())
+            .contains("REVIEW_TEMPLATE_CREATE", "REVIEW_TEMPLATE_UPDATE", "REVIEW_TEMPLATE_DELETE");
     }
 }

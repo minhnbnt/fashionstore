@@ -6,8 +6,12 @@ import com.minhnbnt.fashionstore.dto.review.ReplyReviewRequest;
 import com.minhnbnt.fashionstore.dto.review.ReportReviewRequest;
 import com.minhnbnt.fashionstore.dto.review.ReviewHelpfulResponse;
 import com.minhnbnt.fashionstore.dto.review.ReviewResponse;
+import com.minhnbnt.fashionstore.dto.review.ReviewReplyTemplateResponse;
 import com.minhnbnt.fashionstore.dto.review.ReviewSummaryResponse;
+import com.minhnbnt.fashionstore.dto.review.SaveReviewReplyTemplateRequest;
+import com.minhnbnt.fashionstore.dto.review.SellerReviewProductOptionResponse;
 import com.minhnbnt.fashionstore.dto.review.SellerReviewResponse;
+import com.minhnbnt.fashionstore.dto.review.SellerReviewTrendResponse;
 import com.minhnbnt.fashionstore.dto.review.UpdateReviewRequest;
 import com.minhnbnt.fashionstore.features.catalog.ProductStockService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
@@ -15,10 +19,13 @@ import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
 import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.review.repository.ReviewHelpfulRepository;
+import com.minhnbnt.fashionstore.features.review.repository.ReviewReplyTemplateRepository;
 import com.minhnbnt.fashionstore.features.review.repository.ReviewRepository;
+import com.minhnbnt.fashionstore.features.review.repository.SellerReviewQueryRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.infrastructure.media.VideoMetadataService;
 import com.minhnbnt.fashionstore.model.Review;
+import com.minhnbnt.fashionstore.model.ReviewReplyTemplate;
 import com.minhnbnt.fashionstore.model.ReviewSort;
 import com.minhnbnt.fashionstore.model.ReviewTag;
 import com.minhnbnt.fashionstore.model.ShopPermission;
@@ -31,12 +38,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -47,12 +59,20 @@ public class ReviewService {
 
     public static final int MIN_COMMENT_LENGTH = 10;
     public static final int MAX_COMMENT_LENGTH = 2000;
+    public static final int MAX_REPLY_LENGTH = 2000;
+    public static final int MAX_TEMPLATE_TITLE_LENGTH = 100;
+    public static final int MAX_TEMPLATES_PER_SHOP = 50;
     public static final int MAX_REVIEW_IMAGES = 5;
     public static final double MAX_REVIEW_VIDEO_SECONDS = 30.0;
+    private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private final ReviewRepository reviews;
 
     private final ReviewHelpfulRepository helpfulRepository;
+
+    private final ReviewReplyTemplateRepository templates;
+
+    private final SellerReviewQueryRepository sellerQueries;
 
     private final ProductStockService productStock;
 
@@ -253,21 +273,204 @@ public class ReviewService {
         @NonNull UUID shopId,
         boolean onlyUnreplied
     ) {
-        access.requireShopPermission(userId, shopId, ShopPermission.REVIEW_READ);
+        return listForShop(userId, shopId, onlyUnreplied, null, null);
+    }
 
-        List<Review> list;
-        if (onlyUnreplied) {
-            list = reviews.findUnrepliedByShopIdOrderByCreatedAtDesc(shopId);
-        } else {
-            list = reviews.findByShopIdOrderByCreatedAtDesc(shopId);
+    @Transactional(readOnly = true)
+    public List<SellerReviewResponse> listForShop(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        boolean onlyUnreplied,
+        @Nullable Integer stars,
+        @Nullable UUID productId
+    ) {
+        access.requireShopPermission(userId, shopId, ShopPermission.REVIEW_READ);
+        if (stars != null && (stars < 1 || stars > 5)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stars filter must be between 1 and 5");
         }
 
-        var responses = new ArrayList<SellerReviewResponse>();
-        for (var review : list) {
-            responses.add(toSellerResponse(review));
+        var rows = sellerQueries.findShopReviews(shopId, onlyUnreplied, stars, productId);
+        var responses = new ArrayList<SellerReviewResponse>(rows.size());
+        for (var row : rows) {
+            responses.add(toSellerResponse(row.review(), row.productName()));
         }
 
         return responses;
+    }
+
+    @Transactional(readOnly = true)
+    public List<SellerReviewProductOptionResponse> listShopReviewProducts(
+        @NonNull UUID userId,
+        @NonNull UUID shopId
+    ) {
+        access.requireShopPermission(userId, shopId, ShopPermission.REVIEW_READ);
+        return sellerQueries.findShopReviewProductOptions(shopId);
+    }
+
+    @Transactional(readOnly = true)
+    public SellerReviewTrendResponse shopReviewTrend(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        @NonNull String period,
+        @Nullable LocalDate from,
+        @Nullable LocalDate to
+    ) {
+        access.requireShopPermission(userId, shopId, ShopPermission.REVIEW_READ);
+
+        var normalizedPeriod = period.trim().toLowerCase(Locale.ROOT);
+        if (!"day".equals(normalizedPeriod)
+            && !"week".equals(normalizedPeriod)
+            && !"month".equals(normalizedPeriod)
+        ) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Period must be one of: day, week, month"
+            );
+        }
+
+        var today = LocalDate.now(VN_ZONE);
+        var effectiveTo = to;
+        if (effectiveTo == null) {
+            effectiveTo = today;
+        }
+        var effectiveFrom = from;
+        if (effectiveFrom == null) {
+            if ("week".equals(normalizedPeriod)) {
+                effectiveFrom = effectiveTo.minusWeeks(11);
+            } else if ("month".equals(normalizedPeriod)) {
+                effectiveFrom = effectiveTo.withDayOfMonth(1).minusMonths(11);
+            } else {
+                effectiveFrom = effectiveTo.minusDays(29);
+            }
+        }
+        if (effectiveFrom.isAfter(effectiveTo)) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "From date must not be after to date"
+            );
+        }
+
+        var fromInstant = effectiveFrom.atStartOfDay(VN_ZONE).toInstant();
+        var toInstant = effectiveTo.plusDays(1).atStartOfDay(VN_ZONE).toInstant();
+        var rows = sellerQueries.findShopReviewTrend(shopId, normalizedPeriod, fromInstant, toInstant);
+        var points = new ArrayList<SellerReviewTrendResponse.Point>(rows.size());
+        for (var row : rows) {
+            points.add(new SellerReviewTrendResponse.Point(
+                row.label(),
+                row.reviewCount(),
+                roundTwoDecimals(row.averageRating())
+            ));
+        }
+
+        return new SellerReviewTrendResponse(normalizedPeriod, points);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReviewReplyTemplateResponse> listReplyTemplates(
+        @NonNull UUID userId,
+        @NonNull UUID shopId
+    ) {
+        access.requireShopPermission(userId, shopId, ShopPermission.REVIEW_READ);
+        var list = templates.findByShopIdOrderByUpdatedAtDescCreatedAtDesc(shopId);
+        var responses = new ArrayList<ReviewReplyTemplateResponse>(list.size());
+        for (var template : list) {
+            responses.add(toTemplateResponse(template));
+        }
+        return responses;
+    }
+
+    @Transactional
+    public ReviewReplyTemplateResponse createReplyTemplate(
+        @NonNull UUID userId,
+        @NonNull UUID shopId,
+        @NonNull SaveReviewReplyTemplateRequest request
+    ) {
+        access.requireShopPermission(userId, shopId, ShopPermission.REVIEW_REPLY);
+        var title = normalizeTemplateTitle(request.title());
+        var content = normalizeTemplateContent(request.content());
+
+        if (templates.countByShopId(shopId) >= MAX_TEMPLATES_PER_SHOP) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Maximum 50 reply templates per shop"
+            );
+        }
+        if (templates.existsDuplicateTitle(shopId, title)) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Reply template title already exists"
+            );
+        }
+
+        var saved = templates.save(ReviewReplyTemplate.create(shopId, userId, title, content));
+        audit.record(
+            shopId,
+            userId,
+            "REVIEW_TEMPLATE_CREATE",
+            "REVIEW_TEMPLATE",
+            saved.getId(),
+            "Tạo mẫu phản hồi nhanh: " + title
+        );
+
+        return toTemplateResponse(saved);
+    }
+
+    @Transactional
+    public ReviewReplyTemplateResponse updateReplyTemplate(
+        @NonNull UUID userId,
+        @NonNull UUID templateId,
+        @NonNull SaveReviewReplyTemplateRequest request
+    ) {
+        var template = templates.findById(templateId).orElse(null);
+        if (template == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Reply template not found");
+        }
+        access.requireShopPermission(userId, template.getShopId(), ShopPermission.REVIEW_REPLY);
+
+        var title = normalizeTemplateTitle(request.title());
+        var content = normalizeTemplateContent(request.content());
+
+        if (templates.existsDuplicateTitleExcludingId(template.getShopId(), title, templateId)) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Reply template title already exists"
+            );
+        }
+
+        template.update(title, content);
+        var saved = templates.save(template);
+        audit.record(
+            template.getShopId(),
+            userId,
+            "REVIEW_TEMPLATE_UPDATE",
+            "REVIEW_TEMPLATE",
+            saved.getId(),
+            "Cập nhật mẫu phản hồi nhanh: " + title
+        );
+
+        return toTemplateResponse(saved);
+    }
+
+    @Transactional
+    public void deleteReplyTemplate(
+        @NonNull UUID userId,
+        @NonNull UUID templateId
+    ) {
+        var template = templates.findById(templateId).orElse(null);
+        if (template == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Reply template not found");
+        }
+        access.requireShopPermission(userId, template.getShopId(), ShopPermission.REVIEW_REPLY);
+
+        templates.delete(template);
+        audit.record(
+            template.getShopId(),
+            userId,
+            "REVIEW_TEMPLATE_DELETE",
+            "REVIEW_TEMPLATE",
+            template.getId(),
+            "Xóa mẫu phản hồi nhanh: " + template.getTitle()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -283,7 +486,8 @@ public class ReviewService {
         @NonNull ReplyReviewRequest request
     ) {
         var found = requireShopReview(userId, reviewId);
-        found.review().reply(request.reply());
+        var replyText = normalizeReply(request.reply());
+        found.review().reply(replyText);
 
         var saved = reviews.save(found.review());
         audit.record(
@@ -292,7 +496,7 @@ public class ReviewService {
             "REVIEW_REPLY",
             "REVIEW",
             saved.getId(),
-            "Phản hồi đánh giá: " + request.reply()
+            "Phản hồi đánh giá: " + replyText
         );
 
         notifications.create(
@@ -300,12 +504,12 @@ public class ReviewService {
             NotificationCategory.ACTIVITY,
             "REVIEW_REPLIED",
             "Shop đã phản hồi đánh giá của bạn",
-            request.reply(),
+            replyText,
             "/product/" + saved.getProductId(),
             saved.getId()
         );
 
-        return toSellerResponse(saved);
+        return toSellerResponse(saved, found.productName());
     }
 
     @Transactional
@@ -327,7 +531,7 @@ public class ReviewService {
             "Báo cáo đánh giá: " + request.reason()
         );
 
-        return toSellerResponse(saved);
+        return toSellerResponse(saved, found.productName());
     }
 
     /**
@@ -385,7 +589,46 @@ public class ReviewService {
 
         access.requireShopPermission(userId, product.getShopId(), ShopPermission.REVIEW_REPLY);
 
-        return new ShopReview(review, product.getShopId());
+        return new ShopReview(review, product.getShopId(), product.getName());
+    }
+
+    private static String normalizeReply(String rawReply) {
+        var trimmed = rawReply.trim();
+        if (trimmed.isEmpty() || trimmed.length() > MAX_REPLY_LENGTH) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Reply must be between 1 and 2000 characters"
+            );
+        }
+        return trimmed;
+    }
+
+    private static String normalizeTemplateTitle(String rawTitle) {
+        var trimmed = rawTitle.trim();
+        if (trimmed.isEmpty() || trimmed.length() > MAX_TEMPLATE_TITLE_LENGTH) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Reply template title must be between 1 and 100 characters"
+            );
+        }
+        return trimmed;
+    }
+
+    private static String normalizeTemplateContent(String rawContent) {
+        var trimmed = rawContent.trim();
+        if (trimmed.isEmpty() || trimmed.length() > MAX_REPLY_LENGTH) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Reply template content must be between 1 and 2000 characters"
+            );
+        }
+        return trimmed;
+    }
+
+    private static double roundTwoDecimals(double value) {
+        return BigDecimal.valueOf(value)
+            .setScale(2, RoundingMode.HALF_UP)
+            .doubleValue();
     }
 
     private static String normalizeAndValidateComment(String rawComment) {
@@ -428,7 +671,18 @@ public class ReviewService {
         return trimmed;
     }
 
-    private record ShopReview(Review review, UUID shopId) {
+    private record ShopReview(Review review, UUID shopId, String productName) {
+    }
+
+    private static ReviewReplyTemplateResponse toTemplateResponse(ReviewReplyTemplate template) {
+        return new ReviewReplyTemplateResponse(
+            template.getId(),
+            template.getShopId(),
+            template.getTitle(),
+            template.getContent(),
+            template.getCreatedAt(),
+            template.getUpdatedAt()
+        );
     }
 
     private static ReviewSummaryResponse toSummaryResponse(ReviewRepository.ReviewSummaryRow row) {
@@ -492,7 +746,7 @@ public class ReviewService {
         );
     }
 
-    private static SellerReviewResponse toSellerResponse(Review review) {
+    private static SellerReviewResponse toSellerResponse(Review review, String productName) {
         var editedAt = review.getEditedAt();
         var edited = editedAt != null;
         var displayName = review.getBuyerDisplayName();
@@ -503,6 +757,7 @@ public class ReviewService {
         return new SellerReviewResponse(
             review.getId(),
             review.getProductId(),
+            productName,
             review.getOrderId(),
             displayName,
             review.getVariantLabel(),
