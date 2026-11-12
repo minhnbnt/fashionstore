@@ -12,7 +12,7 @@ public record SellerReviewTrendResponse(
     @Schema(description = "Danh sách các điểm dữ liệu theo mốc thời gian")
     List<Point> points
 ) {
-    @Schema(description = "Dữ liệu đánh giá tại một mốc thời gian")
+    @Schema(name = "SellerReviewTrendPoint", description = "Dữ liệu đánh giá tại một mốc thời gian")
     public record Point(
         @Schema(description = "Nhãn thời gian (YYYY-MM-DD, YYYY-Www, hoặc YYYY-MM)", example = "2026-11-12")
         String label,
