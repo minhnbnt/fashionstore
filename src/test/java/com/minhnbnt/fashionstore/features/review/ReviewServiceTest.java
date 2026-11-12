@@ -166,17 +166,25 @@ class ReviewServiceTest {
     }
 
     @Test
-    void updateOwnReview() {
+    void updateOwnReviewOnceAndSecondEditFails() {
         var ownerId = mirroredUser();
         var buyerId = mirroredUser();
         var shopId = approvedShop(ownerId, "shop-rev-e");
         var productId = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-e", "SKU-REV-E");
-        reviews.createReview(buyerId, productId, new CreateReviewRequest(3, "Tam on"));
+        var created = reviews.createReview(buyerId, productId, new CreateReviewRequest(3, "Tam on"));
+        assertThat(created.edited()).isFalse();
+        assertThat(created.editedAt()).isNull();
 
         var updated = reviews.updateReview(buyerId, productId, new UpdateReviewRequest(5, "Xuat sac"));
 
         assertThat(updated.stars()).isEqualTo(5);
         assertThat(updated.comment()).isEqualTo("Xuat sac");
+        assertThat(updated.edited()).isTrue();
+        assertThat(updated.editedAt()).isNotNull();
+
+        assertThatThrownBy(() -> reviews.updateReview(buyerId, productId, new UpdateReviewRequest(4, "Sua lan 2")))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
     }
 
     @Test
@@ -193,29 +201,44 @@ class ReviewServiceTest {
     }
 
     @Test
-    void deleteOwnReview() {
+    void listMineReturnsBuyerReviewsOrderedByUpdatedAtDesc() {
         var ownerId = mirroredUser();
-        var buyerId = mirroredUser();
-        var shopId = approvedShop(ownerId, "shop-rev-g");
-        var productId = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-g", "SKU-REV-G");
-        reviews.createReview(buyerId, productId, new CreateReviewRequest(4, null));
+        var shopId = approvedShop(ownerId, "shop-rev-mine");
+        var buyerA = mirroredUser();
+        var buyerB = mirroredUser();
+        var product1 = deliveredProduct(ownerId, buyerA, shopId, "ao-rev-m1", "SKU-REV-M1");
+        var product2 = deliveredProduct(ownerId, buyerA, shopId, "ao-rev-m2", "SKU-REV-M2");
+        purchaseVariant(ownerId, buyerB, shopId, catalog.getDetail(product1).variants().get(0).id());
 
-        reviews.deleteReview(buyerId, productId);
+        reviews.createReview(buyerA, product1, new CreateReviewRequest(4, "Ban dau 1"));
+        reviews.createReview(buyerA, product2, new CreateReviewRequest(5, "Ban dau 2"));
+        reviews.createReview(buyerB, product1, new CreateReviewRequest(3, "Nguoi khac"));
 
-        assertThat(reviews.getReviews(productId)).isEmpty();
+        reviews.updateReview(buyerA, product1, new UpdateReviewRequest(5, "Da chinh sua 1"));
+
+        var mine = reviews.listMine(buyerA);
+        assertThat(mine).hasSize(2);
+        assertThat(mine.get(0).productId()).isEqualTo(product1);
+        assertThat(mine.get(0).edited()).isTrue();
+        assertThat(mine.get(0).editedAt()).isNotNull();
+        assertThat(mine.get(1).productId()).isEqualTo(product2);
+        assertThat(mine.get(1).edited()).isFalse();
     }
 
     @Test
-    void deleteOthersReviewFails() {
+    void createAndEditAllowedWhenProductHiddenAfterReceipt() {
         var ownerId = mirroredUser();
         var buyerId = mirroredUser();
-        var shopId = approvedShop(ownerId, "shop-rev-h");
-        var productId = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-h", "SKU-REV-H");
-        reviews.createReview(buyerId, productId, new CreateReviewRequest(4, null));
+        var shopId = approvedShop(ownerId, "shop-rev-hidden");
+        var productId = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-h1", "SKU-REV-H1");
+        catalog.updateProduct(ownerId, shopId, productId, new UpdateProductRequest(null, null, null, "HIDDEN", null));
 
-        assertThatThrownBy(() -> reviews.deleteReview(mirroredUser(), productId))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.NOT_FOUND));
+        var created = reviews.createReview(buyerId, productId, new CreateReviewRequest(5, "Van danh gia duoc"));
+        assertThat(created.edited()).isFalse();
+
+        var updated = reviews.updateReview(buyerId, productId, new UpdateReviewRequest(4, "Sua duoc 1 lan"));
+        assertThat(updated.edited()).isTrue();
+        assertThat(updated.editedAt()).isNotNull();
     }
 
     @Test

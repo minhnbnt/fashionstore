@@ -17,6 +17,8 @@ public interface ReviewRepository extends CrudRepository<Review, UUID> {
 
     Optional<Review> findByProductIdAndBuyerId(UUID productId, UUID buyerId);
 
+    List<Review> findByBuyerIdOrderByUpdatedAtDescCreatedAtDesc(UUID buyerId);
+
     @Query("""
         SELECT r.* FROM review r
         JOIN product p ON p.id = r.product_id

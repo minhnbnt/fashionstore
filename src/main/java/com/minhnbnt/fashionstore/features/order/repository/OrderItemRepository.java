@@ -4,10 +4,13 @@ import com.minhnbnt.fashionstore.model.OrderItem;
 import org.springframework.data.jdbc.repository.query.Query;
 import org.springframework.data.repository.CrudRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
 public interface OrderItemRepository extends CrudRepository<OrderItem, UUID> {
+
+    List<OrderItem> findByOrderIdIn(Collection<UUID> orderIds);
 
     List<OrderItem> findByOrderId(UUID orderId);
 

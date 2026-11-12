@@ -1,10 +1,13 @@
 package com.minhnbnt.fashionstore.features.order.controller;
 
 import com.minhnbnt.fashionstore.dto.admin.OrderTimelineResponse;
+import com.minhnbnt.fashionstore.dto.order.AddOrderTrackingEventRequest;
 import com.minhnbnt.fashionstore.dto.order.BulkConfirmOrderRequest;
 import com.minhnbnt.fashionstore.dto.order.BulkConfirmOrderResponse;
 import com.minhnbnt.fashionstore.dto.order.CancelOrderRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
+import com.minhnbnt.fashionstore.dto.order.OrderTrackingEventResponse;
+import com.minhnbnt.fashionstore.dto.order.ShipOrderRequest;
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -13,6 +16,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -82,6 +86,7 @@ public class SellerOrderController {
     @PatchMapping("/{id}/ship")
     @Operation(summary = "Giao cho vận chuyển", description = "CONFIRMED -> SHIPPING.")
     @ApiResponse(responseCode = "200", description = "Đơn sau khi ship")
+    @ApiResponse(responseCode = "400", description = "Dữ liệu vận chuyển không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @ApiResponse(responseCode = "403",
             description = "Không phải thành viên shop hoặc thiếu quyền ORDER_PROCESS")
@@ -90,12 +95,13 @@ public class SellerOrderController {
     @SecurityRequirement(name = "bearerAuth")
     public OrderResponse ship(
         @AuthenticationPrincipal Jwt jwt,
-        @Parameter(description = "id đơn") @PathVariable UUID id
+        @Parameter(description = "id đơn") @PathVariable UUID id,
+        @RequestBody(required = false) @Valid @Nullable ShipOrderRequest request
     ) {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var userId = UUID.fromString(subject);
 
-        return orders.ship(userId, id);
+        return orders.ship(userId, id, request);
     }
 
     @PatchMapping("/{id}/deliver")
@@ -180,5 +186,48 @@ public class SellerOrderController {
         var userId = UUID.fromString(subject);
 
         return orders.getOrderTimeline(userId, id);
+    }
+
+    @GetMapping("/{id}/tracking")
+    @Operation(
+        summary = "Hành trình vận chuyển đơn hàng",
+        description = "Lấy danh sách các mốc di chuyển gói hàng của đơn."
+    )
+    @ApiResponse(responseCode = "200", description = "Danh sách mốc hành trình")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Thiếu quyền ORDER_READ ở shop của đơn")
+    @ApiResponse(responseCode = "404", description = "Đơn không tồn tại")
+    @SecurityRequirement(name = "bearerAuth")
+    public List<OrderTrackingEventResponse> tracking(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id đơn") @PathVariable UUID id
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return orders.getSellerTracking(userId, id);
+    }
+
+    @PostMapping("/{id}/tracking")
+    @Operation(
+        summary = "Thêm mốc hành trình vận chuyển",
+        description = "Shop bổ sung mốc trung chuyển mới khi đơn đang ở trạng thái SHIPPING."
+    )
+    @ApiResponse(responseCode = "200", description = "Mốc hành trình vừa thêm")
+    @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Thiếu quyền ORDER_PROCESS ở shop của đơn")
+    @ApiResponse(responseCode = "404", description = "Đơn không tồn tại")
+    @ApiResponse(responseCode = "409", description = "Đơn không ở trạng thái SHIPPING")
+    @SecurityRequirement(name = "bearerAuth")
+    public OrderTrackingEventResponse addTracking(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id đơn") @PathVariable UUID id,
+        @Valid @RequestBody AddOrderTrackingEventRequest request
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return orders.addTrackingEvent(userId, id, request);
     }
 }

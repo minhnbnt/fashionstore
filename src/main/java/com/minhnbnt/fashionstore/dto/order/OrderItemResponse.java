@@ -26,6 +26,13 @@ public record OrderItemResponse(
 
     int quantity,
 
-    long lineTotal
+    long lineTotal,
+
+    @Schema(description = "Storage key ảnh đại diện sản phẩm/biến thể", nullable = true)
+    @Nullable
+    String imageKey,
+
+    @Schema(description = "Sản phẩm còn đang mở bán hay đã ẩn/ngừng bán")
+    boolean productAvailable
 ) {
 }

@@ -14,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -74,6 +73,7 @@ public class ReviewController {
     @ApiResponse(responseCode = "200", description = "Danh gia sau khi sua")
     @ApiResponse(responseCode = "401", description = "Thieu hoac sai JWT")
     @ApiResponse(responseCode = "404", description = "Ban chua danh gia product nay")
+    @ApiResponse(responseCode = "409", description = "Danh gia chi duoc sua toi da 1 lan")
     @SecurityRequirement(name = "bearerAuth")
     public ReviewResponse update(
         @AuthenticationPrincipal Jwt jwt,
@@ -84,22 +84,5 @@ public class ReviewController {
         var buyerId = UUID.fromString(subject);
 
         return reviews.updateReview(buyerId, productId, request);
-    }
-
-    @DeleteMapping
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Xoa danh gia cua minh")
-    @ApiResponse(responseCode = "204", description = "Da xoa")
-    @ApiResponse(responseCode = "401", description = "Thieu hoac sai JWT")
-    @ApiResponse(responseCode = "404", description = "Ban chua danh gia product nay")
-    @SecurityRequirement(name = "bearerAuth")
-    public void delete(
-        @AuthenticationPrincipal Jwt jwt,
-        @Parameter(description = "id product") @PathVariable UUID productId
-    ) {
-        var subject = Objects.requireNonNull(jwt.getSubject());
-        var buyerId = UUID.fromString(subject);
-
-        reviews.deleteReview(buyerId, productId);
     }
 }

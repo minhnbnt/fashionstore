@@ -10,6 +10,8 @@ import java.util.UUID;
 public record ReturnRequestResponse(
     UUID id,
     UUID orderId,
+    String orderCode,
+    String orderStatus,
     UUID shopId,
     UUID buyerId,
     String reason,

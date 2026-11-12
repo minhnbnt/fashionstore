@@ -141,9 +141,14 @@ public class ReviewService {
         return toResponse(reviews.save(review));
     }
 
-    @Transactional
-    public void deleteReview(@NonNull UUID buyerId, @NonNull UUID productId) {
-        reviews.delete(requireOwnReview(buyerId, productId));
+    @Transactional(readOnly = true)
+    public List<ReviewResponse> listMine(@NonNull UUID buyerId) {
+        var responses = new ArrayList<ReviewResponse>();
+        for (var review : reviews.findByBuyerIdOrderByUpdatedAtDescCreatedAtDesc(buyerId)) {
+            responses.add(toResponse(review));
+        }
+
+        return responses;
     }
 
     @Transactional(readOnly = true)
@@ -256,18 +261,24 @@ public class ReviewService {
     }
 
     private static ReviewResponse toResponse(Review review) {
+        var editedAt = review.getEditedAt();
+        var edited = editedAt != null;
         return new ReviewResponse(
             review.getId(),
             review.getProductId(),
             review.getBuyerDisplayName(),
             review.getStars(),
             review.getComment(),
+            edited,
+            editedAt,
             review.getCreatedAt(),
             review.getUpdatedAt()
         );
     }
 
     private static SellerReviewResponse toSellerResponse(Review review) {
+        var editedAt = review.getEditedAt();
+        var edited = editedAt != null;
         return new SellerReviewResponse(
             review.getId(),
             review.getProductId(),
@@ -277,6 +288,8 @@ public class ReviewService {
             review.getSellerReply(),
             review.getRepliedAt(),
             review.isReported(),
+            edited,
+            editedAt,
             review.getCreatedAt(),
             review.getUpdatedAt()
         );

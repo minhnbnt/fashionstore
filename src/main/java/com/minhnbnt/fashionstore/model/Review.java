@@ -41,6 +41,8 @@ public class Review implements Persistable<UUID> {
 
     private @Nullable String reportReason;
 
+    private @Nullable Instant editedAt;
+
     private Instant createdAt;
 
     private Instant updatedAt;
@@ -63,15 +65,21 @@ public class Review implements Persistable<UUID> {
             null,
             false,
             null,
+            null,
             now,
             now,
             true);
     }
 
     public void update(int stars, @Nullable String comment) {
+        if (this.editedAt != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Review has already been edited once");
+        }
+        var now = Instant.now();
         this.stars = stars;
         this.comment = comment;
-        updatedAt = Instant.now();
+        this.editedAt = now;
+        this.updatedAt = now;
     }
 
     public void reply(String reply) {

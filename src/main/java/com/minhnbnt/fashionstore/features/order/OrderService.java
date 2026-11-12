@@ -8,26 +8,39 @@ import com.minhnbnt.fashionstore.dto.admin.DailyOrderTotals;
 import com.minhnbnt.fashionstore.dto.admin.OrderRevenueTotals;
 import com.minhnbnt.fashionstore.dto.common.PageResponse;
 import com.minhnbnt.fashionstore.dto.admin.OrderTimelineResponse;
+import com.minhnbnt.fashionstore.dto.order.AddOrderTrackingEventRequest;
 import com.minhnbnt.fashionstore.dto.order.BulkConfirmFailureItem;
 import com.minhnbnt.fashionstore.dto.order.BulkConfirmOrderResponse;
+import com.minhnbnt.fashionstore.dto.order.BuyerCancelOrderRequest;
+import com.minhnbnt.fashionstore.dto.order.BuyerOrderTimelineResponse;
 import com.minhnbnt.fashionstore.dto.order.CancelOrderRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderItemResponse;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
+import com.minhnbnt.fashionstore.dto.order.OrderTrackingEventResponse;
+import com.minhnbnt.fashionstore.dto.order.ShipOrderRequest;
 import com.minhnbnt.fashionstore.features.catalog.ProductStockService;
 import com.minhnbnt.fashionstore.features.order.repository.OrderAdminQueryRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderMonitoringQueryRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderStatusHistoryRepository;
+import com.minhnbnt.fashionstore.features.order.repository.OrderTrackingEventRepository;
+import com.minhnbnt.fashionstore.features.order.repository.ReturnRequestRepository;
+import com.minhnbnt.fashionstore.features.settings.SystemSettingsService;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.AdminCancelReason;
+import com.minhnbnt.fashionstore.model.BuyerCancelReason;
 import com.minhnbnt.fashionstore.model.Order;
+import com.minhnbnt.fashionstore.model.OrderCanceller;
 import com.minhnbnt.fashionstore.model.OrderItem;
 import com.minhnbnt.fashionstore.model.OrderStatus;
 import com.minhnbnt.fashionstore.model.OrderStatusHistory;
+import com.minhnbnt.fashionstore.model.OrderTrackingEvent;
+import com.minhnbnt.fashionstore.model.OrderTrackingStatus;
 import com.minhnbnt.fashionstore.model.ProductStatus;
+import com.minhnbnt.fashionstore.model.ReturnStatus;
 import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
@@ -48,6 +61,8 @@ import java.time.temporal.ChronoUnit;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -65,6 +80,10 @@ public class OrderService {
 
     private final OrderStatusHistoryRepository histories;
 
+    private final OrderTrackingEventRepository trackingEvents;
+
+    private final ReturnRequestRepository returns;
+
     private final ProductStockService productStock;
 
     private final ShopService shops;
@@ -80,6 +99,8 @@ public class OrderService {
     private final OrderMonitoringQueryRepository monitoring;
 
     private final ReturnRequestService returnRequests;
+
+    private final SystemSettingsService systemSettings;
 
     private final Clock clock;
 
@@ -236,14 +257,7 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public List<OrderResponse> getMine(@NonNull UUID buyerId) {
-        var result = new ArrayList<OrderResponse>();
-
-        for (var order : orders.findByBuyerIdOrderByCreatedAtDesc(buyerId)) {
-            var orderItems = items.findByOrderId(order.getId());
-            result.add(toResponse(order, orderItems));
-        }
-
-        return result;
+        return toResponses(orders.findByBuyerIdOrderByCreatedAtDesc(buyerId));
     }
 
     @Transactional(readOnly = true)
@@ -256,16 +270,53 @@ public class OrderService {
 
     @Transactional
     public OrderResponse cancel(@NonNull UUID buyerId, @NonNull UUID orderId) {
-        var order = requireBuyerOrder(buyerId, orderId);
-        order.cancel();
-        histories.save(OrderStatusHistory.record(order.getId(), OrderStatus.PENDING, OrderStatus.CANCELLED, buyerId));
+        return cancel(buyerId, orderId, null);
+    }
+
+    @Transactional
+    public OrderResponse cancel(
+        @NonNull UUID buyerId,
+        @NonNull UUID orderId,
+        @Nullable BuyerCancelOrderRequest request
+    ) {
+        var order = requireLockedBuyerOrder(buyerId, orderId);
+        String notificationBody;
+        if (request != null) {
+            var reason = BuyerCancelReason.parse(request.reason());
+            var trimmedNote = trimToNull(request.note());
+            if (reason == BuyerCancelReason.OTHER && trimmedNote == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vui lòng nhập lý do hủy chi tiết");
+            }
+            order.cancel(reason.name(), trimmedNote);
+            var historyNote = reason.label();
+            if (trimmedNote != null) {
+                historyNote = historyNote + " - " + trimmedNote;
+            }
+            histories.save(OrderStatusHistory.record(
+                order.getId(),
+                OrderStatus.PENDING,
+                OrderStatus.CANCELLED,
+                buyerId,
+                historyNote
+            ));
+            notificationBody = "Khách hàng đã hủy đơn #" + order.getCode() + " (" + reason.label() + ").";
+        } else {
+            order.cancel();
+            histories.save(OrderStatusHistory.record(
+                order.getId(),
+                OrderStatus.PENDING,
+                OrderStatus.CANCELLED,
+                buyerId
+            ));
+            notificationBody = "Khách hàng đã hủy đơn #" + order.getCode() + ".";
+        }
 
         notifications.create(
             shops.findActiveUserIdsByShop(order.getShopId()),
             NotificationCategory.SELLING,
             "ORDER_CANCELLED",
             "Đơn #" + order.getCode() + " đã bị hủy",
-            "Khách hàng đã hủy đơn #" + order.getCode() + ".",
+            notificationBody,
             "/shop?shopId=" + order.getShopId() + "&tab=orders&orderId=" + order.getId(),
             order.getId()
         );
@@ -277,27 +328,42 @@ public class OrderService {
 
     @Transactional
     public OrderResponse confirmReceipt(@NonNull UUID buyerId, @NonNull UUID orderId) {
-        var order = requireBuyerOrder(buyerId, orderId);
-        order.confirmReceipt();
-
+        var order = requireLockedBuyerOrder(buyerId, orderId);
+        if (order.getStatus() != OrderStatus.DELIVERED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only delivered orders can be confirmed");
+        }
+        if (returns.existsBlockingByOrderId(order.getId())) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Không thể xác nhận đã nhận hàng khi đơn đang có yêu cầu đổi trả"
+            );
+        }
         var orderItems = items.findByOrderId(order.getId());
-        return toResponse(orders.save(order), orderItems);
+        if (order.getReceivedAt() != null) {
+            return toResponse(order, orderItems);
+        }
+
+        order.confirmReceipt();
+        var saved = orders.save(order);
+        histories.save(OrderStatusHistory.record(
+            saved.getId(),
+            OrderStatus.DELIVERED,
+            OrderStatus.DELIVERED,
+            buyerId,
+            "Khách hàng xác nhận đã nhận được hàng"
+        ));
+
+        return toResponse(saved, orderItems);
     }
 
     @Transactional(readOnly = true)
     public List<OrderResponse> listSellerOrders(@NonNull UUID userId) {
-        var result = new ArrayList<OrderResponse>();
-
+        var allOrders = new ArrayList<Order>();
         for (var shopId : orderReadableShopIds(userId)) {
-            for (var order : orders.findByShopIdOrderByCreatedAtDesc(shopId)) {
-                var orderItems = items.findByOrderId(order.getId());
-                result.add(toResponse(order, orderItems));
-            }
+            allOrders.addAll(orders.findByShopIdOrderByCreatedAtDesc(shopId));
         }
-
-        result.sort((left, right) -> right.createdAt().compareTo(left.createdAt()));
-
-        return result;
+        allOrders.sort((left, right) -> right.getCreatedAt().compareTo(left.getCreatedAt()));
+        return toResponses(allOrders);
     }
 
     @Transactional
@@ -330,7 +396,7 @@ public class OrderService {
             "ORDER_CANCELLED",
             "Đơn #" + order.getCode() + " đã bị hủy",
             "Đơn #" + order.getCode() + " đã bị hủy: " + request.reason(),
-            "/account",
+            "/account/orders/" + order.getId(),
             order.getId()
         );
 
@@ -370,7 +436,7 @@ public class OrderService {
             "Đơn #" + saved.getCode() + " đã bị hủy tự động",
             "Đơn #" + saved.getCode()
                 + " đã tự động hủy do người bán không xác nhận trong vòng " + pendingTimeoutHours + " giờ.",
-            "/account",
+            "/account/orders/" + saved.getId(),
             saved.getId()
         );
 
@@ -419,9 +485,9 @@ public class OrderService {
         var summary = requireAdminOrder(orderId);
         var order = orders.findById(orderId).orElseThrow();
 
-        var itemResponses = items.findByOrderId(orderId).stream()
-            .map(OrderService::toItemResponse)
-            .toList();
+        var orderItems = items.findByOrderId(orderId);
+        var displayInfos = loadProductDisplayInfos(orderItems);
+        var itemResponses = toItemResponses(orderItems, displayInfos);
 
         return new AdminOrderDetailResponse(
             summary,
@@ -468,7 +534,7 @@ public class OrderService {
             "ORDER_CANCELLED",
             "Đơn #" + order.getCode() + " đã bị hủy",
             "Đơn #" + order.getCode() + " đã bị hủy: " + reason.name(),
-            "/account",
+            "/account/orders/" + order.getId(),
             order.getId()
         );
 
@@ -492,7 +558,7 @@ public class OrderService {
             shopIds = orderReadableShopIds(userId);
         }
 
-        var result = new ArrayList<OrderResponse>();
+        var matched = new ArrayList<Order>();
         for (var sId : shopIds) {
             for (var order : orders.findByShopIdOrderByCreatedAtDesc(sId)) {
                 if (statusFilter != null && !statusFilter.isBlank()) {
@@ -509,19 +575,19 @@ public class OrderService {
                         continue;
                     }
                 }
-                var orderItems = items.findByOrderId(order.getId());
-                result.add(toResponse(order, orderItems));
+                matched.add(order);
             }
         }
 
-        result.sort((left, right) -> right.createdAt().compareTo(left.createdAt()));
+        matched.sort((left, right) -> right.getCreatedAt().compareTo(left.getCreatedAt()));
 
         var pageSize = Math.clamp(limit, 1, 100);
         var offset = (long) Math.max(page, 0) * pageSize;
-        return result.stream()
+        var paged = matched.stream()
             .skip(offset)
             .limit(pageSize)
             .toList();
+        return toResponses(paged);
     }
 
     @Transactional(noRollbackFor = ResponseStatusException.class)
@@ -559,7 +625,7 @@ public class OrderService {
             "ORDER_CONFIRMED",
             "Đơn #" + order.getCode() + " đã được xác nhận",
             "Shop đã xác nhận đơn #" + order.getCode() + ", đang chuẩn bị hàng.",
-            "/account",
+            "/account/orders/" + order.getId(),
             order.getId()
         );
 
@@ -629,27 +695,60 @@ public class OrderService {
 
     @Transactional
     public OrderResponse ship(@NonNull UUID userId, @NonNull UUID orderId) {
+        return ship(userId, orderId, null);
+    }
+
+    @Transactional
+    public OrderResponse ship(
+        @NonNull UUID userId,
+        @NonNull UUID orderId,
+        @Nullable ShipOrderRequest request
+    ) {
         var order = requireOrder(orderId);
         access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_PROCESS);
 
         var from = order.getStatus();
-        order.ship();
-        histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.SHIPPING, userId));
+        String carrier = null;
+        String trackingCode = null;
+        if (request != null) {
+            carrier = request.shippingCarrier();
+            trackingCode = request.trackingCode();
+        }
+        order.ship(carrier, trackingCode);
 
         var orderItems = items.findByOrderId(order.getId());
         var saved = orders.save(order);
+        var historyNote = "Bàn giao ĐVVC " + saved.getShippingCarrier()
+            + " (mã vận đơn: " + saved.getTrackingCode() + ")";
+        histories.save(OrderStatusHistory.record(saved.getId(), from, OrderStatus.SHIPPING, userId, historyNote));
+
+        var shippedAt = saved.getShippedAt();
+        if (shippedAt == null) {
+            shippedAt = clock.instant();
+        }
+        trackingEvents.save(OrderTrackingEvent.record(
+            saved.getId(),
+            OrderTrackingStatus.PICKED_UP.name(),
+            OrderTrackingStatus.PICKED_UP.label(),
+            null,
+            "ĐVVC " + saved.getShippingCarrier() + " đã lấy hàng (mã: " + saved.getTrackingCode() + ")",
+            shippedAt,
+            userId
+        ));
+
         var shipDetail = "Giao đơn hàng #" + saved.getCode() + " (" + orderItems.size()
-                + " món) cho đơn vị vận chuyển";
+            + " món) cho " + saved.getShippingCarrier() + " - " + saved.getTrackingCode();
         audit.record(saved.getShopId(), userId, "ORDER_SHIP", "ORDER", saved.getId(), shipDetail);
 
         notifications.create(
-            Set.of(order.getBuyerId()),
+            Set.of(saved.getBuyerId()),
             NotificationCategory.ORDER,
             "ORDER_SHIPPED",
-            "Đơn #" + order.getCode() + " đang được giao",
-            "Shop đã bàn giao đơn #" + order.getCode() + " cho đơn vị vận chuyển.",
-            "/account",
-            order.getId()
+            "Đơn #" + saved.getCode() + " đang được giao",
+            "Shop đã bàn giao đơn #" + saved.getCode() + " cho " + saved.getShippingCarrier()
+                + " (mã vận đơn: " + saved.getTrackingCode() + ").",
+            "/account/orders/" + saved.getId(),
+            saved.getId()
         );
 
         return toResponse(saved, orderItems);
@@ -667,21 +766,186 @@ public class OrderService {
 
         var orderItems = items.findByOrderId(order.getId());
         var saved = orders.save(order);
+        var deliveredAt = saved.getDeliveredAt();
+        if (deliveredAt == null) {
+            deliveredAt = clock.instant();
+        }
+        String deliveryLocation = saved.getShippingAddress();
+        if (deliveryLocation.isBlank()) {
+            deliveryLocation = "Địa chỉ người nhận";
+        }
+        trackingEvents.save(OrderTrackingEvent.record(
+            saved.getId(),
+            "DELIVERED",
+            "Giao hàng thành công",
+            deliveryLocation,
+            "Đơn hàng đã được giao tới người nhận",
+            deliveredAt,
+            userId
+        ));
+
         var deliverDetail = "Đánh dấu đơn hàng #" + saved.getCode()
             + " giao thành công | Doanh thu thanh toán: " + saved.getSubtotal() + "₫";
         audit.record(saved.getShopId(), userId, "ORDER_DELIVER", "ORDER", saved.getId(), deliverDetail);
 
         notifications.create(
-            Set.of(order.getBuyerId()),
+            Set.of(saved.getBuyerId()),
             NotificationCategory.ORDER,
             "ORDER_DELIVERED",
-            "Đơn #" + order.getCode() + " đã được giao",
-            "Đơn #" + order.getCode() + " đã giao thành công. Đừng quên đánh giá sản phẩm!",
-            "/account",
-            order.getId()
+            "Đơn #" + saved.getCode() + " đã được giao",
+            "Đơn #" + saved.getCode() + " đã giao thành công. Đừng quên đánh giá sản phẩm!",
+            "/account/orders/" + saved.getId(),
+            saved.getId()
         );
 
         return toResponse(saved, orderItems);
+    }
+
+    @Transactional(readOnly = true)
+    public List<BuyerOrderTimelineResponse> getBuyerTimeline(@NonNull UUID buyerId, @NonNull UUID orderId) {
+        var order = requireBuyerOrder(buyerId, orderId);
+        return histories.findByOrderIdOrderByCreatedAtAsc(order.getId()).stream()
+            .map(history -> {
+                String note = history.getNote();
+                if (note == null) {
+                    note = "";
+                }
+                return new BuyerOrderTimelineResponse(
+                    history.getFromStatus(),
+                    history.getToStatus(),
+                    resolveActor(order, history),
+                    note,
+                    history.getCreatedAt()
+                );
+            })
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderTrackingEventResponse> getBuyerTracking(@NonNull UUID buyerId, @NonNull UUID orderId) {
+        var order = requireBuyerOrder(buyerId, orderId);
+        return trackingEvents.findByOrderIdOrderByEventTimeDescCreatedAtDesc(order.getId()).stream()
+            .map(OrderService::toTrackingEventResponse)
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderTrackingEventResponse> getSellerTracking(@NonNull UUID userId, @NonNull UUID orderId) {
+        var order = orders.findById(orderId).orElseThrow(() ->
+            new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found")
+        );
+        access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_READ);
+        return trackingEvents.findByOrderIdOrderByEventTimeDescCreatedAtDesc(order.getId()).stream()
+            .map(OrderService::toTrackingEventResponse)
+            .toList();
+    }
+
+    @Transactional
+    public OrderTrackingEventResponse addTrackingEvent(
+        @NonNull UUID userId,
+        @NonNull UUID orderId,
+        @NonNull AddOrderTrackingEventRequest request
+    ) {
+        var order = requireOrder(orderId);
+        access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_PROCESS);
+        if (order.getStatus() != OrderStatus.SHIPPING) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Chỉ có thể cập nhật hành trình khi đơn hàng đang ở trạng thái đang giao"
+            );
+        }
+
+        var trackingStatus = OrderTrackingStatus.parse(request.statusCode());
+        var title = request.title().trim();
+        if (title.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tiêu đề mốc hành trình không được để trống");
+        }
+        var location = trimToNull(request.location());
+        var description = trimToNull(request.description());
+
+        var saved = trackingEvents.save(OrderTrackingEvent.record(
+            order.getId(),
+            trackingStatus.name(),
+            title,
+            location,
+            description,
+            clock.instant(),
+            userId
+        ));
+
+        audit.record(
+            order.getShopId(),
+            userId,
+            "ORDER_TRACKING_ADD",
+            "ORDER",
+            order.getId(),
+            "Cập nhật vận chuyển đơn #" + order.getCode() + ": " + title
+        );
+
+        notifications.create(
+            Set.of(order.getBuyerId()),
+            NotificationCategory.ORDER,
+            "ORDER_TRACKING_UPDATED",
+            "Cập nhật vận chuyển đơn #" + order.getCode(),
+            title,
+            "/account/orders/" + order.getId(),
+            order.getId()
+        );
+
+        return toTrackingEventResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Order> findDeliveredReadyForAutoComplete() {
+        int days = Math.max(1, systemSettings.current().autoCompleteDays());
+        var cutoff = clock.instant().minus(days, ChronoUnit.DAYS);
+        return orders.findDeliveredReadyForAutoComplete(cutoff);
+    }
+
+    @Transactional
+    public void systemAutoCompleteOrder(@NonNull UUID orderId) {
+        var order = requireOrder(orderId);
+        if (order.getStatus() != OrderStatus.DELIVERED || order.getReceivedAt() != null) {
+            return;
+        }
+        if (returns.existsBlockingByOrderId(order.getId())) {
+            return;
+        }
+        int days = Math.max(1, systemSettings.current().autoCompleteDays());
+        var cutoff = clock.instant().minus(days, ChronoUnit.DAYS);
+        if (order.getDeliveredAt() == null || order.getDeliveredAt().isAfter(cutoff)) {
+            return;
+        }
+
+        order.confirmReceipt();
+        var saved = orders.save(order);
+        histories.save(OrderStatusHistory.record(
+            saved.getId(),
+            OrderStatus.DELIVERED,
+            OrderStatus.DELIVERED,
+            null,
+            "Hệ thống tự động xác nhận hoàn thành sau " + days + " ngày giao hàng"
+        ));
+
+        audit.record(
+            saved.getShopId(),
+            null,
+            "ORDER_AUTO_COMPLETE",
+            "ORDER",
+            saved.getId(),
+            "Hệ thống tự động xác nhận hoàn thành đơn #" + saved.getCode() + " sau " + days + " ngày"
+        );
+
+        notifications.create(
+            Set.of(saved.getBuyerId()),
+            NotificationCategory.ORDER,
+            "ORDER_COMPLETED",
+            "Đơn #" + saved.getCode() + " đã hoàn thành",
+            "Hệ thống đã tự động xác nhận hoàn thành đơn #" + saved.getCode()
+                + " sau " + days + " ngày giao hàng.",
+            "/account/orders/" + saved.getId(),
+            saved.getId()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -728,10 +992,16 @@ public class OrderService {
 
     private Order requireBuyerOrder(UUID buyerId, UUID orderId) {
         var order = orders.findById(orderId).orElse(null);
-        if (order == null) {
+        if (order == null || !order.getBuyerId().equals(buyerId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found");
         }
-        if (!order.getBuyerId().equals(buyerId)) {
+
+        return order;
+    }
+
+    private Order requireLockedBuyerOrder(UUID buyerId, UUID orderId) {
+        var order = orders.findLockedById(orderId).orElse(null);
+        if (order == null || !order.getBuyerId().equals(buyerId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found");
         }
 
@@ -793,34 +1063,200 @@ public class OrderService {
         return "ORD-" + raw;
     }
 
-    private static OrderItemResponse toItemResponse(OrderItem item) {
-        return new OrderItemResponse(
-            item.getId(),
-            item.getProductId(),
-            item.getVariantId(),
-            item.getProductName(),
-            item.getVariantLabel(),
-            item.getSku(),
-            item.getUnitPrice(),
-            item.getQuantity(),
-            item.getLineTotal()
+    private static @Nullable String trimToNull(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        var trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed;
+    }
+
+    private static String resolveActor(Order order, OrderStatusHistory history) {
+        var changedBy = history.getChangedBy();
+        if (changedBy == null) {
+            return "SYSTEM";
+        }
+        if (changedBy.equals(order.getBuyerId())) {
+            return "BUYER";
+        }
+        if (OrderStatus.CANCELLED.name().equals(history.getToStatus()) && order.getCancelledBy() != null) {
+            return order.getCancelledBy().name();
+        }
+        return "SELLER";
+    }
+
+    private static boolean isBlockingReturn(ReturnStatus status) {
+        return status == ReturnStatus.REQUESTED
+            || status == ReturnStatus.APPROVED
+            || status == ReturnStatus.COMPLETED;
+    }
+
+    private static OrderTrackingEventResponse toTrackingEventResponse(OrderTrackingEvent event) {
+        return new OrderTrackingEventResponse(
+            event.getId(),
+            event.getStatusCode(),
+            event.getTitle(),
+            event.getLocation(),
+            event.getDescription(),
+            event.getEventTime(),
+            event.getCreatedAt()
         );
     }
 
-    private static OrderResponse toResponse(Order order, List<OrderItem> orderItems) {
-        var itemResponses = orderItems.stream()
-            .map(OrderService::toItemResponse)
-            .toList();
+    private Map<UUID, ProductStockService.ProductDisplayInfo> loadProductDisplayInfos(List<OrderItem> orderItems) {
+        var productIds = new LinkedHashSet<UUID>();
+        for (var item : orderItems) {
+            if (item.getProductId() != null) {
+                productIds.add(item.getProductId());
+            }
+        }
+        return productStock.findProductDisplayInfos(productIds);
+    }
 
+    private static List<OrderItemResponse> toItemResponses(
+        List<OrderItem> orderItems,
+        Map<UUID, ProductStockService.ProductDisplayInfo> displayInfos
+    ) {
+        var responses = new ArrayList<OrderItemResponse>(orderItems.size());
+        for (var item : orderItems) {
+            String imageKey = null;
+            boolean productAvailable = false;
+            var productId = item.getProductId();
+            if (productId != null) {
+                var info = displayInfos.get(productId);
+                if (info != null) {
+                    productAvailable = info.available();
+                    if (item.getVariantId() != null) {
+                        imageKey = info.variantImageKeys().get(item.getVariantId());
+                    }
+                    if (imageKey == null) {
+                        imageKey = info.defaultImageKey();
+                    }
+                }
+            }
+            responses.add(new OrderItemResponse(
+                item.getId(),
+                productId,
+                item.getVariantId(),
+                item.getProductName(),
+                item.getVariantLabel(),
+                item.getSku(),
+                item.getUnitPrice(),
+                item.getQuantity(),
+                item.getLineTotal(),
+                imageKey,
+                productAvailable
+            ));
+        }
+        return responses;
+    }
+
+    private List<OrderResponse> toResponses(List<Order> orderList) {
+        if (orderList.isEmpty()) {
+            return List.of();
+        }
+        var orderIds = new ArrayList<UUID>(orderList.size());
+        var shopIds = new LinkedHashSet<UUID>();
+        for (var order : orderList) {
+            orderIds.add(order.getId());
+            shopIds.add(order.getShopId());
+        }
+        var itemsByOrderId = new LinkedHashMap<UUID, List<OrderItem>>();
+        var allItems = items.findByOrderIdIn(orderIds);
+        for (var item : allItems) {
+            itemsByOrderId.computeIfAbsent(item.getOrderId(), ignored -> new ArrayList<>()).add(item);
+        }
+        var shopSummaries = shops.findShopSummariesByIds(shopIds);
+        var displayInfos = loadProductDisplayInfos(allItems);
+        var latestReturnStatusByOrderId = new LinkedHashMap<UUID, String>();
+        var blockingReturnByOrderId = new LinkedHashMap<UUID, Boolean>();
+        for (var ret : returns.findByOrderIdInOrderByCreatedAtDesc(orderIds)) {
+            latestReturnStatusByOrderId.putIfAbsent(ret.getOrderId(), ret.getStatus().name());
+            if (isBlockingReturn(ret.getStatus())) {
+                blockingReturnByOrderId.put(ret.getOrderId(), Boolean.TRUE);
+            }
+        }
+        int autoCompleteDays = Math.max(1, systemSettings.current().autoCompleteDays());
+        var result = new ArrayList<OrderResponse>(orderList.size());
+        for (var order : orderList) {
+            var orderItems = itemsByOrderId.getOrDefault(order.getId(), List.of());
+            var returnStatus = latestReturnStatusByOrderId.get(order.getId());
+            boolean blockingReturn = Boolean.TRUE.equals(blockingReturnByOrderId.get(order.getId()));
+            result.add(buildOrderResponse(
+                order,
+                orderItems,
+                shopSummaries.get(order.getShopId()),
+                displayInfos,
+                returnStatus,
+                blockingReturn,
+                autoCompleteDays
+            ));
+        }
+        return result;
+    }
+
+    private OrderResponse toResponse(Order order, List<OrderItem> orderItems) {
+        var shopSummaries = shops.findShopSummariesByIds(List.of(order.getShopId()));
+        var displayInfos = loadProductDisplayInfos(orderItems);
+        String returnStatus = null;
+        boolean blockingReturn = false;
+        for (var ret : returns.findByOrderIdInOrderByCreatedAtDesc(List.of(order.getId()))) {
+            if (returnStatus == null) {
+                returnStatus = ret.getStatus().name();
+            }
+            if (isBlockingReturn(ret.getStatus())) {
+                blockingReturn = true;
+            }
+        }
+        int autoCompleteDays = Math.max(1, systemSettings.current().autoCompleteDays());
+        return buildOrderResponse(
+            order,
+            orderItems,
+            shopSummaries.get(order.getShopId()),
+            displayInfos,
+            returnStatus,
+            blockingReturn,
+            autoCompleteDays
+        );
+    }
+
+    private static OrderResponse buildOrderResponse(
+        Order order,
+        List<OrderItem> orderItems,
+        ShopService.@Nullable ShopSummary shopSummary,
+        Map<UUID, ProductStockService.ProductDisplayInfo> displayInfos,
+        @Nullable String returnStatus,
+        boolean blockingReturn,
+        int autoCompleteDays
+    ) {
+        var itemResponses = toItemResponses(orderItems, displayInfos);
+        String shopName = "Shop";
+        String shopSlug = null;
+        if (shopSummary != null) {
+            shopName = shopSummary.name();
+            shopSlug = shopSummary.slug();
+        }
         String cancelledByName = null;
         if (order.getCancelledBy() != null) {
             cancelledByName = order.getCancelledBy().name();
+        }
+        Instant autoCompleteAt = null;
+        if (order.getStatus() == OrderStatus.DELIVERED
+            && order.getDeliveredAt() != null
+            && order.getReceivedAt() == null
+            && !blockingReturn) {
+            autoCompleteAt = order.getDeliveredAt().plus(autoCompleteDays, ChronoUnit.DAYS);
         }
 
         return new OrderResponse(
             order.getId(),
             order.getCode(),
             order.getShopId(),
+            shopName,
+            shopSlug,
             order.getBuyerId(),
             order.getStatus().name(),
             order.getPaymentStatus().name(),
@@ -831,12 +1267,19 @@ public class OrderService {
             order.getShippingName(),
             order.getShippingPhone(),
             order.getShippingAddress(),
+            order.getShippingCarrier(),
+            order.getTrackingCode(),
             order.getNote(),
             order.getCancelReason(),
             order.getCancelNote(),
             cancelledByName,
             order.getConfirmedAt(),
+            order.getShippedAt(),
+            order.getDeliveredAt(),
+            order.getReceivedAt(),
+            autoCompleteAt,
             order.getCancelledAt(),
+            returnStatus,
             itemResponses,
             order.getCreatedAt()
         );

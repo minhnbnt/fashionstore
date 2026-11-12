@@ -17,6 +17,13 @@ public record OrderResponse(
     @Schema(description = "ID shop bán")
     UUID shopId,
 
+    @Schema(description = "Tên shop bán")
+    String shopName,
+
+    @Nullable
+    @Schema(description = "Slug của shop", nullable = true)
+    String shopSlug,
+
     @Schema(description = "ID người mua")
     UUID buyerId,
 
@@ -48,6 +55,14 @@ public record OrderResponse(
     String shippingAddress,
 
     @Nullable
+    @Schema(description = "Đơn vị vận chuyển", nullable = true, example = "GHN")
+    String shippingCarrier,
+
+    @Nullable
+    @Schema(description = "Mã vận đơn", nullable = true, example = "VN-ORD-AB12CD34")
+    String trackingCode,
+
+    @Nullable
     @Schema(description = "Ghi chú của người mua", example = "Giao giờ hành chính")
     String note,
 
@@ -68,8 +83,31 @@ public record OrderResponse(
     Instant confirmedAt,
 
     @Nullable
+    @Schema(description = "Thời điểm shop giao cho ĐVVC", nullable = true)
+    Instant shippedAt,
+
+    @Nullable
+    @Schema(description = "Thời điểm giao hàng thành công", nullable = true)
+    Instant deliveredAt,
+
+    @Nullable
+    @Schema(description = "Thời điểm hoàn thành / người mua xác nhận đã nhận hàng", nullable = true)
+    Instant receivedAt,
+
+    @Nullable
+    @Schema(description = "Thời điểm dự kiến hệ thống tự hoàn thành đơn nếu không đổi trả", nullable = true)
+    Instant autoCompleteAt,
+
+    @Nullable
     @Schema(description = "Thời điểm đơn bị hủy")
     Instant cancelledAt,
+
+    @Nullable
+    @Schema(
+        description = "Trạng thái yêu cầu đổi trả mới nhất (REQUESTED, APPROVED, COMPLETED, REJECTED)",
+        nullable = true
+    )
+    String returnStatus,
 
     @Schema(description = "Danh sách sản phẩm trong đơn")
     List<OrderItemResponse> items,

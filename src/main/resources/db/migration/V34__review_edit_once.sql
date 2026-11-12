@@ -1,0 +1,3 @@
+ALTER TABLE review
+    ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ;
+

@@ -58,4 +58,21 @@ public interface OrderRepository extends CrudRepository<Order, UUID> {
         ORDER BY day DESC
         """)
     List<DailyRevenueRow> sumDailyRevenue(UUID shopId);
+
+    @Query("""
+        SELECT o.*
+        FROM orders o
+        WHERE o.status = 'DELIVERED'
+          AND o.received_at IS NULL
+          AND o.delivered_at IS NOT NULL
+          AND o.delivered_at <= :cutoff
+          AND NOT EXISTS (
+              SELECT 1
+              FROM return_request rr
+              WHERE rr.order_id = o.id
+                AND rr.status IN ('REQUESTED', 'APPROVED', 'COMPLETED')
+          )
+        ORDER BY o.delivered_at ASC, o.id
+        """)
+    List<Order> findDeliveredReadyForAutoComplete(Instant cutoff);
 }

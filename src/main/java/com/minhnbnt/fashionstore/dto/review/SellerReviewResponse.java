@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.dto.review;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
@@ -14,6 +15,8 @@ public record SellerReviewResponse(
     @Nullable String sellerReply,
     @Nullable Instant repliedAt,
     boolean isReported,
+    @Schema boolean edited,
+    @Schema(nullable = true) @Nullable Instant editedAt,
     Instant createdAt,
     Instant updatedAt
 ) {
