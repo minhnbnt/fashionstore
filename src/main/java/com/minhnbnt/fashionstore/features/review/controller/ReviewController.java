@@ -69,8 +69,12 @@ public class ReviewController {
     }
 
     @PutMapping
-    @Operation(summary = "Sua danh gia cua minh")
+    @Operation(
+        summary = "Sua danh gia cua minh",
+        description = "Chi cho phep sua danh gia 1 lan duy nhat."
+    )
     @ApiResponse(responseCode = "200", description = "Danh gia sau khi sua")
+    @ApiResponse(responseCode = "400", description = "Du lieu danh gia khong hop le")
     @ApiResponse(responseCode = "401", description = "Thieu hoac sai JWT")
     @ApiResponse(responseCode = "404", description = "Ban chua danh gia product nay")
     @ApiResponse(responseCode = "409", description = "Danh gia chi duoc sua toi da 1 lan")

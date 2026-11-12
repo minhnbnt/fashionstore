@@ -7,7 +7,7 @@ import org.jspecify.annotations.Nullable;
 @Schema(description = "Thông tin vận chuyển khi shop giao đơn cho ĐVVC")
 public record ShipOrderRequest(
     @Nullable
-    @Size(max = 100, message = "Đơn vị vận chuyển tối đa 100 ký tự")
+    @Size(max = 100, message = "Shipping carrier must not exceed 100 characters")
     @Schema(
         description = "Tên đơn vị vận chuyển (mặc định GHN nếu bỏ trống)",
         nullable = true,
@@ -16,7 +16,7 @@ public record ShipOrderRequest(
     String shippingCarrier,
 
     @Nullable
-    @Size(max = 100, message = "Mã vận đơn tối đa 100 ký tự")
+    @Size(max = 100, message = "Tracking code must not exceed 100 characters")
     @Schema(
         description = "Mã vận đơn (tự sinh VN-<code đơn> nếu bỏ trống)",
         nullable = true,

@@ -81,7 +81,7 @@ public class ReturnRequestService {
         if (returns.existsBlockingByOrderId(order.getId())) {
             throw new ResponseStatusException(
                 HttpStatus.CONFLICT,
-                "Đơn hàng đã có yêu cầu đổi/trả đang xử lý hoặc đã hoàn tất"
+                "Order already has an active or completed return request"
             );
         }
 

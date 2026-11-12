@@ -127,9 +127,11 @@ class OrderAutoCompleteJobTest {
             .filter(n -> "ORDER_COMPLETED".equals(n.type()) && ("/account/orders/" + dueOrder.id()).equals(n.link()))
             .toList();
         assertThat(completedNotifications).hasSize(1);
-        assertThat(completedNotifications.getFirst().title()).isEqualTo("Đơn #" + dueOrder.code() + " đã hoàn thành");
+        assertThat(completedNotifications.getFirst().title())
+            .isEqualTo("Đơn #" + dueOrder.code() + " đã hoàn thành");
         assertThat(completedNotifications.getFirst().body()).isEqualTo(
-            "Hệ thống đã tự động xác nhận hoàn thành đơn #" + dueOrder.code() + " sau 7 ngày giao hàng."
+            "Hệ thống đã tự động xác nhận hoàn thành đơn #"
+                + dueOrder.code() + " sau 7 ngày giao hàng."
         );
     }
 }

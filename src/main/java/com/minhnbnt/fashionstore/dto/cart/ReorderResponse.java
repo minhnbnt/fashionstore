@@ -12,10 +12,15 @@ public record ReorderResponse(
     @Schema(description = "Tổng số dòng sản phẩm từ đơn cũ")
     int totalRequestedItems,
 
-    @Schema(description = "Số dòng đã thêm được vào giỏ (gồm cả dòng bị điều chỉnh số lượng)")
+    @Schema(
+        description = "Số dòng đã thêm được vào giỏ (gồm cả dòng bị điều chỉnh số lượng)"
+    )
     int addedCount,
 
-    @Schema(description = "Số dòng chỉ thêm được một phần do tồn kho còn lại thấp hơn số lượng cũ")
+    @Schema(
+        description = "Số dòng chỉ thêm được một phần do tồn kho còn lại "
+            + "thấp hơn số lượng cũ"
+    )
     int adjustedCount,
 
     @Schema(description = "Số dòng không thể thêm lại")

@@ -285,7 +285,10 @@ public class OrderService {
             var reason = BuyerCancelReason.parse(request.reason());
             var trimmedNote = trimToNull(request.note());
             if (reason == BuyerCancelReason.OTHER && trimmedNote == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vui lòng nhập lý do hủy chi tiết");
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Detailed note is required when cancel reason is OTHER"
+                );
             }
             order.cancel(reason.name(), trimmedNote);
             var historyNote = reason.label();
@@ -335,7 +338,7 @@ public class OrderService {
         if (returns.existsBlockingByOrderId(order.getId())) {
             throw new ResponseStatusException(
                 HttpStatus.CONFLICT,
-                "Không thể xác nhận đã nhận hàng khi đơn đang có yêu cầu đổi trả"
+                "Cannot confirm receipt while order has an active return request"
             );
         }
         var orderItems = items.findByOrderId(order.getId());
@@ -435,7 +438,8 @@ public class OrderService {
             "ORDER_CANCELLED",
             "Đơn #" + saved.getCode() + " đã bị hủy tự động",
             "Đơn #" + saved.getCode()
-                + " đã tự động hủy do người bán không xác nhận trong vòng " + pendingTimeoutHours + " giờ.",
+                + " đã tự động hủy do người bán không xác nhận trong vòng "
+                + pendingTimeoutHours + " giờ.",
             "/account/orders/" + saved.getId(),
             saved.getId()
         );
@@ -446,7 +450,8 @@ public class OrderService {
             "ORDER_CANCELLED",
             "Đơn #" + saved.getCode() + " đã bị hủy tự động",
             "Đơn #" + saved.getCode()
-                + " đã quá hạn xác nhận " + pendingTimeoutHours + " giờ và bị hệ thống tự động hủy.",
+                + " đã quá hạn xác nhận " + pendingTimeoutHours
+                + " giờ và bị hệ thống tự động hủy.",
             "/shop?shopId=" + saved.getShopId() + "&tab=orders&orderId=" + saved.getId(),
             saved.getId()
         );
@@ -851,14 +856,14 @@ public class OrderService {
         if (order.getStatus() != OrderStatus.SHIPPING) {
             throw new ResponseStatusException(
                 HttpStatus.CONFLICT,
-                "Chỉ có thể cập nhật hành trình khi đơn hàng đang ở trạng thái đang giao"
+                "Tracking events can only be added while order is shipping"
             );
         }
 
         var trackingStatus = OrderTrackingStatus.parse(request.statusCode());
         var title = request.title().trim();
         if (title.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tiêu đề mốc hành trình không được để trống");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tracking event title is required");
         }
         var location = trimToNull(request.location());
         var description = trimToNull(request.description());

@@ -142,7 +142,8 @@ public class CartController {
     @PostMapping("/reorder/{orderId}")
     @Operation(
         summary = "Mua lại đơn hàng",
-        description = "Thêm lại các sản phẩm hợp lệ từ đơn hàng cũ vào giỏ và báo cáo món hết hàng hoặc giảm số lượng."
+        description = "Thêm lại các sản phẩm hợp lệ từ đơn hàng cũ vào giỏ và "
+            + "báo cáo món hết hàng hoặc giảm số lượng."
     )
     @ApiResponse(responseCode = "200", description = "Kết quả mua lại")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")

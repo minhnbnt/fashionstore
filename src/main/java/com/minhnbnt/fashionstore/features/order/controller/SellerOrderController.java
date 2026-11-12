@@ -54,7 +54,8 @@ public class SellerOrderController {
         @Parameter(description = "Lọc theo shop cụ thể") @RequestParam(required = false) UUID shopId,
         @Parameter(description = "Lọc theo trạng thái (PENDING, CONFIRMED, SHIPPING, DELIVERED, CANCELLED)")
         @RequestParam(required = false) String status,
-        @Parameter(description = "Tìm theo mã đơn hoặc tên người nhận") @RequestParam(required = false) String q,
+        @Parameter(description = "Tìm theo mã đơn hoặc tên người nhận")
+        @RequestParam(required = false) String q,
         @Parameter(description = "Trang bắt đầu từ 0") @RequestParam(defaultValue = "0") int page,
         @Parameter(description = "Số đơn mỗi trang") @RequestParam(defaultValue = "20") int limit
     ) {

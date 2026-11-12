@@ -95,7 +95,10 @@ public record OrderResponse(
     Instant receivedAt,
 
     @Nullable
-    @Schema(description = "Thời điểm dự kiến hệ thống tự hoàn thành đơn nếu không đổi trả", nullable = true)
+    @Schema(
+        description = "Thời điểm dự kiến hệ thống tự hoàn thành đơn nếu không đổi trả",
+        nullable = true
+    )
     Instant autoCompleteAt,
 
     @Nullable

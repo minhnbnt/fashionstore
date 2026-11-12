@@ -215,7 +215,7 @@ public class CartService {
     public ReorderResponse reorder(@NonNull UUID buyerId, @NonNull UUID orderId) {
         var order = orders.getDetail(buyerId, orderId);
         if (!shops.isShopApproved(order.shopId())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Shop hiện không hoạt động");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Shop is not active for reorder");
         }
 
         var cart = getOrCreate(buyerId);

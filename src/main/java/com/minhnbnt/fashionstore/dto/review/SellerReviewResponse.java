@@ -7,17 +7,17 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record SellerReviewResponse(
-    UUID id,
-    UUID productId,
-    String buyerDisplayName,
-    int stars,
-    @Nullable String comment,
-    @Nullable String sellerReply,
-    @Nullable Instant repliedAt,
-    boolean isReported,
-    @Schema boolean edited,
+    @Schema(description = "ID đánh giá") UUID id,
+    @Schema(description = "ID sản phẩm") UUID productId,
+    @Schema(description = "Tên hiển thị người mua") String buyerDisplayName,
+    @Schema(description = "Số sao đánh giá (1-5)") int stars,
+    @Schema(nullable = true) @Nullable String comment,
+    @Schema(nullable = true) @Nullable String sellerReply,
+    @Schema(nullable = true) @Nullable Instant repliedAt,
+    @Schema(description = "Đánh giá đã bị shop báo cáo hay chưa") boolean isReported,
+    @Schema(description = "Đánh giá đã từng được chỉnh sửa hay chưa") boolean edited,
     @Schema(nullable = true) @Nullable Instant editedAt,
-    Instant createdAt,
-    Instant updatedAt
+    @Schema(description = "Thời điểm tạo đánh giá") Instant createdAt,
+    @Schema(description = "Thời điểm cập nhật gần nhất") Instant updatedAt
 ) {
 }
