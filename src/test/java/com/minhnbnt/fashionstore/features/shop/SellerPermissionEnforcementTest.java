@@ -155,7 +155,19 @@ class SellerPermissionEnforcementTest {
             "",
             ownerId
         ));
-        var review = Review.create(product.getId(), mirroredUser(), "Buyer", 5, "Tot");
+        var review = Review.create(
+            product.getId(),
+            mirroredUser(),
+            null,
+            "Buyer",
+            null,
+            5,
+            "San pham dung mo ta va dep",
+            new String[0],
+            null,
+            new String[0],
+            false
+        );
 
         return reviewRepository.save(review).getId();
     }

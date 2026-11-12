@@ -4,7 +4,9 @@ import com.minhnbnt.fashionstore.dto.review.CreateReviewRequest;
 import com.minhnbnt.fashionstore.dto.review.RatingSummary;
 import com.minhnbnt.fashionstore.dto.review.ReplyReviewRequest;
 import com.minhnbnt.fashionstore.dto.review.ReportReviewRequest;
+import com.minhnbnt.fashionstore.dto.review.ReviewHelpfulResponse;
 import com.minhnbnt.fashionstore.dto.review.ReviewResponse;
+import com.minhnbnt.fashionstore.dto.review.ReviewSummaryResponse;
 import com.minhnbnt.fashionstore.dto.review.SellerReviewResponse;
 import com.minhnbnt.fashionstore.dto.review.UpdateReviewRequest;
 import com.minhnbnt.fashionstore.features.catalog.ProductStockService;
@@ -12,13 +14,18 @@ import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
 import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
+import com.minhnbnt.fashionstore.features.review.repository.ReviewHelpfulRepository;
 import com.minhnbnt.fashionstore.features.review.repository.ReviewRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
+import com.minhnbnt.fashionstore.infrastructure.media.VideoMetadataService;
 import com.minhnbnt.fashionstore.model.Review;
+import com.minhnbnt.fashionstore.model.ReviewSort;
+import com.minhnbnt.fashionstore.model.ReviewTag;
 import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +33,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,7 +45,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ReviewService {
 
+    public static final int MIN_COMMENT_LENGTH = 10;
+    public static final int MAX_COMMENT_LENGTH = 2000;
+    public static final int MAX_REVIEW_IMAGES = 5;
+    public static final double MAX_REVIEW_VIDEO_SECONDS = 30.0;
+
     private final ReviewRepository reviews;
+
+    private final ReviewHelpfulRepository helpfulRepository;
 
     private final ProductStockService productStock;
 
@@ -50,31 +66,48 @@ public class ReviewService {
 
     private final NotificationService notifications;
 
-    @Transactional(readOnly = true)
-    public List<ReviewResponse> getReviews(@NonNull UUID productId) {
-        requireVisible(productId);
+    private final VideoMetadataService videoMetadataService;
 
-        var responses = new ArrayList<ReviewResponse>();
-        for (var review : reviews.findByProductIdOrderByCreatedAtDesc(productId)) {
-            responses.add(toResponse(review));
+    @Transactional(readOnly = true)
+    public List<ReviewResponse> getReviews(
+        @NonNull UUID productId,
+        @Nullable UUID currentUserId,
+        @NonNull ReviewSort sort,
+        @Nullable Integer stars,
+        boolean hasMedia
+    ) {
+        requireVisible(productId);
+        if (stars != null && (stars < 1 || stars > 5)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stars filter must be between 1 and 5");
         }
 
-        return responses;
+        var minStars = 1;
+        var maxStars = 5;
+        if (stars != null) {
+            minStars = stars;
+            maxStars = stars;
+        }
+
+        List<Review> list;
+        if (sort == ReviewSort.NEWEST) {
+            list = reviews.findFilteredOrderByNewest(productId, minStars, maxStars, hasMedia);
+        } else {
+            list = reviews.findFilteredOrderByHelpful(productId, minStars, maxStars, hasMedia);
+        }
+
+        return mapResponsesForViewer(list, currentUserId, true);
+    }
+
+    @Transactional(readOnly = true)
+    public ReviewSummaryResponse reviewSummary(@NonNull UUID productId) {
+        requireVisible(productId);
+        return toSummaryResponse(reviews.summarizeByProductId(productId));
     }
 
     @Transactional(readOnly = true)
     public RatingSummary ratingSummary(@NonNull UUID productId) {
-        var all = reviews.findByProductIdOrderByCreatedAtDesc(productId);
-        if (all.isEmpty()) {
-            return new RatingSummary(0, null);
-        }
-
-        var sum = 0L;
-        for (var review : all) {
-            sum += review.getStars();
-        }
-
-        return new RatingSummary(all.size(), (double) sum / all.size());
+        var row = reviews.summarizeByProductId(productId);
+        return new RatingSummary(row.reviewCount(), row.averageRating());
     }
 
     /**
@@ -116,39 +149,102 @@ public class ReviewService {
         if (productStock.findProductById(productId).isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found");
         }
-        if (reviews.findByProductIdAndBuyerId(productId, buyerId).isPresent()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "You have already reviewed this product");
+        if (reviews.findByOrderIdAndProductId(request.orderId(), productId).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "You have already reviewed this product for this order");
         }
-        if (!orderService.hasDeliveredAndReceivedProduct(buyerId, productId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only delivered products can be reviewed");
+
+        var variantLabel = orderService.resolveCompletedOrderProductVariant(buyerId, request.orderId(), productId);
+        var normalizedComment = normalizeAndValidateComment(request.comment());
+        var normalizedImages = normalizeAndValidateImageKeys(request.imageKeys());
+        var normalizedVideo = normalizeVideoKey(request.videoKey());
+        if (normalizedVideo != null) {
+            videoMetadataService.validateVideoDuration(normalizedVideo, MAX_REVIEW_VIDEO_SECONDS);
         }
+        var normalizedTags = ReviewTag.normalizeAndValidate(request.tags());
 
         var displayName = users.getById(buyerId).displayName();
-        var review = Review.create(productId, buyerId, displayName, request.stars(), request.comment());
+        var review = Review.create(
+            productId,
+            buyerId,
+            request.orderId(),
+            displayName,
+            variantLabel,
+            request.stars(),
+            normalizedComment,
+            normalizedImages,
+            normalizedVideo,
+            normalizedTags,
+            request.anonymous()
+        );
 
-        return toResponse(reviews.save(review));
+        return toResponse(reviews.save(review), buyerId, false, Set.of());
     }
 
     @Transactional
-    public ReviewResponse updateReview(
+    public ReviewResponse updateReviewById(
         @NonNull UUID buyerId,
-        @NonNull UUID productId,
+        @NonNull UUID reviewId,
         @NonNull UpdateReviewRequest request
     ) {
-        var review = requireOwnReview(buyerId, productId);
-        review.update(request.stars(), request.comment());
+        var review = reviews.findByIdAndBuyerId(reviewId, buyerId).orElse(null);
+        if (review == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Review not found");
+        }
 
-        return toResponse(reviews.save(review));
+        var normalizedComment = normalizeAndValidateComment(request.comment());
+        var normalizedImages = normalizeAndValidateImageKeys(request.imageKeys());
+        var normalizedVideo = normalizeVideoKey(request.videoKey());
+        if (normalizedVideo != null && !normalizedVideo.equals(review.getVideoKey())) {
+            videoMetadataService.validateVideoDuration(normalizedVideo, MAX_REVIEW_VIDEO_SECONDS);
+        }
+        var normalizedTags = ReviewTag.normalizeAndValidate(request.tags());
+
+        review.update(
+            request.stars(),
+            normalizedComment,
+            normalizedImages,
+            normalizedVideo,
+            normalizedTags,
+            request.anonymous()
+        );
+
+        var saved = reviews.save(review);
+        var helpfulIds = helpfulRepository.findHelpfulReviewIds(buyerId, List.of(saved.getId()));
+        return toResponse(saved, buyerId, false, helpfulIds);
+    }
+
+    @Transactional
+    public ReviewHelpfulResponse toggleHelpful(
+        @NonNull UUID userId,
+        @NonNull UUID reviewId
+    ) {
+        var review = reviews.findById(reviewId).orElse(null);
+        if (review == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Review not found");
+        }
+        requireVisible(review.getProductId());
+        if (review.getBuyerId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "You cannot mark your own review as helpful");
+        }
+
+        boolean helpfulByMe;
+        if (helpfulRepository.insertIfAbsent(reviewId, userId)) {
+            reviews.incrementHelpfulCount(reviewId);
+            helpfulByMe = true;
+        } else {
+            helpfulRepository.delete(reviewId, userId);
+            reviews.decrementHelpfulCount(reviewId);
+            helpfulByMe = false;
+        }
+
+        var updated = reviews.findById(reviewId).orElse(review);
+        return new ReviewHelpfulResponse(reviewId, Math.max(0, updated.getHelpfulCount()), helpfulByMe);
     }
 
     @Transactional(readOnly = true)
     public List<ReviewResponse> listMine(@NonNull UUID buyerId) {
-        var responses = new ArrayList<ReviewResponse>();
-        for (var review : reviews.findByBuyerIdOrderByUpdatedAtDescCreatedAtDesc(buyerId)) {
-            responses.add(toResponse(review));
-        }
-
-        return responses;
+        var list = reviews.findByBuyerIdOrderByUpdatedAtDescCreatedAtDesc(buyerId);
+        return mapResponsesForViewer(list, buyerId, false);
     }
 
     @Transactional(readOnly = true)
@@ -172,6 +268,12 @@ public class ReviewService {
         }
 
         return responses;
+    }
+
+    @Transactional(readOnly = true)
+    public ReviewSummaryResponse shopReviewSummary(@NonNull UUID userId, @NonNull UUID shopId) {
+        access.requireShopPermission(userId, shopId, ShopPermission.REVIEW_READ);
+        return toSummaryResponse(reviews.summarizeByShopId(shopId));
     }
 
     @Transactional
@@ -228,17 +330,46 @@ public class ReviewService {
         return toSellerResponse(saved);
     }
 
-    private void requireVisible(UUID productId) {
-        productStock.requireActiveProduct(productId);
+    /**
+     * Che tên người dùng kiểu Shopee (ví dụ "Minh Nguyễn" -> "M***n", "An" -> "A***").
+     */
+    public static String maskDisplayName(String displayName) {
+        var trimmed = displayName.trim();
+        if (trimmed.isEmpty()) {
+            return "***";
+        }
+        var length = trimmed.length();
+        var first = trimmed.substring(0, 1);
+        if (length <= 2) {
+            return first + "***";
+        }
+        var last = trimmed.substring(length - 1);
+        return first + "***" + last;
     }
 
-    private Review requireOwnReview(UUID buyerId, UUID productId) {
-        var review = reviews.findByProductIdAndBuyerId(productId, buyerId).orElse(null);
-        if (review == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Review not found");
+    private List<ReviewResponse> mapResponsesForViewer(
+        List<Review> list,
+        @Nullable UUID currentUserId,
+        boolean maskAnonymous
+    ) {
+        Set<UUID> helpfulIds = Set.of();
+        if (currentUserId != null && !list.isEmpty()) {
+            var reviewIds = new ArrayList<UUID>(list.size());
+            for (var review : list) {
+                reviewIds.add(review.getId());
+            }
+            helpfulIds = helpfulRepository.findHelpfulReviewIds(currentUserId, reviewIds);
         }
 
-        return review;
+        var responses = new ArrayList<ReviewResponse>(list.size());
+        for (var review : list) {
+            responses.add(toResponse(review, currentUserId, maskAnonymous, helpfulIds));
+        }
+        return responses;
+    }
+
+    private void requireVisible(UUID productId) {
+        productStock.requireActiveProduct(productId);
     }
 
     private ShopReview requireShopReview(UUID userId, UUID reviewId) {
@@ -257,18 +388,103 @@ public class ReviewService {
         return new ShopReview(review, product.getShopId());
     }
 
+    private static String normalizeAndValidateComment(String rawComment) {
+        var trimmed = rawComment.trim();
+        if (trimmed.length() < MIN_COMMENT_LENGTH || trimmed.length() > MAX_COMMENT_LENGTH) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Review comment must be between 10 and 2000 characters"
+            );
+        }
+        return trimmed;
+    }
+
+    private static String[] normalizeAndValidateImageKeys(@Nullable List<String> rawImageKeys) {
+        if (rawImageKeys == null || rawImageKeys.isEmpty()) {
+            return new String[0];
+        }
+        if (rawImageKeys.size() > MAX_REVIEW_IMAGES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Maximum 5 review images allowed");
+        }
+        var keys = new LinkedHashSet<String>();
+        for (var raw : rawImageKeys) {
+            var trimmed = raw.trim();
+            if (trimmed.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image key must not be blank");
+            }
+            keys.add(trimmed);
+        }
+        return keys.toArray(String[]::new);
+    }
+
+    private static @Nullable String normalizeVideoKey(@Nullable String rawVideoKey) {
+        if (rawVideoKey == null) {
+            return null;
+        }
+        var trimmed = rawVideoKey.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed;
+    }
+
     private record ShopReview(Review review, UUID shopId) {
     }
 
-    private static ReviewResponse toResponse(Review review) {
+    private static ReviewSummaryResponse toSummaryResponse(ReviewRepository.ReviewSummaryRow row) {
+        return new ReviewSummaryResponse(
+            row.reviewCount(),
+            row.averageRating(),
+            row.fiveStarCount(),
+            row.fourStarCount(),
+            row.threeStarCount(),
+            row.twoStarCount(),
+            row.oneStarCount(),
+            row.withMediaCount()
+        );
+    }
+
+    private static List<String> toStringList(String @Nullable [] array) {
+        if (array == null || array.length == 0) {
+            return List.of();
+        }
+        var list = new ArrayList<String>(array.length);
+        Collections.addAll(list, array);
+        return Collections.unmodifiableList(list);
+    }
+
+    private static ReviewResponse toResponse(
+        Review review,
+        @Nullable UUID currentUserId,
+        boolean maskAnonymous,
+        Set<UUID> helpfulIds
+    ) {
         var editedAt = review.getEditedAt();
         var edited = editedAt != null;
+        var displayName = review.getBuyerDisplayName();
+        if (maskAnonymous && review.isAnonymous()) {
+            displayName = maskDisplayName(displayName);
+        }
+        var mine = currentUserId != null && review.getBuyerId().equals(currentUserId);
+        var helpfulByMe = helpfulIds.contains(review.getId());
+
         return new ReviewResponse(
             review.getId(),
             review.getProductId(),
-            review.getBuyerDisplayName(),
+            review.getOrderId(),
+            displayName,
+            review.getVariantLabel(),
             review.getStars(),
             review.getComment(),
+            toStringList(review.getImageKeys()),
+            review.getVideoKey(),
+            toStringList(review.getTags()),
+            review.isAnonymous(),
+            mine,
+            review.getHelpfulCount(),
+            helpfulByMe,
+            review.getSellerReply(),
+            review.getRepliedAt(),
             edited,
             editedAt,
             review.getCreatedAt(),
@@ -279,12 +495,24 @@ public class ReviewService {
     private static SellerReviewResponse toSellerResponse(Review review) {
         var editedAt = review.getEditedAt();
         var edited = editedAt != null;
+        var displayName = review.getBuyerDisplayName();
+        if (review.isAnonymous()) {
+            displayName = maskDisplayName(displayName);
+        }
+
         return new SellerReviewResponse(
             review.getId(),
             review.getProductId(),
-            review.getBuyerDisplayName(),
+            review.getOrderId(),
+            displayName,
+            review.getVariantLabel(),
             review.getStars(),
             review.getComment(),
+            toStringList(review.getImageKeys()),
+            review.getVideoKey(),
+            toStringList(review.getTags()),
+            review.isAnonymous(),
+            review.getHelpfulCount(),
             review.getSellerReply(),
             review.getRepliedAt(),
             review.isReported(),

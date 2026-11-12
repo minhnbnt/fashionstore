@@ -1,8 +1,9 @@
 package com.minhnbnt.fashionstore.features.review.controller;
 
-import com.minhnbnt.fashionstore.dto.review.SellerReviewResponse;
 import com.minhnbnt.fashionstore.dto.review.ReplyReviewRequest;
 import com.minhnbnt.fashionstore.dto.review.ReportReviewRequest;
+import com.minhnbnt.fashionstore.dto.review.ReviewSummaryResponse;
+import com.minhnbnt.fashionstore.dto.review.SellerReviewResponse;
 import com.minhnbnt.fashionstore.features.review.ReviewService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -54,6 +55,26 @@ public class SellerReviewController {
         var userId = UUID.fromString(subject);
 
         return reviews.listForShop(userId, shopId, unreplied);
+    }
+
+    @GetMapping("/summary")
+    @Operation(
+        summary = "Thống kê đánh giá của shop",
+        description = "Trả điểm trung bình, tổng số đánh giá và phân bố 5 -> 1 sao cho toàn bộ sản phẩm của shop."
+    )
+    @ApiResponse(responseCode = "200", description = "Thống kê đánh giá")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403",
+            description = "Không phải thành viên shop hoặc thiếu quyền REVIEW_READ")
+    @SecurityRequirement(name = "bearerAuth")
+    public ReviewSummaryResponse summary(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "Id shop") @RequestParam UUID shopId
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var userId = UUID.fromString(subject);
+
+        return reviews.shopReviewSummary(userId, shopId);
     }
 
     @PatchMapping("/{id}/reply")
