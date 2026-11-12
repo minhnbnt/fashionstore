@@ -33,6 +33,7 @@ import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -402,7 +403,15 @@ public class ReviewService {
             );
         }
 
-        var saved = templates.save(ReviewReplyTemplate.create(shopId, userId, title, content));
+        ReviewReplyTemplate saved;
+        try {
+            saved = templates.save(ReviewReplyTemplate.create(shopId, userId, title, content));
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Reply template title already exists"
+            );
+        }
         audit.record(
             shopId,
             userId,
@@ -438,7 +447,15 @@ public class ReviewService {
         }
 
         template.update(title, content);
-        var saved = templates.save(template);
+        ReviewReplyTemplate saved;
+        try {
+            saved = templates.save(template);
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Reply template title already exists"
+            );
+        }
         audit.record(
             template.getShopId(),
             userId,
