@@ -73,6 +73,8 @@ tasks.test {
 tasks.register<Test>("openApiExport") {
     group = "verification"
     description = "Chạy riêng OpenApiExportTest để export docs/openapi.json khi cần sync spec sang FE"
+    // Khai báo output để Gradle re-run khi file bị xoá (nếu không, task báo UP-TO-DATE oan)
+    outputs.file(layout.projectDirectory.file("docs/openapi.json"))
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = sourceSets["test"].runtimeClasspath
     include("**/OpenApiExportTest.class")
