@@ -12,6 +12,7 @@ public record SellerReviewResponse(
     @Schema(description = "ID sản phẩm") UUID productId,
     @Schema(description = "Tên sản phẩm") String productName,
     @Schema(description = "ID đơn hàng", nullable = true) @Nullable UUID orderId,
+    @Schema(description = "ID người mua (seller được phép xem để nhắn tin hỗ trợ)") UUID buyerId,
     @Schema(description = "Tên hiển thị người mua (đã che nếu khách chọn ẩn danh)") String buyerDisplayName,
     @Schema(description = "Phân loại/kích thước khách đã mua", nullable = true) @Nullable String variantLabel,
     @Schema(description = "Số sao đánh giá (1-5)") int stars,

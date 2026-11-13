@@ -69,6 +69,23 @@ public class ChatService {
         return toConversationResponse(created, false);
     }
 
+    @Transactional
+    public ChatConversationResponse openConversationForSeller(
+        @NonNull UUID sellerId,
+        @NonNull UUID shopId,
+        @NonNull UUID buyerId
+    ) {
+        access.requireShopPermission(sellerId, shopId, ShopPermission.CHAT_ACCESS);
+
+        var existing = conversations.findByShopIdAndBuyerId(shopId, buyerId).orElse(null);
+        if (existing != null) {
+            return toConversationResponse(existing, true);
+        }
+
+        var created = conversations.save(ChatConversation.create(shopId, buyerId));
+        return toConversationResponse(created, true);
+    }
+
     @Transactional(readOnly = true)
     public List<ChatConversationResponse> listSellerConversations(
         @NonNull UUID userId,

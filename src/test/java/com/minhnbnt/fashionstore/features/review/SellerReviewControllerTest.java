@@ -80,6 +80,7 @@ class SellerReviewControllerTest {
             productId,
             "Áo linen dáng suông",
             UUID.randomUUID(),
+            UUID.randomUUID(), // buyerId
             "M***h",
             "M · Kem",
             5,

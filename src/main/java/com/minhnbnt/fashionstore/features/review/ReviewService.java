@@ -776,6 +776,7 @@ public class ReviewService {
             review.getProductId(),
             productName,
             review.getOrderId(),
+            review.getBuyerId(),
             displayName,
             review.getVariantLabel(),
             review.getStars(),
