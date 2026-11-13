@@ -61,6 +61,7 @@ tasks.withType<Test> {
     // System property ưu tiên hơn file import nên ghi đè được.
     systemProperty("app.bootstrap-admin.email", "")
     systemProperty("gotrue.service-role-key", "")
+    // app.demo-seed bật như dev, nhưng ảnh demo là file fake — xem TestcontainersConfiguration#demoImageFetcher.
 }
 
 tasks.withType<JavaCompile>().configureEach {
