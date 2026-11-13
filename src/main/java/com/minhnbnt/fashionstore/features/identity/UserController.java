@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.features.identity;
 
+import com.minhnbnt.fashionstore.dto.identity.ChangeAvatarRequest;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.dto.identity.UserResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,8 +12,10 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -55,6 +58,35 @@ public class UserController {
         var subject = Objects.requireNonNull(jwt.getSubject());
 
         return users.getById(UUID.fromString(subject));
+    }
+
+    @PutMapping("/api/users/me/avatar")
+    @Operation(
+        summary = "Đổi ảnh đại diện",
+        description = "Nhận S3 key ảnh đã upload qua /api/uploads/presign. Gọi DELETE để xóa ảnh."
+    )
+    @ApiResponse(responseCode = "200", description = "Profile sau khi đổi ảnh")
+    @ApiResponse(responseCode = "400", description = "avatarKey không phải key ảnh đã upload")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @SecurityRequirement(name = "bearerAuth")
+    public UserResponse changeAvatar(
+        @AuthenticationPrincipal Jwt jwt,
+        @Valid @RequestBody ChangeAvatarRequest request
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+
+        return users.changeAvatar(UUID.fromString(subject), request.avatarKey());
+    }
+
+    @DeleteMapping("/api/users/me/avatar")
+    @Operation(summary = "Xóa ảnh đại diện")
+    @ApiResponse(responseCode = "200", description = "Profile sau khi xóa ảnh")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @SecurityRequirement(name = "bearerAuth")
+    public UserResponse clearAvatar(@AuthenticationPrincipal Jwt jwt) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+
+        return users.clearAvatar(UUID.fromString(subject));
     }
 
     @GetMapping("/api/public/hello")

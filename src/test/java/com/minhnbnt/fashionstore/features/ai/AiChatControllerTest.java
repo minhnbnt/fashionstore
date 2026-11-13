@@ -131,4 +131,24 @@ class AiChatControllerTest {
         mockMvc.perform(get("/api/ai/conversations"))
             .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void saveMessageWithInvalidRole_returns400() throws Exception {
+        mockMvc.perform(post("/api/ai/conversations/{id}/messages", UUID.randomUUID())
+                .with(jwt().jwt(j -> j.subject(UUID.randomUUID().toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"role\":\"hacker\",\"content\":\"xin chao\"}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createConversationWithTooLongTitle_returns400() throws Exception {
+        var longTitle = "a".repeat(256);
+
+        mockMvc.perform(post("/api/ai/conversations")
+                .with(jwt().jwt(j -> j.subject(UUID.randomUUID().toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"" + longTitle + "\"}"))
+            .andExpect(status().isBadRequest());
+    }
 }

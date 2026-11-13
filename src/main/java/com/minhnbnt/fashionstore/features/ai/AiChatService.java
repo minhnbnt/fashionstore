@@ -9,10 +9,13 @@ import com.minhnbnt.fashionstore.features.ai.repository.AiMessageRepository;
 import com.minhnbnt.fashionstore.model.AiConversation;
 import com.minhnbnt.fashionstore.model.AiMessage;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.UUID;
@@ -25,7 +28,10 @@ public class AiChatService {
     private static final int MAX_TITLE_LENGTH = 50;
 
     private final AiConversationRepository conversationRepo;
+
     private final AiMessageRepository messageRepo;
+
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public List<AiConversationResponse> listConversations(UUID userId) {
@@ -36,7 +42,7 @@ public class AiChatService {
     }
 
     @Transactional
-    public AiConversationResponse createConversation(UUID userId, CreateAiConversationRequest request) {
+    public AiConversationResponse createConversation(UUID userId, @Nullable CreateAiConversationRequest request) {
         String rawTitle = null;
         if (request != null) {
             rawTitle = request.title();
@@ -80,6 +86,7 @@ public class AiChatService {
         if (request.content() != null) {
             safeContent = request.content();
         }
+        validateMetadata(request.metadata());
         var msg = AiMessage.of(conversationId, request.role(), safeContent, request.metadata());
         messageRepo.insertMessage(
             msg.getId(),
@@ -104,6 +111,18 @@ public class AiChatService {
         conversationRepo.save(conv);
 
         return toMessageResponse(msg);
+    }
+
+    private void validateMetadata(@Nullable String metadata) {
+        if (metadata == null) {
+            return;
+        }
+
+        try {
+            objectMapper.readTree(metadata);
+        } catch (JacksonException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "metadata must be valid JSON");
+        }
     }
 
     private AiConversationResponse toConversationResponse(AiConversation conv) {

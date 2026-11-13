@@ -16,7 +16,6 @@ import com.minhnbnt.fashionstore.dto.catalog.ProductSummaryResponse;
 import com.minhnbnt.fashionstore.dto.catalog.SearchFacetsResponse;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateVariantRequest;
-import com.minhnbnt.fashionstore.dto.catalog.VariantResponse;
 import com.minhnbnt.fashionstore.dto.catalog.AdjustStockRequest;
 import com.minhnbnt.fashionstore.dto.catalog.BulkDeleteProductsRequest;
 import com.minhnbnt.fashionstore.dto.catalog.BulkImportResult;
@@ -85,6 +84,10 @@ import java.util.stream.StreamSupport;
 @Service
 @RequiredArgsConstructor
 public class CatalogService {
+
+    private static final Pattern UUID_STRING_PATTERN = Pattern.compile(
+        "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    );
 
     private final ProductRepository products;
 
@@ -564,10 +567,6 @@ public class CatalogService {
         return toResponse(product);
     }
 
-    private static final Pattern UUID_STRING_PATTERN = Pattern.compile(
-        "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-    );
-
     @Transactional(readOnly = true)
     public ProductResponse getDetailByIdentifier(@NonNull String idOrSlug) {
         var trimmed = idOrSlug.trim();
@@ -595,8 +594,7 @@ public class CatalogService {
      * của getDetail).
      */
     @Transactional(readOnly = true)
-    public List<ProductResponse> getDetails(@NonNull List<UUID> productIds) {
-        if (productIds.isEmpty()) {
+    public List<ProductResponse> getDetails(@NonNull List<UUID> productIds) {        if (productIds.isEmpty()) {
             return List.of();
         }
 
@@ -607,12 +605,9 @@ public class CatalogService {
             }
         }
 
-        var approvedShopIds = new HashSet<UUID>();
-        for (var shopId : productsById.values().stream().map(Product::getShopId).distinct().toList()) {
-            if (shops.isShopApproved(shopId)) {
-                approvedShopIds.add(shopId);
-            }
-        }
+        var approvedShopIds = shops.findApprovedShopIds(
+            productsById.values().stream().map(Product::getShopId).distinct().toList()
+        );
 
         var visibleProducts = new LinkedHashMap<UUID, Product>();
         for (var id : productIds) {
@@ -656,39 +651,11 @@ public class CatalogService {
         return responses;
     }
 
-    /**
-     * Batch tóm tắt sản phẩm công khai cho trợ lý AI / hiển thị nhiều thẻ sản phẩm cùng lúc.
-     * Dùng chung điều kiện hiển thị với {@link #getDetails(List)}: giữ nguyên thứ tự id đầu vào
-     * và bỏ qua id không tìm thấy, không ACTIVE hoặc thuộc shop chưa duyệt.
-     */
     @Transactional(readOnly = true)
-    public List<ProductSummaryResponse> getSummaryBatch(@NonNull List<UUID> productIds) {
+    public List<ProductSummaryResponse> getSummaries(@NonNull List<UUID> productIds) {
         return getDetails(productIds).stream()
-            .map(CatalogService::toSummaryResponse)
+            .map(CatalogMapper::toSummary)
             .toList();
-    }
-
-    private static ProductSummaryResponse toSummaryResponse(ProductResponse detail) {
-        var minPrice = 0L;
-        if (!detail.variants().isEmpty()) {
-            minPrice = detail.variants().stream()
-                .mapToLong(VariantResponse::price)
-                .min()
-                .orElse(0L);
-        }
-        String defaultImageKey = null;
-        if (!detail.images().isEmpty()) {
-            defaultImageKey = detail.images().getFirst().s3Key();
-        }
-        return new ProductSummaryResponse(
-            detail.id(),
-            detail.shopId(),
-            detail.name(),
-            detail.slug(),
-            minPrice,
-            defaultImageKey,
-            null
-        );
     }
 
     @Transactional(readOnly = true)

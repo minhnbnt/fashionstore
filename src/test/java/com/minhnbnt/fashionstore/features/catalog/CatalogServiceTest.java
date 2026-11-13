@@ -1019,7 +1019,7 @@ class CatalogServiceTest {
     }
 
     @Test
-    void getSummaryBatchPreservesOrderComputesMinPriceAndSkipsHidden() {
+    void getSummariesPreservesOrderComputesMinPriceAndSkipsHidden() {
         var ownerId = mirroredUser();
         var shopId = approvedShop(ownerId, "shop-batch-summary");
         var pendingOwnerId = mirroredUser();
@@ -1039,7 +1039,7 @@ class CatalogServiceTest {
 
         var missingId = UUID.randomUUID();
 
-        var summaries = catalog.getSummaryBatch(List.of(active2.id(), hiddenDraft.id(), missingId, active1.id()));
+        var summaries = catalog.getSummaries(List.of(active2.id(), hiddenDraft.id(), missingId, active1.id()));
 
         assertThat(summaries).hasSize(2);
         assertThat(summaries.get(0).id()).isEqualTo(active2.id());
@@ -1049,8 +1049,8 @@ class CatalogServiceTest {
         assertThat(summaries.get(0).rank()).isNull();
         assertThat(summaries.get(1).id()).isEqualTo(active1.id());
         assertThat(summaries.get(1).minPrice()).isEqualTo(100000L);
-        assertThat(catalog.getSummaryBatch(List.of(missingId, pendingShop.id()))).isEmpty();
-        assertThat(catalog.getSummaryBatch(List.<UUID>of())).isEmpty();
+        assertThat(catalog.getSummaries(List.of(missingId, pendingShop.id()))).isEmpty();
+        assertThat(catalog.getSummaries(List.<UUID>of())).isEmpty();
     }
 
     @Test
