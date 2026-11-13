@@ -29,14 +29,14 @@ public class PublicProductController {
     @GetMapping("/{id}")
     @Operation(
         operationId = "detail", summary = "Chi tiết sản phẩm",
-        description = "Chỉ product ACTIVE của shop APPROVED mới xem được, còn lại 404."
+        description = "Chỉ product ACTIVE của shop APPROVED mới xem được, nhận UUID hoặc slug; còn lại 404."
     )
     @ApiResponse(responseCode = "200", description = "Chi tiết kèm variants và ảnh")
     @ApiResponse(responseCode = "404", description = "Không có, bị ẩn hoặc shop chưa duyệt")
     public ProductResponse detail(
-        @Parameter(description = "Id product") @PathVariable UUID id
+        @Parameter(description = "Id (UUID) hoặc slug của product") @PathVariable String id
     ) {
-        return catalog.getDetail(id);
+        return catalog.getDetailByIdentifier(id);
     }
 
     @GetMapping("/batch")

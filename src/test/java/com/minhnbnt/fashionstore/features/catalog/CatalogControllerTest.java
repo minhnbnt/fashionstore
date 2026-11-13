@@ -236,10 +236,22 @@ class CatalogControllerTest {
     void getDetailIsPublic() throws Exception {
         var id = UUID.randomUUID();
         var shopId = UUID.randomUUID();
-        when(catalog.getDetail(id)).thenReturn(product(id, shopId));
+        when(catalog.getDetailByIdentifier(id.toString())).thenReturn(product(id, shopId));
 
         mockMvc.perform(get("/api/products/{id}", id))
             .andExpect(status().isOk())
+            .andExpect(jsonPath("$.slug").value("ao-thun"));
+    }
+
+    @Test
+    void getDetailAcceptsSlug() throws Exception {
+        var id = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        when(catalog.getDetailByIdentifier("ao-thun")).thenReturn(product(id, shopId));
+
+        mockMvc.perform(get("/api/products/{id}", "ao-thun"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(id.toString()))
             .andExpect(jsonPath("$.slug").value("ao-thun"));
     }
 
@@ -274,6 +286,12 @@ class CatalogControllerTest {
             .andExpect(status().isBadRequest());
 
         verify(catalog, never()).getSummaries(any());
+    }
+
+    @Test
+    void batchSummariesWithoutIdsIsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/products/batch"))
+            .andExpect(status().isBadRequest());
     }
 
     private static ProductSearchResponse searchPage() {

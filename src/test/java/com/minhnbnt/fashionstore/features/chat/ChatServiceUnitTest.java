@@ -4,8 +4,11 @@ import com.minhnbnt.fashionstore.dto.chat.ChatMessageResponse;
 import com.minhnbnt.fashionstore.dto.chat.ChatReadEvent;
 import com.minhnbnt.fashionstore.dto.chat.ConversationEvent;
 import com.minhnbnt.fashionstore.dto.chat.SendMessageRequest;
+import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatConversationRepository;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatMessageRepository;
+import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
+import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.infrastructure.realtime.ChatRealtimePublisher;
@@ -27,8 +30,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -48,19 +49,24 @@ class ChatServiceUnitTest {
     private ChatMessageRepository messages;
 
     @Mock
+    private ProductRepository products;
+
+    @Mock
     private ShopService shops;
 
     @Mock
+    @SuppressWarnings("unused")
     private ShopAccessChecker access;
 
     @Mock
+    @SuppressWarnings("unused")
     private ShopAuditService audit;
 
     @Mock
-    private ChatRealtimePublisher realtime;
+    private NotificationService notifications;
 
     @Mock
-    private com.minhnbnt.fashionstore.features.notification.NotificationService notifications;
+    private ChatRealtimePublisher realtime;
 
     @InjectMocks
     private ChatService chatService;
@@ -127,6 +133,32 @@ class ChatServiceUnitTest {
         // Auto reply must come from a real shop member, not the shop row itself.
         assertThat(autoReply.getSenderId()).isEqualTo(ownerId);
         assertThat(autoReply.getContent()).isEqualTo("Xin chao, shop se phan hoi ban som nhat!");
+    }
+
+    @Test
+    void sendMessageFromShopNotifiesBuyer() {
+        var buyerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var sellerId = UUID.randomUUID();
+        var conv = ChatConversation.create(shopId, buyerId);
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(shops.isMember(shopId, sellerId)).thenReturn(true);
+        when(shops.getShopName(shopId)).thenReturn("Fashion Hub");
+
+        var req = new SendMessageRequest("Shop chao ban", null);
+        chatService.sendMessage(sellerId, convId, req);
+
+        verify(notifications).create(
+            eq(Set.of(buyerId)),
+            eq(NotificationCategory.ACTIVITY),
+            eq("CHAT_MESSAGE"),
+            eq("Tin nhắn mới từ Fashion Hub"),
+            eq("Shop chao ban"),
+            eq(null),
+            any()
+        );
     }
 
     @Test
@@ -244,6 +276,26 @@ class ChatServiceUnitTest {
     }
 
     @Test
+    void sendMessageFromBuyerWithImageOnly_savesAndRecordsPreviewAsImageTag() {
+        var buyerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var conv = ChatConversation.create(shopId, buyerId);
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(shops.isMember(shopId, buyerId)).thenReturn(false);
+
+        var req = new SendMessageRequest(null, "chat/photo.jpg");
+        chatService.sendMessage(buyerId, convId, req);
+
+        verify(messages).save(captor.capture());
+        var savedMessage = captor.getValue();
+        assertThat(savedMessage.getContent()).isEqualTo("");
+        assertThat(savedMessage.getImageKey()).isEqualTo("chat/photo.jpg");
+        assertThat(conv.getLastMessageText()).isEqualTo("[Hình ảnh]");
+    }
+
+    @Test
     void markReadByBuyerSendsReadReceiptToShop() {
         var buyerId = UUID.randomUUID();
         var shopId = UUID.randomUUID();
@@ -283,53 +335,82 @@ class ChatServiceUnitTest {
     }
 
     @Test
-    void sendMessageFromShopNotifiesBuyer() {
+    void sendMessageWithOtherShopProductLinkThrowsBadRequest() {
         var buyerId = UUID.randomUUID();
-        var shopId = UUID.randomUUID();
+        var convShopId = UUID.randomUUID();
+        var otherShopId = UUID.randomUUID();
         var convId = UUID.randomUUID();
-        var sellerId = UUID.randomUUID();
-        var conv = ChatConversation.create(shopId, buyerId);
+        var otherProductId = UUID.randomUUID();
+        var conv = ChatConversation.create(convShopId, buyerId);
+
+        var otherProduct = com.minhnbnt.fashionstore.model.Product.create(
+            otherShopId, null, "Áo Shop Khác", "ao-shop-khac", "Mô tả",
+            com.minhnbnt.fashionstore.model.ProductStatus.ACTIVE,
+            null, null, false, null, null, null, null, null, null, null, null, null
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(otherProduct, "id", otherProductId);
 
         when(conversations.findById(convId)).thenReturn(Optional.of(conv));
-        when(shops.isMember(shopId, sellerId)).thenReturn(true);
-        when(shops.getShopName(shopId)).thenReturn("Fashion Hub");
-        when(shops.findActiveUserIdsByShop(shopId)).thenReturn(List.of(sellerId));
+        when(shops.isMember(convShopId, buyerId)).thenReturn(false);
+        when(products.findById(otherProductId)).thenReturn(Optional.of(otherProduct));
 
-        var req = new SendMessageRequest("Shop chao ban", null);
-        chatService.sendMessage(sellerId, convId, req);
+        var req = new SendMessageRequest("/product/" + otherProductId, null);
 
-        verify(notifications).create(
-            eq(Set.of(buyerId)),
-            eq(NotificationCategory.ACTIVITY),
-            eq("CHAT_MESSAGE"),
-            eq("Tin nhắn mới từ Fashion Hub"),
-            eq("Shop chao ban"),
-            eq(null),
-            any()
-        );
+        assertThatThrownBy(() -> chatService.sendMessage(buyerId, convId, req))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(org.springframework.http.HttpStatus.BAD_REQUEST));
     }
 
     @Test
-    void sendMessageFromBuyerDoesNotNotifySeller() {
+    void sendMessageWithOtherShopProductSlugThrowsBadRequest() {
+        var buyerId = UUID.randomUUID();
+        var convShopId = UUID.randomUUID();
+        var otherShopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var conv = ChatConversation.create(convShopId, buyerId);
+
+        var otherProduct = com.minhnbnt.fashionstore.model.Product.create(
+            otherShopId, null, "Áo Shop Khác", "ao-shop-khac", "Mô tả",
+            com.minhnbnt.fashionstore.model.ProductStatus.ACTIVE,
+            null, null, false, null, null, null, null, null, null, null, null, null
+        );
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(shops.isMember(convShopId, buyerId)).thenReturn(false);
+        when(products.findBySlug("ao-shop-khac")).thenReturn(List.of(otherProduct));
+
+        var req = new SendMessageRequest("/product/ao-shop-khac", null);
+
+        assertThatThrownBy(() -> chatService.sendMessage(buyerId, convId, req))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(org.springframework.http.HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void sendMessageWithSameShopProductLinkSucceeds() {
         var buyerId = UUID.randomUUID();
         var shopId = UUID.randomUUID();
         var convId = UUID.randomUUID();
+        var ownProductId = UUID.randomUUID();
         var conv = ChatConversation.create(shopId, buyerId);
 
-        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
-        when(shops.findActiveUserIdsByShop(shopId)).thenReturn(List.of(UUID.randomUUID()));
-
-        var req = new SendMessageRequest("Buyer chao shop", null);
-        chatService.sendMessage(buyerId, convId, req);
-
-        verify(notifications, never()).create(
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any()
+        var ownProduct = com.minhnbnt.fashionstore.model.Product.create(
+            shopId, null, "Áo Cùng Shop", "ao-cung-shop", "Mô tả",
+            com.minhnbnt.fashionstore.model.ProductStatus.ACTIVE,
+            null, null, false, null, null, null, null, null, null, null, null, null
         );
+        org.springframework.test.util.ReflectionTestUtils.setField(ownProduct, "id", ownProductId);
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(shops.isMember(shopId, buyerId)).thenReturn(false);
+        when(products.findById(ownProductId)).thenReturn(Optional.of(ownProduct));
+
+        var req = new SendMessageRequest("/product/" + ownProductId, null);
+        var resp = chatService.sendMessage(buyerId, convId, req);
+
+        assertThat(resp.content()).isEqualTo("/product/" + ownProductId);
+        assertThat(conv.getLastMessageText()).isEqualTo("[Sản phẩm]");
     }
 }
