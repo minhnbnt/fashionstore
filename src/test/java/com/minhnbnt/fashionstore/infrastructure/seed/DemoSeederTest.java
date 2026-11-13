@@ -24,16 +24,34 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.TestPropertySource;
 import software.amazon.awssdk.services.s3.S3Client;
+
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @TestPropertySource(properties = "test.context.id=demo-seeder")
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, DemoSeederTest.StubImages.class})
 @SpringBootTest
 class DemoSeederTest {
+
+    /** JPEG rỗng (SOI + EOI): đủ để S3 nhận, test không phải chờ mạng tải ảnh thật. */
+    private static final byte[] EMPTY_JPEG = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xD9};
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class StubImages {
+
+        @Bean
+        @Primary
+        DemoImageFetcher demoImageFetcher() {
+            return url -> Optional.of(EMPTY_JPEG);
+        }
+    }
 
     @Autowired
     private ShopService shopService;
@@ -58,6 +76,9 @@ class DemoSeederTest {
 
     @Value("${s3.bucket}")
     private String bucket;
+
+    @Autowired
+    private DemoImageFetcher imageFetcher;
 
     @Autowired
     private OrderService orderService;
@@ -95,6 +116,7 @@ class DemoSeederTest {
             categories,
             s3,
             bucket,
+            imageFetcher,
             orderService,
             reviewService,
             returnRequestService,
