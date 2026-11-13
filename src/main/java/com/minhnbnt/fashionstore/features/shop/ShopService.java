@@ -25,7 +25,9 @@ import java.text.Normalizer;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -96,6 +98,26 @@ public class ShopService {
         members.add(ShopMember.owner(shop.getId(), ownerId));
         histories.save(ShopStatusHistory.record(shop.getId(), null, shop.getStatus(), ownerId, ""));
         return toResponse(shop);
+    }
+
+    public record ShopSummary(UUID id, String name, @Nullable String slug, boolean approved) {}
+
+    @Transactional(readOnly = true)
+    public Map<UUID, ShopSummary> findShopSummariesByIds(@NonNull Collection<UUID> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        var map = new LinkedHashMap<UUID, ShopSummary>();
+        shops.findAllById(ids).forEach(shop -> map.put(
+            shop.getId(),
+            new ShopSummary(
+                shop.getId(),
+                shop.getName(),
+                shop.getSlug(),
+                shop.getStatus() == ShopStatus.APPROVED
+            )
+        ));
+        return map;
     }
 
     @Transactional

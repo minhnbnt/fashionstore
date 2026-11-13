@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 @Table("orders")
@@ -47,6 +48,10 @@ public class Order implements Persistable<UUID> {
     private String shippingAddress;
 
     private String note;
+
+    private @Nullable String shippingCarrier;
+
+    private @Nullable String trackingCode;
 
     private @Nullable String cancelReason;
 
@@ -104,6 +109,8 @@ public class Order implements Persistable<UUID> {
             null,
             null,
             null,
+            null,
+            null,
             now,
             now,
             true);
@@ -119,12 +126,27 @@ public class Order implements Persistable<UUID> {
     }
 
     public void ship() {
+        ship(null, null);
+    }
+
+    public void ship(@Nullable String carrier, @Nullable String trackingCode) {
         if (status != OrderStatus.CONFIRMED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only confirmed orders can be shipped");
         }
+        var resolvedCarrier = "GHN";
+        if (carrier != null && !carrier.isBlank()) {
+            resolvedCarrier = carrier.trim();
+        }
+        var resolvedCode = "VN-" + code;
+        if (trackingCode != null && !trackingCode.isBlank()) {
+            resolvedCode = trackingCode.trim();
+        }
         status = OrderStatus.SHIPPING;
-        shippedAt = Instant.now();
-        updatedAt = Instant.now();
+        this.shippingCarrier = resolvedCarrier;
+        this.trackingCode = resolvedCode;
+        var now = Instant.now();
+        shippedAt = now;
+        updatedAt = now;
     }
 
     public void deliver() {
@@ -138,13 +160,20 @@ public class Order implements Persistable<UUID> {
     }
 
     public void cancel() {
+        cancel(null, null);
+    }
+
+    public void cancel(@Nullable String reason, @Nullable String note) {
         if (status != OrderStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending orders can be cancelled");
         }
         status = OrderStatus.CANCELLED;
+        cancelReason = reason;
+        cancelNote = note;
         cancelledBy = OrderCanceller.BUYER;
-        cancelledAt = Instant.now();
-        updatedAt = Instant.now();
+        var now = Instant.now();
+        cancelledAt = now;
+        updatedAt = now;
     }
 
     public void cancelBySeller(String reason, @Nullable String note) {
@@ -192,8 +221,12 @@ public class Order implements Persistable<UUID> {
         if (status != OrderStatus.DELIVERED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only delivered orders can be confirmed");
         }
-        receivedAt = Instant.now();
-        updatedAt = Instant.now();
+        if (receivedAt != null) {
+            return;
+        }
+        var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        receivedAt = now;
+        updatedAt = now;
     }
 
     @Override

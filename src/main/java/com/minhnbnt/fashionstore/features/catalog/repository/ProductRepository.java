@@ -16,6 +16,8 @@ public interface ProductRepository extends CrudRepository<Product, UUID> {
 
     Optional<Product> findByShopIdAndSlug(UUID shopId, String slug);
 
+    List<Product> findBySlug(String slug);
+
     /**
      * SELECT ... FOR UPDATE: admin gỡ/khôi phục đi qua đây để 2 admin bấm cùng lúc không ghi đè nhau.
      */

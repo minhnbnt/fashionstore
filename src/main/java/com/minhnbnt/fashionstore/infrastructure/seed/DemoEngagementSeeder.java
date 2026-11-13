@@ -6,10 +6,13 @@ import com.minhnbnt.fashionstore.dto.chat.SendMessageRequest;
 import com.minhnbnt.fashionstore.dto.review.CreateReviewRequest;
 import com.minhnbnt.fashionstore.dto.review.ReplyReviewRequest;
 import com.minhnbnt.fashionstore.dto.review.ReportReviewRequest;
+import com.minhnbnt.fashionstore.dto.review.SaveReviewReplyTemplateRequest;
 import com.minhnbnt.fashionstore.features.chat.ChatService;
 import com.minhnbnt.fashionstore.features.order.ReturnRequestService;
 import com.minhnbnt.fashionstore.features.review.ReviewService;
+import com.minhnbnt.fashionstore.model.ReviewTag;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -41,31 +44,111 @@ class DemoEngagementSeeder {
         DemoOrderSeeder.DemoBuyers buyers,
         DemoOrderSeeder.DemoOrders orders
     ) {
-        seedReviews(ownerId, productIdBySlug, buyers);
+        seedReviews(ownerId, productIdBySlug, buyers, orders);
+        seedTemplates(ownerId, shopId);
         seedReturns(ownerId, buyers, orders);
         seedChat(ownerId, shopId, buyers);
     }
 
-    private void seedReviews(UUID ownerId, Map<String, UUID> productIdBySlug, DemoOrderSeeder.DemoBuyers buyers) {
+    private void seedReviews(
+        UUID ownerId,
+        Map<String, UUID> productIdBySlug,
+        DemoOrderSeeder.DemoBuyers buyers,
+        DemoOrderSeeder.DemoOrders orders
+    ) {
         var aoThun = product(productIdBySlug, "ao-thun-oversize");
         var quanJeans = product(productIdBySlug, "quan-jeans-ong-suong");
         var chanVay = product(productIdBySlug, "chan-vay-chu-a");
 
-        reviews.createReview(buyers.linh(), aoThun, new CreateReviewRequest(5, "Vải dày dặn, form đẹp."));
-        reviews.createReview(buyers.tram(), aoThun, new CreateReviewRequest(5, "Mặc 3 tháng chưa xù."));
-        reviews.createReview(buyers.khang(), aoThun, new CreateReviewRequest(4, "Form rộng thoải mái, giao nhanh."));
-        reviews.createReview(buyers.linh(), chanVay, new CreateReviewRequest(5, "Màu lên chuẩn ảnh shop."));
+        reviews.createReview(
+            buyers.linh(),
+            aoThun,
+            new CreateReviewRequest(
+                orders.aoThunLinh(),
+                5,
+                "Vải dày dặn, form đẹp.",
+                null,
+                null,
+                List.of(ReviewTag.QUALITY_GOOD, ReviewTag.TRUE_TO_SIZE),
+                false
+            )
+        );
+        reviews.createReview(
+            buyers.tram(),
+            aoThun,
+            new CreateReviewRequest(
+                orders.aoThunTram(),
+                5,
+                "Mặc 3 tháng chưa xù.",
+                null,
+                null,
+                List.of(ReviewTag.QUALITY_GOOD, ReviewTag.AS_DESCRIBED),
+                false
+            )
+        );
+        reviews.createReview(
+            buyers.khang(),
+            aoThun,
+            new CreateReviewRequest(
+                orders.aoThunKhang(),
+                4,
+                "Form rộng thoải mái, giao nhanh.",
+                null,
+                null,
+                List.of(ReviewTag.FAST_DELIVERY, ReviewTag.CAREFUL_PACKING),
+                true
+            )
+        );
+        reviews.createReview(
+            buyers.linh(),
+            chanVay,
+            new CreateReviewRequest(
+                orders.chanVayLinh(),
+                5,
+                "Màu lên chuẩn ảnh shop.",
+                null,
+                null,
+                List.of(ReviewTag.AS_DESCRIBED),
+                false
+            )
+        );
 
         var oneStar = reviews.createReview(
             buyers.an(),
             quanJeans,
-            new CreateReviewRequest(1, "Màu khác ảnh, chất vải cứng hơn mình nghĩ.")
+            new CreateReviewRequest(
+                orders.quanJeansAn(),
+                1,
+                "Màu khác ảnh, chất vải cứng hơn mình nghĩ.",
+                null,
+                null,
+                List.of(),
+                false
+            )
         );
         reviews.reply(ownerId, oneStar.id(), new ReplyReviewRequest(
             "Cảm ơn bạn đã góp ý ạ. Shop sẽ chụp lại ảnh sát màu thật hơn để bạn tiện so sánh."
         ));
         reviews.report(ownerId, oneStar.id(), new ReportReviewRequest(
             "Đánh giá có nội dung sai sự thật về màu sắc và chất liệu sản phẩm."
+        ));
+    }
+
+    private void seedTemplates(UUID ownerId, UUID shopId) {
+        if (!reviews.listReplyTemplates(ownerId, shopId).isEmpty()) {
+            return;
+        }
+        reviews.createReplyTemplate(ownerId, shopId, new SaveReviewReplyTemplateRequest(
+            "Cảm ơn đánh giá 5 sao",
+            "Cảm ơn bạn rất nhiều đã tin tưởng và ủng hộ shop! Rất mong tiếp tục được phục vụ bạn ở những đơn hàng tiếp theo."
+        ));
+        reviews.createReplyTemplate(ownerId, shopId, new SaveReviewReplyTemplateRequest(
+            "Hỗ trợ đổi size / sản phẩm",
+            "Cảm ơn bạn đã góp ý cho shop. Nếu cần hỗ trợ đổi size hoặc kiểm tra lại sản phẩm, bạn nhắn tin cho shop qua mục Chat để được xử lý nhanh nhé."
+        ));
+        reviews.createReplyTemplate(ownerId, shopId, new SaveReviewReplyTemplateRequest(
+            "Ghi nhận góp ý chất lượng",
+            "Shop xin lỗi vì trải nghiệm chưa trọn vẹn và cảm ơn bạn đã phản hồi thẳng thắn. Shop đã ghi nhận để kiểm tra kỹ hơn khâu đóng gói và kiểm hàng."
         ));
     }
 

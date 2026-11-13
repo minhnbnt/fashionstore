@@ -3,6 +3,7 @@ package com.minhnbnt.fashionstore.features.cart.controller;
 import com.minhnbnt.fashionstore.dto.cart.CartCheckoutRequest;
 import com.minhnbnt.fashionstore.dto.cart.CartItemRequest;
 import com.minhnbnt.fashionstore.dto.cart.CartResponse;
+import com.minhnbnt.fashionstore.dto.cart.ReorderResponse;
 import com.minhnbnt.fashionstore.dto.cart.UpdateCartItemRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
 import com.minhnbnt.fashionstore.features.cart.CartCheckoutBlockedException;
@@ -136,6 +137,27 @@ public class CartController {
         var buyerId = UUID.fromString(subject);
 
         return carts.checkout(buyerId, request);
+    }
+
+    @PostMapping("/reorder/{orderId}")
+    @Operation(
+        summary = "Mua lại đơn hàng",
+        description = "Thêm lại các sản phẩm hợp lệ từ đơn hàng cũ vào giỏ và "
+            + "báo cáo món hết hàng hoặc giảm số lượng."
+    )
+    @ApiResponse(responseCode = "200", description = "Kết quả mua lại")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "404", description = "Đơn hàng không tồn tại")
+    @ApiResponse(responseCode = "409", description = "Shop hiện không hoạt động")
+    @SecurityRequirement(name = "bearerAuth")
+    public ReorderResponse reorder(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id đơn hàng") @PathVariable UUID orderId
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var buyerId = UUID.fromString(subject);
+
+        return carts.reorder(buyerId, orderId);
     }
 
     @ExceptionHandler(CartCheckoutBlockedException.class)

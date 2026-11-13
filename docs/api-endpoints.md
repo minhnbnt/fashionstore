@@ -56,14 +56,18 @@ Chi tiết luồng này xem `docs/catalog.md`.
 | [x] | 17 | POST | `/api/orders` | Checkout, 1 đơn đúng 1 shop |
 | [x] | 18 | GET | `/api/orders/mine` | Buyer xem đơn của mình |
 | [x] | 19 | GET | `/api/orders/{id}` | Buyer xem chi tiết (chỉ khi `PENDING` mới cancel được) |
-| [x] | 19b | PATCH | `/api/orders/{id}/cancel` | Buyer hủy đơn (chỉ khi `PENDING`) |
+| [x] | 19b | PATCH | `/api/orders/{id}/cancel` | Buyer hủy đơn (chỉ khi `PENDING`), tùy chọn `{reason, note}` (`CHANGE_MIND`, `FOUND_CHEAPER`, `ORDERED_BY_MISTAKE`, `OTHER`) |
+| [x] | 19c | GET | `/api/orders/{id}/timeline` | Buyer xem dòng thời gian trạng thái đơn (không lộ thông tin nội bộ shop) |
+| [x] | 19d | GET | `/api/orders/{id}/tracking` | Buyer xem hành trình vận chuyển gói hàng (mã vận đơn, ĐVVC, lịch sử di chuyển) |
 | [x] | 20 | GET | `/api/seller/orders` | Seller xem đơn mọi shop mình tham gia |
 | [x] | 21 | PATCH | `/api/seller/orders/{id}/confirm` | Confirm đơn hàng (`PENDING -> CONFIRMED`) |
-| [x] | 22 | PATCH | `/api/seller/orders/{id}/ship` | Chuyển sang `SHIPPING` (bàn giao cho ĐVVC) |
-| [x] | 23 | PATCH | `/api/seller/orders/{id}/deliver` | `DELIVERED` = thu COD (`payment_status='COLLECTED'`) |
+| [x] | 22 | PATCH | `/api/seller/orders/{id}/ship` | Chuyển sang `SHIPPING` (bàn giao ĐVVC; tùy chọn `{shippingCarrier, trackingCode}`, tạo mã `VN-...` nếu bỏ trống) |
+| [x] | 23 | PATCH | `/api/seller/orders/{id}/deliver` | `DELIVERED` = thu COD (`payment_status='COLLECTED'`), đặt `auto_complete_at` sau 7 ngày |
 | [x] | 23b | PATCH | `/api/seller/orders/{id}/cancel` | Seller hủy đơn kèm lý do + ghi chú, tự động hoàn trả tồn kho nguyên tử |
 | [x] | 23c | POST | `/api/seller/orders/bulk-confirm` | Seller xác nhận hàng loạt đơn hàng PENDING → CONFIRMED, báo cáo chi tiết từng đơn (partial success) |
 | [x] | 23d | GET | `/api/seller/orders/{id}/timeline` | Seller xem dòng thời gian (timeline) chuyển trạng thái của đơn hàng |
+| [x] | 23e | GET | `/api/seller/orders/{id}/tracking` | Seller xem danh sách mốc hành trình vận chuyển của đơn hàng |
+| [x] | 23f | POST | `/api/seller/orders/{id}/tracking` | Seller bổ sung mốc di chuyển gói hàng khi đơn đang `SHIPPING` |
 
 *Chu trình tồn kho chuẩn hóa sàn TMĐT*: Trừ kho nguyên tử ngay lúc checkout (triệt tiêu race conditions overselling), lúc confirm chỉ chuyển trạng thái, hoàn trả tồn kho nguyên tử kèm nhật ký biến động kho khi đơn bị hủy ở mọi trạng thái trước giao (BUYER hủy, SELLER hủy, ADMIN hủy, hoặc SYSTEM tự động hủy sau 24 giờ).
 
@@ -165,7 +169,7 @@ Khóa tài khoản được thực thi hai lớp: `AccountFilter` chặn access 
 
 | Xong | # | Method | Path | Mô tả |
 |------|---|--------|------|-------|
-| [x] | 42 | POST | `/api/orders/{orderId}/return` | Buyer tạo yêu cầu trả hàng / hoàn tiền cho đơn đã `DELIVERED` |
+| [x] | 42 | POST | `/api/orders/{id}/returns` | Buyer tạo yêu cầu trả hàng / hoàn tiền cho đơn đã `DELIVERED` (khóa xác nhận đã nhận và tự động hoàn thành khi còn mở) |
 | [x] | 43 | GET | `/api/orders/returns/mine` | Buyer xem danh sách yêu cầu trả hàng của mình |
 | [x] | 44 | GET | `/api/seller/returns` | Seller xem các yêu cầu đổi trả cần xử lý (lọc theo trạng thái) |
 | [x] | 45 | PATCH | `/api/seller/returns/{id}/approve` | Seller phê duyệt phương án đổi/trả & hoàn tiền |
@@ -239,6 +243,7 @@ Buyer tạo/sửa/xóa đánh giá đã chuyển hẳn về Flow 14 (`review`, b
 | [x] | 83 | DELETE | `/api/cart/items/{variantId}` | Xóa item |
 | [x] | 84 | DELETE | `/api/cart` | Xóa sạch giỏ |
 | [x] | 85 | POST | `/api/cart/checkout` | Kiểm tra hết rồi đặt, mỗi shop 1 đơn; `variantIds` tùy chọn để chỉ đặt item đã tick, hỏng thì 409 kèm từng item lỗi |
+| [x] | 85b | POST | `/api/cart/reorder/{orderId}` | Mua lại đơn hàng cũ: thêm các món còn hợp lệ vào giỏ và báo cáo chi tiết món hết hàng/giảm số lượng |
 
 Chi tiết luồng này xem `docs/cart.md`. Địa chỉ giao hàng vẫn là text thuần (cart chưa dùng tới sổ địa chỉ `V5__address_book`) — xem mục "Nâng cấp sau" trong đó.
 
@@ -246,11 +251,11 @@ Chi tiết luồng này xem `docs/cart.md`. Địa chỉ giao hàng vẫn là te
 
 | Xong | # | Method | Path | Mô tả |
 |------|---|--------|------|-------|
-| [x] | 86 | PATCH | `/api/orders/{id}/received` | Buyer xác nhận đã nhận (chỉ đơn `DELIVERED`) |
-| [x] | 87 | POST | `/api/products/{productId}/reviews` | Viết đánh giá (stars 1–5, đã nhận hàng mới viết được) |
+| [x] | 86 | PATCH | `/api/orders/{id}/received` | Buyer xác nhận đã nhận (chỉ đơn `DELIVERED` không có yêu cầu đổi/trả đang mở) |
+| [x] | 87 | POST | `/api/products/{productId}/reviews` | Viết đánh giá (stars 1–5, đã nhận hàng mới viết được, tối đa 1 bài/sản phẩm) |
 | [x] | 88 | GET | `/api/products/{productId}/reviews` | Public liệt kê, mới nhất trước |
-| [x] | 89 | PUT | `/api/products/{productId}/reviews` | Sửa bài của mình |
-| [x] | 90 | DELETE | `/api/products/{productId}/reviews` | Xóa bài của mình |
+| [x] | 89 | PUT | `/api/products/{productId}/reviews` | Sửa bài của mình (tối đa 1 lần chỉnh sửa, lần thứ 2 trả 409) |
+| [x] | 90 | GET | `/api/reviews/mine` | Buyer xem danh sách đánh giá đã tạo (mới cập nhật trước) |
 
 Chi tiết luồng này xem `docs/review.md`.
 

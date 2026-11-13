@@ -1,28 +1,42 @@
 package com.minhnbnt.fashionstore.features.review;
 
-import com.minhnbnt.fashionstore.test.ProductTestFixtures;
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
-import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutItemRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.review.CreateReviewRequest;
+import com.minhnbnt.fashionstore.dto.review.ReplyReviewRequest;
+import com.minhnbnt.fashionstore.dto.review.SaveReviewReplyTemplateRequest;
 import com.minhnbnt.fashionstore.dto.review.UpdateReviewRequest;
-import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
 import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
+import com.minhnbnt.fashionstore.features.notification.NotificationRepository;
 import com.minhnbnt.fashionstore.features.order.OrderService;
+import com.minhnbnt.fashionstore.features.shop.ShopMemberAuditRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
+import com.minhnbnt.fashionstore.features.shop.ShopRoleRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.model.ReviewSort;
+import com.minhnbnt.fashionstore.model.ReviewTag;
+import com.minhnbnt.fashionstore.model.ShopMember;
+import com.minhnbnt.fashionstore.model.ShopPermission;
+import com.minhnbnt.fashionstore.model.ShopRole;
+import com.minhnbnt.fashionstore.test.ProductTestFixtures;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -50,11 +64,39 @@ class ReviewServiceTest {
     private UserService users;
 
     @Autowired
-    private com.minhnbnt.fashionstore.features.notification.NotificationRepository notifications;
+    private NotificationRepository notifications;
+
+    @Autowired
+    private ShopMemberRepository shopMembers;
+
+    @Autowired
+    private ShopRoleRepository shopRoles;
+
+    @Autowired
+    private ShopMemberAuditRepository shopAudits;
+
+    @Autowired
+    private JdbcClient jdbc;
+
+    private UUID staffWith(UUID ownerId, UUID shopId, ShopPermission... granted) {
+        var staffId = mirroredUser();
+        var permissions = Arrays.stream(granted).map(Enum::name).toArray(String[]::new);
+        var role = ShopRole.create(shopId, "Staff " + UUID.randomUUID(), permissions, false);
+        shopRoles.save(role);
+        shopMembers.add(ShopMember.staff(shopId, staffId, role.getId(), ownerId));
+        return staffId;
+    }
+
+    private record PurchasedItem(UUID orderId, UUID productId, UUID variantId) {
+    }
 
     private UUID mirroredUser() {
+        return mirroredUser("Minh Nguyễn");
+    }
+
+    private UUID mirroredUser(String displayName) {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U", null));
+        users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", displayName, null));
         return id;
     }
 
@@ -66,6 +108,10 @@ class ReviewServiceTest {
     }
 
     private UUID variantInShop(UUID ownerId, UUID shopId, String slug, String sku) {
+        return variantInShop(ownerId, shopId, slug, sku, "M", "Đen");
+    }
+
+    private UUID variantInShop(UUID ownerId, UUID shopId, String slug, String sku, String size, String color) {
         var created = catalog.createProduct(
             ownerId,
             shopId,
@@ -74,18 +120,22 @@ class ReviewServiceTest {
                 slug,
                 null,
                 null,
-                List.of(new CreateVariantRequest(sku, "M", "Den", 100000L, null, 10, true))
+                List.of(new CreateVariantRequest(sku, size, color, 100000L, null, 10, true))
             )
         );
         var detail = catalog.getDetail(created.id());
         return detail.variants().get(0).id();
     }
 
-    private UUID checkout(UUID buyerId, UUID shopId, UUID variantId) {
+    private UUID checkout(UUID buyerId, UUID shopId, List<CheckoutItemRequest> items) {
         return orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, items, "An", "0901", "Ha Noi", 0L)
         ).id();
+    }
+
+    private UUID checkout(UUID buyerId, UUID shopId, UUID variantId) {
+        return checkout(buyerId, shopId, List.of(new CheckoutItemRequest(variantId, 1)));
     }
 
     private void deliverAndReceive(UUID ownerId, UUID buyerId, UUID orderId) {
@@ -95,15 +145,24 @@ class ReviewServiceTest {
         orders.confirmReceipt(buyerId, orderId);
     }
 
-    private UUID deliveredProduct(UUID ownerId, UUID buyerId, UUID shopId, String slug, String sku) {
+    private PurchasedItem purchaseVariant(UUID ownerId, UUID buyerId, UUID shopId, UUID variantId) {
+        var orderId = checkout(buyerId, shopId, variantId);
+        deliverAndReceive(ownerId, buyerId, orderId);
+        var productId = Objects.requireNonNull(orders.getDetail(buyerId, orderId).items().get(0).productId());
+        return new PurchasedItem(orderId, productId, variantId);
+    }
+
+    private PurchasedItem deliveredProduct(UUID ownerId, UUID buyerId, UUID shopId, String slug, String sku) {
         var variantId = variantInShop(ownerId, shopId, slug, sku);
         return purchaseVariant(ownerId, buyerId, shopId, variantId);
     }
 
-    private UUID purchaseVariant(UUID ownerId, UUID buyerId, UUID shopId, UUID variantId) {
-        var orderId = checkout(buyerId, shopId, variantId);
-        deliverAndReceive(ownerId, buyerId, orderId);
-        return Objects.requireNonNull(orders.getDetail(buyerId, orderId).items().get(0).productId());
+    private static CreateReviewRequest validRequest(UUID orderId, int stars, String comment) {
+        return new CreateReviewRequest(orderId, stars, comment, null, null, null, false);
+    }
+
+    private static UpdateReviewRequest validUpdate(int stars, String comment) {
+        return new UpdateReviewRequest(stars, comment, null, null, null, false);
     }
 
     private static void assertStatus(ResponseStatusException e, HttpStatus status) {
@@ -111,198 +170,527 @@ class ReviewServiceTest {
     }
 
     @Test
-    void createReviewAfterDeliveryAndReceipt() {
+    void createReviewAfterDeliveryAndReceiptSnapshotsVariantAndTags() {
         var ownerId = mirroredUser();
-        var buyerId = mirroredUser();
+        var buyerId = mirroredUser("Minh Nguyễn");
         var shopId = approvedShop(ownerId, "shop-rev-a");
-        var productId = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-a", "SKU-REV-A");
+        var purchased = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-a", "SKU-REV-A");
 
-        var response = reviews.createReview(buyerId, productId, new CreateReviewRequest(5, "Vai dep"));
+        var response = reviews.createReview(
+            buyerId,
+            purchased.productId(),
+            new CreateReviewRequest(
+                purchased.orderId(),
+                5,
+                "Vải dày dặn, đường may rất chắc chắn.",
+                List.of("reviews/img-1.jpg", "reviews/img-2.jpg"),
+                null,
+                List.of(ReviewTag.QUALITY_GOOD, ReviewTag.TRUE_TO_SIZE, ReviewTag.QUALITY_GOOD),
+                false
+            )
+        );
 
+        assertThat(response.orderId()).isEqualTo(purchased.orderId());
         assertThat(response.stars()).isEqualTo(5);
-        assertThat(response.comment()).isEqualTo("Vai dep");
-        assertThat(response.buyerDisplayName()).isEqualTo("U");
+        assertThat(response.comment()).isEqualTo("Vải dày dặn, đường may rất chắc chắn.");
+        assertThat(response.buyerDisplayName()).isEqualTo("Minh Nguyễn");
+        assertThat(response.variantLabel()).contains("M").contains("Đen");
+        assertThat(response.imageKeys()).containsExactly("reviews/img-1.jpg", "reviews/img-2.jpg");
+        assertThat(response.tags()).containsExactly(ReviewTag.QUALITY_GOOD, ReviewTag.TRUE_TO_SIZE);
+        assertThat(response.mine()).isTrue();
     }
 
     @Test
-    void createWithoutPurchaseFails() {
+    void createWithDifferentBuyerOrderThrowsNotFound() {
         var ownerId = mirroredUser();
         var buyerId = mirroredUser();
         var shopId = approvedShop(ownerId, "shop-rev-b");
-        var productId = deliveredProduct(ownerId, mirroredUser(), shopId, "ao-rev-b", "SKU-REV-B");
+        var purchased = deliveredProduct(ownerId, mirroredUser(), shopId, "ao-rev-b", "SKU-REV-B");
 
-        assertThatThrownBy(() -> reviews.createReview(buyerId, productId, new CreateReviewRequest(5, null)))
+        assertThatThrownBy(() -> reviews.createReview(
+            buyerId,
+            purchased.productId(),
+            validRequest(purchased.orderId(), 5, "Sản phẩm rất đẹp và vừa vặn.")
+        ))
             .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.FORBIDDEN));
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.NOT_FOUND));
     }
 
     @Test
-    void createWithPendingOrderFails() {
+    void createWithDeliveredButUnconfirmedReceiptFailsForbidden() {
         var ownerId = mirroredUser();
         var buyerId = mirroredUser();
         var shopId = approvedShop(ownerId, "shop-rev-c");
         var variantId = variantInShop(ownerId, shopId, "ao-rev-c", "SKU-REV-C");
-        checkout(buyerId, shopId, variantId);
-        var productId = Objects.requireNonNull(
-            orders.getDetail(buyerId, orders.getMine(buyerId).get(0).id()).items().get(0).productId()
-        );
+        var orderId = checkout(buyerId, shopId, variantId);
+        orders.confirm(ownerId, orderId);
+        orders.ship(ownerId, orderId);
+        orders.deliver(ownerId, orderId);
+        var productId = Objects.requireNonNull(orders.getDetail(buyerId, orderId).items().get(0).productId());
 
-        assertThatThrownBy(() -> reviews.createReview(buyerId, productId, new CreateReviewRequest(4, null)))
+        assertThatThrownBy(() -> reviews.createReview(
+            buyerId,
+            productId,
+            validRequest(orderId, 4, "Đã giao nhưng chưa bấm xác nhận nhận hàng.")
+        ))
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.FORBIDDEN));
     }
 
     @Test
-    void createDuplicateFails() {
+    void createDuplicateForSameOrderFailsButSecondCompletedOrderSucceeds() {
         var ownerId = mirroredUser();
         var buyerId = mirroredUser();
         var shopId = approvedShop(ownerId, "shop-rev-d");
-        var productId = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-d", "SKU-REV-D");
-        reviews.createReview(buyerId, productId, new CreateReviewRequest(5, null));
+        var first = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-d", "SKU-REV-D");
+        var second = purchaseVariant(ownerId, buyerId, shopId, first.variantId());
 
-        assertThatThrownBy(() -> reviews.createReview(buyerId, productId, new CreateReviewRequest(4, null)))
+        reviews.createReview(buyerId, first.productId(), validRequest(first.orderId(), 5, "Đánh giá lần mua thứ nhất."));
+
+        assertThatThrownBy(() -> reviews.createReview(
+            buyerId,
+            first.productId(),
+            validRequest(first.orderId(), 4, "Đánh giá trùng trong cùng một đơn.")
+        ))
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+
+        var secondReview = reviews.createReview(
+            buyerId,
+            first.productId(),
+            validRequest(second.orderId(), 4, "Mua lại đơn thứ hai và đánh giá lại.")
+        );
+        assertThat(secondReview.orderId()).isEqualTo(second.orderId());
     }
 
     @Test
-    void updateOwnReview() {
+    void createOrderWithMultipleVariantsOfSameProductCombinesVariantLabelsOnce() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-rev-mv");
+        var created = catalog.createProduct(
+            ownerId,
+            shopId,
+            ProductTestFixtures.request(
+                "Ao hai size",
+                "ao-hai-size",
+                null,
+                null,
+                List.of(
+                    new CreateVariantRequest("SKU-MV-1", "M", "Đen", 100000L, null, 10, true),
+                    new CreateVariantRequest("SKU-MV-2", "L", "Trắng", 100000L, null, 10, false)
+                )
+            )
+        );
+        var variants = catalog.getDetail(created.id()).variants();
+        var orderId = checkout(
+            buyerId,
+            shopId,
+            List.of(
+                new CheckoutItemRequest(variants.get(0).id(), 1),
+                new CheckoutItemRequest(variants.get(1).id(), 2)
+            )
+        );
+        deliverAndReceive(ownerId, buyerId, orderId);
+
+        var createdReview = reviews.createReview(
+            buyerId,
+            created.id(),
+            validRequest(orderId, 5, "Mua 2 phân loại khác màu đều rất ưng ý.")
+        );
+
+        assertThat(createdReview.variantLabel()).contains("M").contains("L");
+    }
+
+    @Test
+    void createValidatesCommentMinLengthTagsAndMaxImages() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-rev-val");
+        var purchased = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-val", "SKU-REV-VAL");
+
+        assertThatThrownBy(() -> reviews.createReview(
+            buyerId,
+            purchased.productId(),
+            validRequest(purchased.orderId(), 5, "  Ngan  ")
+        ))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+
+        assertThatThrownBy(() -> reviews.createReview(
+            buyerId,
+            purchased.productId(),
+            new CreateReviewRequest(
+                purchased.orderId(),
+                5,
+                "Nhận xét đủ 10 ký tự hợp lệ rồi.",
+                null,
+                null,
+                List.of("Tag không hợp lệ"),
+                false
+            )
+        ))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+
+        assertThatThrownBy(() -> reviews.createReview(
+            buyerId,
+            purchased.productId(),
+            new CreateReviewRequest(
+                purchased.orderId(),
+                5,
+                "Nhận xét đủ 10 ký tự hợp lệ rồi.",
+                List.of("1.jpg", "2.jpg", "3.jpg", "4.jpg", "5.jpg", "6.jpg"),
+                null,
+                null,
+                false
+            )
+        ))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void updateOwnReviewOnceByIdAndSecondEditFails() {
         var ownerId = mirroredUser();
         var buyerId = mirroredUser();
         var shopId = approvedShop(ownerId, "shop-rev-e");
-        var productId = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-e", "SKU-REV-E");
-        reviews.createReview(buyerId, productId, new CreateReviewRequest(3, "Tam on"));
+        var purchased = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-e", "SKU-REV-E");
+        var created = reviews.createReview(
+            buyerId,
+            purchased.productId(),
+            validRequest(purchased.orderId(), 3, "Tạm ổn so với mức giá.")
+        );
+        assertThat(created.edited()).isFalse();
 
-        var updated = reviews.updateReview(buyerId, productId, new UpdateReviewRequest(5, "Xuat sac"));
+        var updated = reviews.updateReviewById(
+            buyerId,
+            created.id(),
+            new UpdateReviewRequest(5, "Sau khi giặt vẫn giữ form xuất sắc.", List.of("a.jpg"), null, List.of(ReviewTag.QUALITY_GOOD), true)
+        );
 
         assertThat(updated.stars()).isEqualTo(5);
-        assertThat(updated.comment()).isEqualTo("Xuat sac");
-    }
+        assertThat(updated.comment()).isEqualTo("Sau khi giặt vẫn giữ form xuất sắc.");
+        assertThat(updated.tags()).containsExactly(ReviewTag.QUALITY_GOOD);
+        assertThat(updated.anonymous()).isTrue();
+        assertThat(updated.edited()).isTrue();
+        assertThat(updated.editedAt()).isNotNull();
 
-    @Test
-    void updateOthersReviewFails() {
-        var ownerId = mirroredUser();
-        var buyerId = mirroredUser();
-        var shopId = approvedShop(ownerId, "shop-rev-f");
-        var productId = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-f", "SKU-REV-F");
-        reviews.createReview(buyerId, productId, new CreateReviewRequest(3, null));
-
-        assertThatThrownBy(() -> reviews.updateReview(mirroredUser(), productId, new UpdateReviewRequest(5, null)))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.NOT_FOUND));
-    }
-
-    @Test
-    void deleteOwnReview() {
-        var ownerId = mirroredUser();
-        var buyerId = mirroredUser();
-        var shopId = approvedShop(ownerId, "shop-rev-g");
-        var productId = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-g", "SKU-REV-G");
-        reviews.createReview(buyerId, productId, new CreateReviewRequest(4, null));
-
-        reviews.deleteReview(buyerId, productId);
-
-        assertThat(reviews.getReviews(productId)).isEmpty();
-    }
-
-    @Test
-    void deleteOthersReviewFails() {
-        var ownerId = mirroredUser();
-        var buyerId = mirroredUser();
-        var shopId = approvedShop(ownerId, "shop-rev-h");
-        var productId = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-h", "SKU-REV-H");
-        reviews.createReview(buyerId, productId, new CreateReviewRequest(4, null));
-
-        assertThatThrownBy(() -> reviews.deleteReview(mirroredUser(), productId))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.NOT_FOUND));
-    }
-
-    @Test
-    void listShowsNewestFirst() {
-        var ownerId = mirroredUser();
-        var shopId = approvedShop(ownerId, "shop-rev-i");
-        var buyerA = mirroredUser();
-        var buyerB = mirroredUser();
-        var variantId = variantInShop(ownerId, shopId, "ao-rev-i", "SKU-REV-I");
-        var productA = purchaseVariant(ownerId, buyerA, shopId, variantId);
-        purchaseVariant(ownerId, buyerB, shopId, variantId);
-        reviews.createReview(buyerA, productA, new CreateReviewRequest(3, "Dau tien"));
-        reviews.createReview(buyerB, productA, new CreateReviewRequest(5, "Thu hai"));
-
-        var list = reviews.getReviews(productA);
-
-        assertThat(list).hasSize(2);
-        assertThat(list.get(0).comment()).isEqualTo("Thu hai");
-        assertThat(list.get(1).comment()).isEqualTo("Dau tien");
-    }
-
-    @Test
-    void listHiddenProductFails() {
-        var ownerId = mirroredUser();
-        var buyerId = mirroredUser();
-        var shopId = approvedShop(ownerId, "shop-rev-j");
-        var productId = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-j", "SKU-REV-J");
-        reviews.createReview(buyerId, productId, new CreateReviewRequest(4, null));
-        var created = catalog.getDetail(productId);
-        catalog.updateProduct(ownerId, shopId, productId, new UpdateProductRequest(null, null, null, "HIDDEN", null));
-        assertThat(created.id()).isNotNull();
-
-        assertThatThrownBy(() -> reviews.getReviews(productId))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.NOT_FOUND));
-    }
-
-    @Test
-    void confirmReceiptRequiresDelivered() {
-        var ownerId = mirroredUser();
-        var buyerId = mirroredUser();
-        var shopId = approvedShop(ownerId, "shop-rev-k");
-        var variantId = variantInShop(ownerId, shopId, "ao-rev-k", "SKU-REV-K");
-        var orderId = checkout(buyerId, shopId, variantId);
-
-        assertThatThrownBy(() -> orders.confirmReceipt(buyerId, orderId))
+        assertThatThrownBy(() -> reviews.updateReviewById(buyerId, created.id(), validUpdate(4, "Sửa lần hai không được phép đâu.")))
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
     }
 
     @Test
-    void productDetailShowsRating() {
+    void anonymousMasksNameOnPublicAndSellerButNotMine() {
         var ownerId = mirroredUser();
-        var buyerA = mirroredUser();
-        var buyerB = mirroredUser();
-        var shopId = approvedShop(ownerId, "shop-rev-l");
-        var variantId = variantInShop(ownerId, shopId, "ao-rev-l", "SKU-REV-L");
-        var productA = purchaseVariant(ownerId, buyerA, shopId, variantId);
-        purchaseVariant(ownerId, buyerB, shopId, variantId);
-        reviews.createReview(buyerA, productA, new CreateReviewRequest(5, null));
-        reviews.createReview(buyerB, productA, new CreateReviewRequest(3, null));
+        var buyerId = mirroredUser("Minh Nguyễn");
+        var shopId = approvedShop(ownerId, "shop-rev-anon");
+        var purchased = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-anon", "SKU-REV-ANON");
 
-        var detail = catalog.getDetail(productA);
+        reviews.createReview(
+            buyerId,
+            purchased.productId(),
+            new CreateReviewRequest(purchased.orderId(), 5, "Sản phẩm rất đẹp và giao đúng hẹn.", null, null, null, true)
+        );
 
-        assertThat(detail.reviewCount()).isEqualTo(2L);
-        assertThat(detail.averageRating()).isEqualTo(4.0);
+        var publicList = reviews.getReviews(purchased.productId(), null, ReviewSort.HELPFUL, null, false);
+        assertThat(publicList).hasSize(1);
+        assertThat(publicList.get(0).buyerDisplayName()).isEqualTo("M***n");
+        assertThat(publicList.get(0).mine()).isFalse();
+
+        var sellerList = reviews.listForShop(ownerId, shopId, false);
+        assertThat(sellerList).hasSize(1);
+        assertThat(sellerList.get(0).buyerDisplayName()).isEqualTo("M***n");
+
+        var mine = reviews.listMine(buyerId);
+        assertThat(mine).hasSize(1);
+        assertThat(mine.get(0).buyerDisplayName()).isEqualTo("Minh Nguyễn");
+        assertThat(mine.get(0).anonymous()).isTrue();
     }
 
     @Test
-    void sellerReplyNotifiesReviewBuyer() {
+    void helpfulToggleSortingFilteringAndSummariesWorkEndToEnd() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-rev-helpful");
+        var buyerA = mirroredUser("Buyer Alpha");
+        var buyerB = mirroredUser("Buyer Beta");
+        var liker1 = mirroredUser();
+        var liker2 = mirroredUser();
+        var variantId = variantInShop(ownerId, shopId, "ao-rev-h", "SKU-REV-HELP");
+        var pA = purchaseVariant(ownerId, buyerA, shopId, variantId);
+        var pB = purchaseVariant(ownerId, buyerB, shopId, variantId);
+
+        var reviewA = reviews.createReview(
+            buyerA,
+            pA.productId(),
+            new CreateReviewRequest(pA.orderId(), 3, "Bài viết đầu tiên có kèm ảnh thực tế.", List.of("rev-a.jpg"), null, null, false)
+        );
+        var reviewB = reviews.createReview(
+            buyerB,
+            pA.productId(),
+            validRequest(pB.orderId(), 5, "Bài viết thứ hai mới hơn nhưng chưa có lượt thích.")
+        );
+
+        assertThatThrownBy(() -> reviews.toggleHelpful(buyerA, reviewA.id()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+
+        var liked1 = reviews.toggleHelpful(liker1, reviewA.id());
+        var liked2 = reviews.toggleHelpful(liker2, reviewA.id());
+        assertThat(liked1.helpfulCount()).isEqualTo(1);
+        assertThat(liked2.helpfulCount()).isEqualTo(2);
+        assertThat(liked2.helpfulByMe()).isTrue();
+
+        var byHelpful = reviews.getReviews(pA.productId(), liker1, ReviewSort.HELPFUL, null, false);
+        assertThat(byHelpful).hasSize(2);
+        assertThat(byHelpful.get(0).id()).isEqualTo(reviewA.id());
+        assertThat(byHelpful.get(0).helpfulCount()).isEqualTo(2);
+        assertThat(byHelpful.get(0).helpfulByMe()).isTrue();
+        assertThat(byHelpful.get(1).id()).isEqualTo(reviewB.id());
+
+        var byNewest = reviews.getReviews(pA.productId(), null, ReviewSort.NEWEST, null, false);
+        assertThat(byNewest.get(0).id()).isEqualTo(reviewB.id());
+
+        var onlyFiveStars = reviews.getReviews(pA.productId(), null, ReviewSort.HELPFUL, 5, false);
+        assertThat(onlyFiveStars).extracting(r -> r.id()).containsExactly(reviewB.id());
+
+        var onlyWithMedia = reviews.getReviews(pA.productId(), null, ReviewSort.HELPFUL, null, true);
+        assertThat(onlyWithMedia).extracting(r -> r.id()).containsExactly(reviewA.id());
+
+        var productSummary = reviews.reviewSummary(pA.productId());
+        assertThat(productSummary.reviewCount()).isEqualTo(2L);
+        assertThat(productSummary.averageRating()).isEqualTo(4.0);
+        assertThat(productSummary.fiveStarCount()).isEqualTo(1L);
+        assertThat(productSummary.threeStarCount()).isEqualTo(1L);
+        assertThat(productSummary.withMediaCount()).isEqualTo(1L);
+
+        var shopSummary = reviews.shopReviewSummary(ownerId, shopId);
+        assertThat(shopSummary.reviewCount()).isEqualTo(2L);
+        assertThat(shopSummary.averageRating()).isEqualTo(4.0);
+
+        var unliked = reviews.toggleHelpful(liker1, reviewA.id());
+        assertThat(unliked.helpfulCount()).isEqualTo(1);
+        assertThat(unliked.helpfulByMe()).isFalse();
+    }
+
+    @Test
+    void hiddenProductStillAllowsBuyerReviewButBlocksPublicListAndHelpful() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-rev-hidden");
+        var purchased = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-h1", "SKU-REV-H1");
+        catalog.updateProduct(ownerId, shopId, purchased.productId(), new UpdateProductRequest(null, null, null, "HIDDEN", null));
+
+        var created = reviews.createReview(buyerId, purchased.productId(), validRequest(purchased.orderId(), 5, "Vẫn đánh giá được khi sản phẩm ẩn."));
+        var updated = reviews.updateReviewById(buyerId, created.id(), validUpdate(4, "Sửa lại đánh giá vẫn được cho phép."));
+        assertThat(updated.edited()).isTrue();
+
+        assertThatThrownBy(() -> reviews.getReviews(purchased.productId(), null, ReviewSort.HELPFUL, null, false))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.NOT_FOUND));
+
+        assertThatThrownBy(() -> reviews.toggleHelpful(mirroredUser(), created.id()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    void sellerReplyIncludesReplyOnPublicReviewResponseAndNotifiesBuyer() {
         var ownerId = mirroredUser();
         var buyerId = mirroredUser();
         var shopId = approvedShop(ownerId, "shop-rev-notif-1");
-        var productId = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-notif-1", "SKU-REV-NOTIF-1");
-        var review = reviews.createReview(buyerId, productId, new CreateReviewRequest(5, "Tuyet voi"));
+        var purchased = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-notif-1", "SKU-REV-NOTIF-1");
+        var review = reviews.createReview(buyerId, purchased.productId(), validRequest(purchased.orderId(), 5, "Sản phẩm rất tuyệt vời và đẹp."));
 
-        reviews.reply(
-            ownerId, review.id(), new com.minhnbnt.fashionstore.dto.review.ReplyReviewRequest("Cam on ban da ung ho")
-        );
+        reviews.reply(ownerId, review.id(), new ReplyReviewRequest("Cam on ban da ung ho shop."));
+
+        var publicList = reviews.getReviews(purchased.productId(), null, ReviewSort.HELPFUL, null, false);
+        assertThat(publicList.get(0).sellerReply()).isEqualTo("Cam on ban da ung ho shop.");
+        assertThat(publicList.get(0).repliedAt()).isNotNull();
 
         var buyerPage = notifications.findPage(buyerId, List.of("ACTIVITY"), 0, 10);
         assertThat(buyerPage).hasSize(1);
-        var notif = buyerPage.getFirst();
-        assertThat(notif.category()).isEqualTo("ACTIVITY");
-        assertThat(notif.type()).isEqualTo("REVIEW_REPLIED");
-        assertThat(notif.title()).isEqualTo("Shop đã phản hồi đánh giá của bạn");
-        assertThat(notif.body()).isEqualTo("Cam on ban da ung ho");
-        assertThat(notif.link()).isEqualTo("/product/" + productId);
+        assertThat(buyerPage.getFirst().type()).isEqualTo("REVIEW_REPLIED");
+    }
+
+    @Test
+    void sellerReviewsFilterByStarsProductAndUnrepliedAndRejectsInvalidStars() {
+        var ownerId = mirroredUser();
+        var buyerA = mirroredUser();
+        var buyerB = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-rev-filter");
+        var variantA = variantInShop(ownerId, shopId, "ao-filter-a", "SKU-FLT-A");
+        var variantB = variantInShop(ownerId, shopId, "quan-filter-b", "SKU-FLT-B");
+
+        var itemA5 = purchaseVariant(ownerId, buyerA, shopId, variantA);
+        var itemA3 = purchaseVariant(ownerId, buyerB, shopId, variantA);
+        var itemB1 = purchaseVariant(ownerId, buyerA, shopId, variantB);
+
+        var revA5 = reviews.createReview(buyerA, itemA5.productId(), validRequest(itemA5.orderId(), 5, "Sản phẩm A rất ưng ý."));
+        var revA3 = reviews.createReview(buyerB, itemA3.productId(), validRequest(itemA3.orderId(), 3, "Sản phẩm A ở mức ổn."));
+        var revB1 = reviews.createReview(buyerA, itemB1.productId(), validRequest(itemB1.orderId(), 1, "Sản phẩm B chưa đạt kỳ vọng."));
+
+        reviews.reply(ownerId, revA5.id(), new ReplyReviewRequest("Cảm ơn bạn đã ủng hộ sản phẩm A!"));
+
+        var all = reviews.listForShop(ownerId, shopId, false, null, null);
+        assertThat(all).hasSize(3);
+        assertThat(all).allSatisfy(item -> assertThat(item.productName()).isNotBlank());
+
+        var onlyFive = reviews.listForShop(ownerId, shopId, false, 5, null);
+        assertThat(onlyFive).extracting(r -> r.id()).containsExactly(revA5.id());
+
+        var onlyProductAUnreplied = reviews.listForShop(ownerId, shopId, true, null, itemA5.productId());
+        assertThat(onlyProductAUnreplied).extracting(r -> r.id()).containsExactly(revA3.id());
+
+        var productBOneStar = reviews.listForShop(ownerId, shopId, true, 1, itemB1.productId());
+        assertThat(productBOneStar).extracting(r -> r.id()).containsExactly(revB1.id());
+
+        assertThatThrownBy(() -> reviews.listForShop(ownerId, shopId, false, 0, null))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+        assertThatThrownBy(() -> reviews.listForShop(ownerId, shopId, false, 6, null))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void sellerReviewProductOptionsIncludesDeletedProductWithReviewsAndWorksForCskhStaff() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-rev-cskh");
+        var cskhId = staffWith(ownerId, shopId, ShopPermission.REVIEW_READ, ShopPermission.REVIEW_REPLY);
+
+        var variantActive = variantInShop(ownerId, shopId, "sp-active-cskh", "SKU-CSKH-1");
+        var variantDeleted = variantInShop(ownerId, shopId, "sp-deleted-cskh", "SKU-CSKH-2");
+
+        var purchasedActive = purchaseVariant(ownerId, buyerId, shopId, variantActive);
+        var purchasedDeleted = purchaseVariant(ownerId, buyerId, shopId, variantDeleted);
+        reviews.createReview(buyerId, purchasedActive.productId(), validRequest(purchasedActive.orderId(), 5, "Sản phẩm đang bán rất đẹp."));
+        reviews.createReview(buyerId, purchasedDeleted.productId(), validRequest(purchasedDeleted.orderId(), 4, "Sản phẩm sắp ngừng bán vẫn tốt."));
+
+        catalog.deleteProduct(ownerId, shopId, purchasedDeleted.productId());
+
+        var options = reviews.listShopReviewProducts(cskhId, shopId);
+        assertThat(options).extracting(o -> o.id())
+            .containsExactlyInAnyOrder(purchasedActive.productId(), purchasedDeleted.productId());
+        assertThat(options).allSatisfy(o -> assertThat(o.reviewCount()).isEqualTo(1L));
+
+        var list = reviews.listForShop(cskhId, shopId, false, null, purchasedDeleted.productId());
+        assertThat(list).hasSize(1);
+        assertThat(list.getFirst().productName()).contains("sp-deleted-cskh");
+
+        var trend = reviews.shopReviewTrend(cskhId, shopId, "day", null, null);
+        assertThat(trend.points()).isNotEmpty();
+
+        var template = reviews.createReplyTemplate(cskhId, shopId, new SaveReviewReplyTemplateRequest("Cảm ơn", "Cảm ơn bạn đã ủng hộ shop!"));
+        assertThat(reviews.listReplyTemplates(cskhId, shopId)).hasSize(1);
+        assertThat(template.title()).isEqualTo("Cảm ơn");
+    }
+
+    @Test
+    void sellerReviewTrendAggregatesByDayWeekMonthAndValidatesDates() {
+        var ownerId = mirroredUser();
+        var buyerA = mirroredUser();
+        var buyerB = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-rev-trend");
+        var variantId = variantInShop(ownerId, shopId, "sp-trend", "SKU-TREND-1");
+        var p1 = purchaseVariant(ownerId, buyerA, shopId, variantId);
+        var p2 = purchaseVariant(ownerId, buyerB, shopId, variantId);
+
+        var r1 = reviews.createReview(buyerA, p1.productId(), validRequest(p1.orderId(), 5, "Đánh giá ngày đầu rất hài lòng."));
+        var r2 = reviews.createReview(buyerB, p2.productId(), validRequest(p2.orderId(), 3, "Đánh giá ngày sau ở mức trung bình."));
+
+        var zone = ZoneId.of("Asia/Ho_Chi_Minh");
+        var oct10 = LocalDate.of(2026, 10, 10).atTime(10, 0).atZone(zone).toInstant();
+        var oct11 = LocalDate.of(2026, 10, 11).atTime(14, 0).atZone(zone).toInstant();
+        jdbc.sql("UPDATE review SET created_at = :ts WHERE id = :id")
+            .param("ts", java.sql.Timestamp.from(oct10))
+            .param("id", r1.id())
+            .update();
+        jdbc.sql("UPDATE review SET created_at = :ts WHERE id = :id")
+            .param("ts", java.sql.Timestamp.from(oct11))
+            .param("id", r2.id())
+            .update();
+
+        var byDay = reviews.shopReviewTrend(ownerId, shopId, "day", LocalDate.of(2026, 10, 9), LocalDate.of(2026, 10, 12));
+        assertThat(byDay.period()).isEqualTo("day");
+        assertThat(byDay.points()).hasSize(2);
+        assertThat(byDay.points().get(0).label()).isEqualTo("2026-10-10");
+        assertThat(byDay.points().get(0).reviewCount()).isEqualTo(1L);
+        assertThat(byDay.points().get(0).averageRating()).isEqualTo(5.0);
+        assertThat(byDay.points().get(1).label()).isEqualTo("2026-10-11");
+        assertThat(byDay.points().get(1).averageRating()).isEqualTo(3.0);
+
+        var byWeek = reviews.shopReviewTrend(ownerId, shopId, "week", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31));
+        assertThat(byWeek.points()).hasSize(1);
+        assertThat(byWeek.points().getFirst().reviewCount()).isEqualTo(2L);
+        assertThat(byWeek.points().getFirst().averageRating()).isEqualTo(4.0);
+
+        var byMonth = reviews.shopReviewTrend(ownerId, shopId, "month", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31));
+        assertThat(byMonth.points()).hasSize(1);
+        assertThat(byMonth.points().getFirst().label()).isEqualTo("2026-10");
+        assertThat(byMonth.points().getFirst().averageRating()).isEqualTo(4.0);
+
+        assertThatThrownBy(() -> reviews.shopReviewTrend(ownerId, shopId, "year", null, null))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+        assertThatThrownBy(() -> reviews.shopReviewTrend(ownerId, shopId, "day", LocalDate.of(2026, 10, 12), LocalDate.of(2026, 10, 10)))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void replyTemplatesCrudEnforcesPermissionsDuplicatesLimitAndAudit() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-rev-tpl");
+        var readOnlyStaff = staffWith(ownerId, shopId, ShopPermission.REVIEW_READ);
+        var outsider = mirroredUser();
+
+        assertThatThrownBy(() -> reviews.createReplyTemplate(readOnlyStaff, shopId, new SaveReviewReplyTemplateRequest("Mẫu 1", "Nội dung mẫu 1")))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.FORBIDDEN));
+
+        assertThatThrownBy(() -> reviews.listReplyTemplates(outsider, shopId))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.FORBIDDEN));
+
+        var created = reviews.createReplyTemplate(ownerId, shopId, new SaveReviewReplyTemplateRequest("  Cảm ơn  ", "  Cảm ơn bạn đã ủng hộ shop!  "));
+        assertThat(created.title()).isEqualTo("Cảm ơn");
+        assertThat(created.content()).isEqualTo("Cảm ơn bạn đã ủng hộ shop!");
+
+        assertThat(reviews.listReplyTemplates(readOnlyStaff, shopId)).hasSize(1);
+
+        assertThatThrownBy(() -> reviews.createReplyTemplate(ownerId, shopId, new SaveReviewReplyTemplateRequest("cảm ơn", "Trùng tên không phân biệt hoa thường")))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+
+        var second = reviews.createReplyTemplate(ownerId, shopId, new SaveReviewReplyTemplateRequest("Đổi trả", "Nhắn shop để được hỗ trợ đổi size nhé."));
+
+        var updatedSameTitle = reviews.updateReplyTemplate(ownerId, created.id(), new SaveReviewReplyTemplateRequest("Cảm ơn", "Nội dung cảm ơn mới."));
+        assertThat(updatedSameTitle.content()).isEqualTo("Nội dung cảm ơn mới.");
+
+        assertThatThrownBy(() -> reviews.updateReplyTemplate(ownerId, created.id(), new SaveReviewReplyTemplateRequest("đổi trả", "Trùng với mẫu khác")))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+
+        for (var i = 3; i <= 50; i++) {
+            reviews.createReplyTemplate(ownerId, shopId, new SaveReviewReplyTemplateRequest("Mẫu " + i, "Nội dung " + i));
+        }
+
+        assertThatThrownBy(() -> reviews.createReplyTemplate(ownerId, shopId, new SaveReviewReplyTemplateRequest("Mẫu 51", "Vượt quá 50")))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+
+        reviews.deleteReplyTemplate(ownerId, second.id());
+        assertThat(reviews.listReplyTemplates(ownerId, shopId)).hasSize(49);
+
+        assertThatThrownBy(() -> reviews.deleteReplyTemplate(ownerId, second.id()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.NOT_FOUND));
+
+        var audits = shopAudits.findByShopIdOrderByCreatedAtDesc(shopId);
+        assertThat(audits).extracting(a -> a.getAction())
+            .contains("REVIEW_TEMPLATE_CREATE", "REVIEW_TEMPLATE_UPDATE", "REVIEW_TEMPLATE_DELETE");
     }
 }

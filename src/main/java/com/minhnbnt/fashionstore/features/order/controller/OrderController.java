@@ -1,7 +1,10 @@
 package com.minhnbnt.fashionstore.features.order.controller;
 
+import com.minhnbnt.fashionstore.dto.order.BuyerCancelOrderRequest;
+import com.minhnbnt.fashionstore.dto.order.BuyerOrderTimelineResponse;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
+import com.minhnbnt.fashionstore.dto.order.OrderTrackingEventResponse;
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -10,6 +13,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -84,29 +88,31 @@ public class OrderController {
     @PatchMapping("/{id}/cancel")
     @Operation(summary = "Huy don", description = "Chi huy duoc khi PENDING.")
     @ApiResponse(responseCode = "200", description = "Don sau khi huy")
+    @ApiResponse(responseCode = "400", description = "Ly do huy khong hop le")
     @ApiResponse(responseCode = "401", description = "Thieu hoac sai JWT")
     @ApiResponse(responseCode = "404", description = "Don khong ton tai hoac khong phai cua ban")
-    @ApiResponse(responseCode = "409", description = "Don khong còn o trang thai PENDING")
+    @ApiResponse(responseCode = "409", description = "Don khong con o trang thai PENDING")
     @SecurityRequirement(name = "bearerAuth")
     public OrderResponse cancel(
         @AuthenticationPrincipal Jwt jwt,
-        @Parameter(description = "id don") @PathVariable UUID id
+        @Parameter(description = "id don") @PathVariable UUID id,
+        @RequestBody(required = false) @Valid @Nullable BuyerCancelOrderRequest request
     ) {
         var subject = Objects.requireNonNull(jwt.getSubject());
         var buyerId = UUID.fromString(subject);
 
-        return orders.cancel(buyerId, id);
+        return orders.cancel(buyerId, id, request);
     }
 
     @PatchMapping("/{id}/received")
     @Operation(
         summary = "Xac nhan da nhan hang",
-        description = "Chi xac nhan duoc don DELIVERED. Mo khoa viet danh gia."
+        description = "Chi xac nhan duoc don DELIVERED khong bi khoa doi tra. Mo khoa viet danh gia."
     )
     @ApiResponse(responseCode = "200", description = "Don sau khi xac nhan")
     @ApiResponse(responseCode = "401", description = "Thieu hoac sai JWT")
     @ApiResponse(responseCode = "404", description = "Don khong ton tai hoac khong phai cua ban")
-    @ApiResponse(responseCode = "409", description = "Don chua o trang thai DELIVERED")
+    @ApiResponse(responseCode = "409", description = "Don chua DELIVERED hoac dang co yeu cau doi tra")
     @SecurityRequirement(name = "bearerAuth")
     public OrderResponse confirmReceipt(
         @AuthenticationPrincipal Jwt jwt,
@@ -116,5 +122,43 @@ public class OrderController {
         var buyerId = UUID.fromString(subject);
 
         return orders.confirmReceipt(buyerId, id);
+    }
+
+    @GetMapping("/{id}/timeline")
+    @Operation(
+        summary = "Dong thoi gian don hang cho nguoi mua",
+        description = "Tra ve cac moc trang thai ma khong kem thong tin noi bo cua shop."
+    )
+    @ApiResponse(responseCode = "200", description = "Timeline don hang")
+    @ApiResponse(responseCode = "401", description = "Thieu hoac sai JWT")
+    @ApiResponse(responseCode = "404", description = "Don khong ton tai hoac khong phai cua ban")
+    @SecurityRequirement(name = "bearerAuth")
+    public List<BuyerOrderTimelineResponse> timeline(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id don") @PathVariable UUID id
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var buyerId = UUID.fromString(subject);
+
+        return orders.getBuyerTimeline(buyerId, id);
+    }
+
+    @GetMapping("/{id}/tracking")
+    @Operation(
+        summary = "Hanh trinh van chuyen don hang",
+        description = "Danh sach cac moc di chuyen goi hang cua don."
+    )
+    @ApiResponse(responseCode = "200", description = "Danh sach moc van chuyen")
+    @ApiResponse(responseCode = "401", description = "Thieu hoac sai JWT")
+    @ApiResponse(responseCode = "404", description = "Don khong ton tai hoac khong phai cua ban")
+    @SecurityRequirement(name = "bearerAuth")
+    public List<OrderTrackingEventResponse> tracking(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id don") @PathVariable UUID id
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var buyerId = UUID.fromString(subject);
+
+        return orders.getBuyerTracking(buyerId, id);
     }
 }

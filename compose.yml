@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: postgres
 
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5434}:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql
@@ -31,6 +31,7 @@ services:
     environment:
       GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID: ${GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID:-}
       GOTRUE_EXTERNAL_GOOGLE_SECRET: ${GOTRUE_EXTERNAL_GOOGLE_SECRET:-}
+      DATABASE_URL: postgres://supabase_auth_admin:root@postgres:5432/fashionstore
 
     ports:
       - "9999:9999"

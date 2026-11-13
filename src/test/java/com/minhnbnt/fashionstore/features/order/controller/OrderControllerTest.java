@@ -1,7 +1,9 @@
 package com.minhnbnt.fashionstore.features.order.controller;
 
 import com.minhnbnt.fashionstore.config.SecurityConfig;
+import com.minhnbnt.fashionstore.dto.order.BuyerOrderTimelineResponse;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
+import com.minhnbnt.fashionstore.dto.order.OrderTrackingEventResponse;
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +45,8 @@ class OrderControllerTest {
             id,
             "ORD-TEST01",
             UUID.randomUUID(),
+            "Shop Test",
+            "shop-test",
             UUID.randomUUID(),
             "PENDING",
             "UNPAID",
@@ -53,6 +57,13 @@ class OrderControllerTest {
             "An",
             "0901",
             "Ha Noi",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
             null,
             null,
             null,
@@ -110,6 +121,61 @@ class OrderControllerTest {
 
         mockMvc.perform(patch("/api/orders/{id}/received", id)
                 .with(jwt().jwt(builder -> builder.subject(id.toString()))))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void buyerTimelineAndTrackingHideStaffMetadata() throws Exception {
+        var buyerId = UUID.randomUUID();
+        var orderId = UUID.randomUUID();
+        when(orders.getBuyerTimeline(buyerId, orderId)).thenReturn(List.of(
+            new BuyerOrderTimelineResponse(null, "PENDING", "BUYER", "", Instant.now())
+        ));
+        when(orders.getBuyerTracking(buyerId, orderId)).thenReturn(List.of(
+            new OrderTrackingEventResponse(
+                UUID.randomUUID(),
+                "PICKED_UP",
+                "Da lay hang",
+                "Kho HN",
+                null,
+                Instant.now(),
+                Instant.now()
+            )
+        ));
+
+        mockMvc.perform(get("/api/orders/{id}/timeline", orderId)
+                .with(jwt().jwt(builder -> builder.subject(buyerId.toString()))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].actor").value("BUYER"))
+            .andExpect(jsonPath("$[0].changedByEmail").doesNotExist());
+
+        mockMvc.perform(get("/api/orders/{id}/tracking", orderId)
+                .with(jwt().jwt(builder -> builder.subject(buyerId.toString()))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].statusCode").value("PICKED_UP"))
+            .andExpect(jsonPath("$[0].createdBy").doesNotExist());
+    }
+
+    @Test
+    void buyerCancelAcceptsReasonOrEmptyBodyButRejectsBlankJsonBody() throws Exception {
+        var buyerId = UUID.randomUUID();
+        var orderId = UUID.randomUUID();
+        when(orders.cancel(any(), any(), any())).thenReturn(response(orderId));
+
+        mockMvc.perform(patch("/api/orders/{id}/cancel", orderId)
+                .with(jwt().jwt(builder -> builder.subject(buyerId.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+            .andExpect(status().isBadRequest());
+
+        mockMvc.perform(patch("/api/orders/{id}/cancel", orderId)
+                .with(jwt().jwt(builder -> builder.subject(buyerId.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\":\"CHANGE_MIND\",\"note\":\"Doi size\"}"))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/orders/{id}/cancel", orderId)
+                .with(jwt().jwt(builder -> builder.subject(buyerId.toString()))))
             .andExpect(status().isOk());
     }
 }

@@ -5,10 +5,9 @@ import com.minhnbnt.fashionstore.dto.chat.ChatMessageResponse;
 import com.minhnbnt.fashionstore.dto.chat.ChatReadEvent;
 import com.minhnbnt.fashionstore.dto.chat.ConversationEvent;
 import com.minhnbnt.fashionstore.dto.chat.SendMessageRequest;
+import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatConversationRepository;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatMessageRepository;
-import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
-import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.infrastructure.realtime.ChatRealtimePublisher;
@@ -19,6 +18,7 @@ import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,14 +30,20 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 public class ChatService {
 
+    private static final Pattern PRODUCT_LINK_PATTERN =
+        Pattern.compile("(?:https?://[^\\s/]+)?/products?/([a-zA-Z0-9_-]+)");
+
     private final ChatConversationRepository conversations;
 
     private final ChatMessageRepository messages;
+
+    private final ProductRepository products;
 
     private final ShopService shops;
 
@@ -46,8 +52,6 @@ public class ChatService {
     private final ShopAuditService audit;
 
     private final ChatRealtimePublisher realtime;
-
-    private final NotificationService notifications;
 
     @Transactional
     public ChatConversationResponse startConversation(@NonNull UUID buyerId, @NonNull UUID shopId) {
@@ -63,6 +67,23 @@ public class ChatService {
 
         var created = conversations.save(ChatConversation.create(shopId, buyerId));
         return toConversationResponse(created, false);
+    }
+
+    @Transactional
+    public ChatConversationResponse openConversationForSeller(
+        @NonNull UUID sellerId,
+        @NonNull UUID shopId,
+        @NonNull UUID buyerId
+    ) {
+        access.requireShopPermission(sellerId, shopId, ShopPermission.CHAT_ACCESS);
+
+        var existing = conversations.findByShopIdAndBuyerId(shopId, buyerId).orElse(null);
+        if (existing != null) {
+            return toConversationResponse(existing, true);
+        }
+
+        var created = conversations.save(ChatConversation.create(shopId, buyerId));
+        return toConversationResponse(created, true);
     }
 
     @Transactional(readOnly = true)
@@ -128,40 +149,35 @@ public class ChatService {
 
         var recipients = realtimeRecipients(conv);
 
+        var textContent = "";
+        if (request.content() != null && !request.content().isBlank()) {
+            textContent = request.content().trim();
+        }
+        validateProductLinks(conv.getShopId(), textContent);
+        var previewText = buildPreviewText(textContent, request.imageKey());
+
         var msg = ChatMessage.of(
             conversationId,
             userId,
             senderType,
-            request.content(),
+            textContent,
             request.imageKey()
         );
         messages.save(msg);
 
-        conv.recordNewMessage(request.content(), !isSeller);
+        conv.recordNewMessage(previewText, !isSeller);
         conversations.save(conv);
 
         if (isSeller) {
             var chatDetail = "Phản hồi tin nhắn trong hội thoại #" + conv.getId();
-            if (request.content() != null && !request.content().isBlank()) {
-                var preview = request.content().trim();
-                if (preview.length() > 50) {
-                    preview = preview.substring(0, 50) + "...";
-                }
+            var preview = previewText;
+            if (preview.length() > 50) {
+                preview = preview.substring(0, 50) + "...";
+            }
+            if (!preview.isBlank()) {
                 chatDetail = chatDetail + ": \"" + preview + "\"";
             }
             audit.record(conv.getShopId(), userId, "CHAT_REPLY", "CONVERSATION", conv.getId(), chatDetail);
-
-            var shopName = shops.getShopName(conv.getShopId());
-            // Client opens chat widget via CustomEvent, so link is null
-            notifications.create(
-                Set.of(conv.getBuyerId()),
-                NotificationCategory.ACTIVITY,
-                "CHAT_MESSAGE",
-                "Tin nhắn mới từ " + shopName,
-                request.content(),
-                null,
-                msg.getId()
-            );
         }
 
         realtime.publishChatMessage(recipients, toMessageResponse(msg));
@@ -256,18 +272,6 @@ public class ChatService {
             recipients,
             new ConversationEvent(conv.getId(), ConversationEvent.Type.NEW_MESSAGE)
         );
-
-        var shopName = shops.getShopName(conv.getShopId());
-        // Client opens chat widget via CustomEvent, so link is null
-        notifications.create(
-            Set.of(conv.getBuyerId()),
-            NotificationCategory.ACTIVITY,
-            "CHAT_MESSAGE",
-            "Tin nhắn mới từ " + shopName,
-            autoReplyText,
-            null,
-            autoMsg.getId()
-        );
     }
 
     private void verifyParticipant(UUID userId, ChatConversation conv) {
@@ -300,6 +304,57 @@ public class ChatService {
             unread,
             c.getCreatedAt()
         );
+    }
+
+    private void validateProductLinks(UUID conversationShopId, String textContent) {
+        if (textContent.isBlank()) {
+            return;
+        }
+        var matcher = PRODUCT_LINK_PATTERN.matcher(textContent);
+        while (matcher.find()) {
+            var ref = matcher.group(1);
+            if (ref == null || ref.isBlank()) {
+                continue;
+            }
+            var productId = tryParseUuid(ref);
+            if (productId != null) {
+                var product = products.findById(productId).orElse(null);
+                if (product != null && !product.getShopId().equals(conversationShopId)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product does not belong to this shop");
+                }
+                continue;
+            }
+            var matchedBySlug = products.findBySlug(ref);
+            if (!matchedBySlug.isEmpty()
+                && matchedBySlug.stream().noneMatch(p -> p.getShopId().equals(conversationShopId))) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product does not belong to this shop");
+            }
+        }
+    }
+
+    private static @Nullable UUID tryParseUuid(String raw) {
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private static String buildPreviewText(String textContent, @Nullable String imageKey) {
+        if (textContent.isBlank()) {
+            if (imageKey != null) {
+                return "[Hình ảnh]";
+            }
+            return "";
+        }
+        if (PRODUCT_LINK_PATTERN.matcher(textContent).find()) {
+            var stripped = PRODUCT_LINK_PATTERN.matcher(textContent).replaceAll("").trim();
+            if (stripped.isBlank()) {
+                return "[Sản phẩm]";
+            }
+            return stripped;
+        }
+        return textContent;
     }
 
     private static ChatMessageResponse toMessageResponse(ChatMessage m) {
