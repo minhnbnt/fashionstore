@@ -97,6 +97,17 @@ class UserServiceTest {
     }
 
     @Test
+    void upsertDoesNotOverwriteAvatarWhenKeyProvided() {
+        var id = mirroredUser();
+        var key = UUID.randomUUID() + ".png";
+        userService.changeAvatar(id, key);
+
+        var updated = userService.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U", "avatar/1.png"));
+
+        assertThat(updated.avatarKey()).isEqualTo(key);
+    }
+
+    @Test
     void lockStoresReasonAndHistory() {
         var adminId = mirroredUser();
         var userId = mirroredUser();

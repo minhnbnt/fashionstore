@@ -125,6 +125,24 @@ class UserControllerTest {
     }
 
     @Test
+    void changeAvatarRejectsSvgKey() throws Exception {
+        mockMvc.perform(put("/api/users/me/avatar")
+                .with(jwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"avatarKey\":\"" + UUID.randomUUID() + ".svg\"}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void changeAvatarRejectsTraversalKey() throws Exception {
+        mockMvc.perform(put("/api/users/me/avatar")
+                .with(jwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"avatarKey\":\"../avatar/a.png\"}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void clearAvatarReturnsProfileWithoutKey() throws Exception {
         var id = UUID.randomUUID();
         var response = new UserResponse(id, "a@t.local", "An", null, "CUSTOMER", "ACTIVE", null, Instant.now());

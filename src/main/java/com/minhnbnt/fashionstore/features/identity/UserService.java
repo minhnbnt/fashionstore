@@ -40,12 +40,9 @@ public class UserService {
         var existing = users.findLockedById(id);
         if (existing.isPresent()) {
             var profile = existing.get();
+            // Avatar chỉ đổi qua /api/users/me/avatar — mirror GoTrue không được đụng tới.
             profile.changeEmail(request.email());
             profile.rename(request.displayName());
-            // Avatar chỉ đổi qua /api/users/me/avatar; mirror sau login không được xóa ảnh.
-            if (request.avatarKey() != null) {
-                profile.changeAvatar(request.avatarKey());
-            }
             return toResponse(users.save(profile));
         }
 
