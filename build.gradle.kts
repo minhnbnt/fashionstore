@@ -61,6 +61,24 @@ tasks.withType<Test> {
     // System property ưu tiên hơn file import nên ghi đè được.
     systemProperty("app.bootstrap-admin.email", "")
     systemProperty("gotrue.service-role-key", "")
+    // app.demo-seed bật như dev, nhưng ảnh demo là file fake — xem TestcontainersConfiguration#demoImageFetcher.
+}
+
+tasks.test {
+    // OpenApiExportTest dựng riêng 1 context + ghi đè docs/openapi.json mỗi lần chạy (~40s).
+    // Tắt mặc định; cần spec thì chạy ./gradlew openApiExport.
+    exclude("**/OpenApiExportTest*")
+}
+
+tasks.register<Test>("openApiExport") {
+    group = "verification"
+    description = "Chạy riêng OpenApiExportTest để export docs/openapi.json khi cần sync spec sang FE"
+    // Khai báo output để Gradle re-run khi file bị xoá (nếu không, task báo UP-TO-DATE oan)
+    outputs.file(layout.projectDirectory.file("docs/openapi.json"))
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    include("**/OpenApiExportTest.class")
+    shouldRunAfter(tasks.test)
 }
 
 tasks.withType<JavaCompile>().configureEach {

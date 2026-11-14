@@ -40,9 +40,9 @@ public class UserService {
         var existing = users.findLockedById(id);
         if (existing.isPresent()) {
             var profile = existing.get();
+            // Avatar chỉ đổi qua /api/users/me/avatar — mirror GoTrue không được đụng tới.
             profile.changeEmail(request.email());
             profile.rename(request.displayName());
-            profile.changeAvatar(request.avatarKey());
             return toResponse(users.save(profile));
         }
 
@@ -68,6 +68,22 @@ public class UserService {
         }
 
         return toResponse(profile);
+    }
+
+    @Transactional
+    public UserResponse changeAvatar(@NonNull UUID id, @NonNull String avatarKey) {
+        var profile = lockedProfile(id);
+
+        profile.changeAvatar(avatarKey);
+        return toResponse(users.save(profile));
+    }
+
+    @Transactional
+    public UserResponse clearAvatar(@NonNull UUID id) {
+        var profile = lockedProfile(id);
+
+        profile.changeAvatar(null);
+        return toResponse(users.save(profile));
     }
 
     @Transactional

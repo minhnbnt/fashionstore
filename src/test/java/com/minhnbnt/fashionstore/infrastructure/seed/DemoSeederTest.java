@@ -60,6 +60,9 @@ class DemoSeederTest {
     private String bucket;
 
     @Autowired
+    private DemoImageFetcher imageFetcher;
+
+    @Autowired
     private OrderService orderService;
 
     @Autowired
@@ -95,6 +98,7 @@ class DemoSeederTest {
             categories,
             s3,
             bucket,
+            imageFetcher,
             orderService,
             reviewService,
             returnRequestService,
