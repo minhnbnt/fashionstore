@@ -57,7 +57,7 @@ class ReviewControllerTest {
             "M · Đen",
             5,
             "Vai day dan va rat dep.",
-            List.of(new ReviewMediaResponse("http://s3.test/fashionstore/img-1.jpg", "IMAGE")),
+            List.of(new ReviewMediaResponse("http://s3.test/fashionstore/img-1.jpg", "IMAGE", UUID.randomUUID())),
             List.of(ReviewTag.QUALITY_GOOD),
             false,
             true,

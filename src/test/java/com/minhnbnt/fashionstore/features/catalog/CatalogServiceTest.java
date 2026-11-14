@@ -33,11 +33,15 @@ import com.minhnbnt.fashionstore.model.Upload;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.server.ResponseStatusException;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -60,8 +64,25 @@ class CatalogServiceTest {
     @Autowired
     private S3UrlService s3Urls;
 
+    @Autowired
+    private S3Client s3Client;
+
+    @Value("${s3.bucket}")
+    private String s3Bucket;
+
     /** Key ảnh đã tạo cho từng productRequest(slug) — dùng cho assertion URL ảnh đầu. */
     private final Map<String, List<String>> productImageKeysBySlug = new HashMap<>();
+
+    /** PUT object rỗng vào MinIO — video validate chỉ cần head/get, parse fail thì bỏ qua. */
+    private void putS3Object(String key, String contentType) {
+        s3Client.putObject(
+            PutObjectRequest.builder()
+                .bucket(s3Bucket)
+                .key(key)
+                .contentType(contentType)
+                .build(),
+            RequestBody.fromBytes(new byte[] {0, 0, 0, 0}));
+    }
 
 
     @Autowired
@@ -719,6 +740,83 @@ class CatalogServiceTest {
             assertThat(log.changesSummary()).contains("Xóa mềm");
             assertThat(log.oldValues()).contains("status");
         });
+    }
+
+    @Test
+    void updateVideoEchoKeepsAndNullDeletes() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-video-echo");
+        var videoKey = uniqueKey("video-1");
+        var videoUploadId = uploads.save(Upload.create(videoKey, "video/mp4")).getId();
+        putS3Object(videoKey, "video/mp4");
+
+        var withVideo = new CreateProductRequest(
+            "Áo Có Video",
+            "ao-co-video",
+            "Mô tả",
+            testCategory(),
+            List.of(new CreateVariantRequest("SKU-VID", "M", "Den", 100000L, null, 10, true)),
+            List.of(new ImageItemRequest(newImageUpload("vid-img-1"), null, 0)),
+            videoUploadId,
+            null, null, null, null, null, null, null, null, null, null, "ACTIVE"
+        );
+        var created = catalog.createProduct(ownerId, shopId, withVideo);
+        assertThat(created.videoUrl()).isEqualTo(s3Urls.publicUrl(videoKey));
+        assertThat(created.videoUploadId()).isEqualTo(videoUploadId);
+
+        // Echo id cũ = giữ nguyên
+        var kept = catalog.updateProduct(
+            ownerId, shopId, created.id(),
+            new UpdateProductRequest(null, null, null, null, null, null, videoUploadId, null,
+                null, null, null, null, null, null, null, null, null));
+        assertThat(kept.videoUrl()).isEqualTo(s3Urls.publicUrl(videoKey));
+
+        // null = xoá video
+        var cleared = catalog.updateProduct(
+            ownerId, shopId, created.id(),
+            new UpdateProductRequest(null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null));
+        assertThat(cleared.videoUrl()).isNull();
+        assertThat(cleared.videoUploadId()).isNull();
+    }
+
+    @Test
+    void updateDeletingGarmentWhileTryOnEnabledIsRejected() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-garment-del");
+        var garmentKey = uniqueKey("garment-del");
+        var garmentUploadId = uploads.save(Upload.create(garmentKey, "image/webp")).getId();
+
+        var withGarment = new CreateProductRequest(
+            "Áo Try-On",
+            "ao-try-on",
+            "Mô tả",
+            testCategory(),
+            List.of(new CreateVariantRequest("SKU-TRY", "M", "Den", 100000L, null, 10, true)),
+            List.of(new ImageItemRequest(newImageUpload("try-img-1"), null, 0)),
+            null,
+            garmentUploadId,
+            true, null, null, null, null, null, null, null, null, "ACTIVE"
+        );
+        var created = catalog.createProduct(ownerId, shopId, withGarment);
+
+        // null = xoá garment nhưng tryOn vẫn bật -> 400
+        assertThatThrownBy(() -> catalog.updateProduct(
+            ownerId,
+            shopId,
+            created.id(),
+            new UpdateProductRequest(null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null))
+        ).isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+
+        // Tắt tryOn rồi xoá garment thì hợp lệ
+        var ok = catalog.updateProduct(
+            ownerId, shopId, created.id(),
+            new UpdateProductRequest(null, null, null, null, null, null, null, null, false,
+                null, null, null, null, null, null, null, null));
+        assertThat(ok.tryOnEnabled()).isFalse();
+        assertThat(ok.garmentUrl()).isNull();
     }
 
     @Test

@@ -23,9 +23,17 @@ public record ShopResponse(
     @Nullable
     String logoUrl,
 
+    @Schema(description = "Id upload logo — FE echo lại khi cập nhật để giữ nguyên, null = chưa có")
+    @Nullable
+    UUID logoUploadId,
+
     @Schema(description = "URL ảnh bìa public path-style, null nếu chưa có. Không trả S3 key.")
     @Nullable
     String bannerUrl,
+
+    @Schema(description = "Id upload ảnh bìa — FE echo lại khi cập nhật để giữ nguyên, null = chưa có")
+    @Nullable
+    UUID bannerUploadId,
 
     @Schema(example = "APPROVED")
     String status,

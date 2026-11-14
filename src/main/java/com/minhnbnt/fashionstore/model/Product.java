@@ -265,12 +265,9 @@ public class Product implements Persistable<UUID> {
         if (categoryId != null) {
             this.categoryId = categoryId;
         }
-        if (videoUploadId != null) {
-            this.videoUploadId = videoUploadId;
-        }
-        if (garmentUploadId != null) {
-            this.garmentUploadId = garmentUploadId;
-        }
+        // Media: null = xoá (service quyết định), id = đặt/đổi. Giữ nguyên do service echo id cũ.
+        this.videoUploadId = videoUploadId;
+        this.garmentUploadId = garmentUploadId;
         if (tryOnEnabled != null) {
             this.tryOnEnabled = tryOnEnabled;
         }

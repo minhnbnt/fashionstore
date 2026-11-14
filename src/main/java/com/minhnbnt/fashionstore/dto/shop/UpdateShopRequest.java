@@ -17,11 +17,11 @@ public record UpdateShopRequest(
     @Nullable
     String description,
 
-    @Schema(description = "Id upload logo mới, null = giữ nguyên", nullable = true)
+    @Schema(description = "Id upload logo. Id cũ = giữ nguyên (echo từ ShopResponse.logoUploadId), id mới = đổi, null = xoá logo", nullable = true)
     @Nullable
     UUID logoUploadId,
 
-    @Schema(description = "Id upload banner mới, null = giữ nguyên", nullable = true)
+    @Schema(description = "Id upload banner. Id cũ = giữ nguyên (echo từ ShopResponse.bannerUploadId), id mới = đổi, null = xoá banner", nullable = true)
     @Nullable
     UUID bannerUploadId
 ) {

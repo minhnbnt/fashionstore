@@ -9,6 +9,7 @@ public record ImageResponse(
     @Schema UUID id,
     @Schema(nullable = true) @Nullable UUID variantId,
     @Schema(description = "URL public của ảnh") String url,
+    @Schema(description = "Id bản ghi upload gốc — FE echo lại khi cập nhật bộ ảnh") UUID uploadId,
     @Schema Integer sortOrder
 ) {
 }

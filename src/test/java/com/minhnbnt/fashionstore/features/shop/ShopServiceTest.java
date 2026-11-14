@@ -449,10 +449,27 @@ class ShopServiceTest {
 
         var newLogoId = uploadOf("image/webp");
         var expectedUrl = s3Urls.publicUrl(uploads.findById(newLogoId).orElseThrow().getS3Key());
+        // Echo bannerUploadId để giữ nguyên banner (null = xoá theo contract mới)
         var updated = shops.update(ownerId, created.id(),
-            new UpdateShopRequest(null, null, newLogoId, null));
+            new UpdateShopRequest(null, null, newLogoId, created.bannerUploadId()));
 
         assertThat(updated.logoUrl()).isEqualTo(expectedUrl);
+        assertThat(updated.logoUploadId()).isEqualTo(newLogoId);
+        assertThat(updated.bannerUploadId()).isEqualTo(created.bannerUploadId());
+    }
+
+    @Test
+    void updateNullLogoUploadIdDeletesLogo() {
+        var ownerId = mirroredUser();
+        var created = shops.register(
+            ownerId, ShopTestFixtures.createRequest(uploads, "Shop Xoa Logo", "shop-xoa-logo"));
+
+        var updated = shops.update(ownerId, created.id(),
+            new UpdateShopRequest(null, null, null, created.bannerUploadId()));
+
+        assertThat(updated.logoUrl()).isNull();
+        assertThat(updated.logoUploadId()).isNull();
+        assertThat(updated.bannerUrl()).isNotNull();
     }
 }
 

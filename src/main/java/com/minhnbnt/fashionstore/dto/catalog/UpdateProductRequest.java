@@ -47,11 +47,11 @@ public record UpdateProductRequest(
     @Valid
     List<ImageItemRequest> images,
 
-    @Schema(description = "Upload id video giới thiệu sản phẩm (tối đa 60s), null = giữ nguyên", nullable = true)
+    @Schema(description = "Upload id video giới thiệu sản phẩm (tối đa 60s). Id cũ = giữ nguyên (echo từ ProductResponse.videoUploadId), id mới = đổi, null = xoá video", nullable = true)
     @Nullable
     UUID videoUploadId,
 
-    @Schema(description = "Upload id ảnh sản phẩm phẳng cho Virtual Try-On, null = giữ nguyên", nullable = true)
+    @Schema(description = "Upload id ảnh sản phẩm phẳng cho Virtual Try-On. Id cũ = giữ nguyên (echo từ ProductResponse.garmentUploadId), id mới = đổi, null = xoá ảnh", nullable = true)
     @Nullable
     UUID garmentUploadId,
 

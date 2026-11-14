@@ -23,6 +23,12 @@ public record BannerResponse(
     @Schema(description = "URL public ảnh mobile, null = dùng ảnh desktop")
     @Nullable String mobileImageUrl,
 
+    @Schema(description = "Id upload ảnh desktop — FE echo lại khi cập nhật banner")
+    UUID imageUploadId,
+
+    @Schema(description = "Id upload ảnh mobile, null = không có ảnh mobile riêng")
+    @Nullable UUID mobileImageUploadId,
+
     @Nullable String linkUrl,
 
     int sortOrder,
@@ -50,6 +56,8 @@ public record BannerResponse(
             banner.getTitle(),
             imageUrl,
             mobileImageUrl,
+            banner.getImageUploadId(),
+            banner.getMobileImageUploadId(),
             banner.getLinkUrl(),
             banner.getSortOrder(),
             banner.isActive(),

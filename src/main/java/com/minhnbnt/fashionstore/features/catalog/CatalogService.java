@@ -342,9 +342,21 @@ public class CatalogService {
             requireCategoryExists(request.categoryId());
         }
 
+        // Media: null = xoá, id = đặt/đổi (echo id cũ = không đổi)
         if (request.videoUploadId() != null
             && !request.videoUploadId().equals(product.getVideoUploadId())) {
             videoMetadataService.validateVideoDuration(requireVideoUpload(request.videoUploadId()).getS3Key());
+        }
+
+        var effectiveTryOn = product.isTryOnEnabled();
+        if (request.tryOnEnabled() != null) {
+            effectiveTryOn = request.tryOnEnabled();
+        }
+        if (effectiveTryOn && request.garmentUploadId() == null) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Garment image is required when virtual try-on is enabled"
+            );
         }
 
         var changes = new ArrayList<String>();
@@ -378,13 +390,21 @@ public class CatalogService {
             oldValues.put("description", product.getDescription());
             newValues.put("description", request.description());
         }
-        if (request.videoUploadId() != null && !request.videoUploadId().equals(product.getVideoUploadId())) {
-            changes.add("Cập nhật video sản phẩm");
+        if (!Objects.equals(request.videoUploadId(), product.getVideoUploadId())) {
+            if (request.videoUploadId() == null) {
+                changes.add("Xoá video sản phẩm");
+            } else {
+                changes.add("Cập nhật video sản phẩm");
+            }
             oldValues.put("videoUploadId", product.getVideoUploadId());
             newValues.put("videoUploadId", request.videoUploadId());
         }
-        if (request.garmentUploadId() != null && !request.garmentUploadId().equals(product.getGarmentUploadId())) {
-            changes.add("Cập nhật ảnh garment thử đồ ảo");
+        if (!Objects.equals(request.garmentUploadId(), product.getGarmentUploadId())) {
+            if (request.garmentUploadId() == null) {
+                changes.add("Xoá ảnh garment thử đồ ảo");
+            } else {
+                changes.add("Cập nhật ảnh garment thử đồ ảo");
+            }
             oldValues.put("garmentUploadId", product.getGarmentUploadId());
             newValues.put("garmentUploadId", request.garmentUploadId());
         }

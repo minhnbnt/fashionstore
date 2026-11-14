@@ -564,7 +564,10 @@ public class ReviewService {
         var responses = new ArrayList<ReviewMediaResponse>(mediaList.size());
         for (var m : mediaList) {
             // FK + validate phía request bảo đảm upload tồn tại; thiếu là lỗi dữ liệu, fail loud.
-            responses.add(new ReviewMediaResponse(Objects.requireNonNull(urls.get(m.getUploadId())), m.getKind()));
+            responses.add(new ReviewMediaResponse(
+                Objects.requireNonNull(urls.get(m.getUploadId())),
+                m.getKind(),
+                m.getUploadId()));
         }
         return responses;
     }

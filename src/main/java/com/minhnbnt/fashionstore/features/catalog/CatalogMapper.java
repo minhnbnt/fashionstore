@@ -44,6 +44,8 @@ public final class CatalogMapper {
             reviewCount,
             videoUrl,
             garmentUrl,
+            product.getVideoUploadId(),
+            product.getGarmentUploadId(),
             product.isTryOnEnabled(),
             product.getMaterial(),
             product.getOrigin(),
@@ -75,6 +77,7 @@ public final class CatalogMapper {
             image.getId(),
             image.getVariantId(),
             Objects.requireNonNull(url, "upload row missing for image " + image.getId()),
+            image.getUploadId(),
             image.getSortOrder()
         );
     }

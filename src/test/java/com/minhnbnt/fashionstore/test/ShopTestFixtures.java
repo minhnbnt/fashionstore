@@ -67,7 +67,7 @@ public final class ShopTestFixtures {
 
     public static ShopResponse response(UUID id, String status, @Nullable String statusReason) {
         return new ShopResponse(
-            id, "Shop", "shop", "Mo ta", null, null, status, statusReason,
+            id, "Shop", "shop", "Mo ta", null, null, null, null, status, statusReason,
             null, null, null, 2, "INDIVIDUAL", null, 0, 0,
             null, null, null, null, null,
             "PENDING_REVIEW", null,

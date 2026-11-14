@@ -3,6 +3,7 @@ package com.minhnbnt.fashionstore.features.catalog;
 import com.minhnbnt.fashionstore.dto.catalog.ImageResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.VariantResponse;
+import com.minhnbnt.fashionstore.model.ProductImage;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -61,11 +62,22 @@ class CatalogMapperTest {
         assertThat(summary.defaultImageUrl()).isNull();
     }
 
+    @Test
+    void imageResponseCarriesUploadIdForEditEcho() {
+        var uploadId = UUID.randomUUID();
+        var image = ProductImage.create(UUID.randomUUID(), null, uploadId, 0);
+
+        var response = CatalogMapper.toImageResponse(image, "http://s3.test/p/1.jpg");
+
+        assertThat(response.uploadId()).isEqualTo(uploadId);
+        assertThat(response.url()).isEqualTo("http://s3.test/p/1.jpg");
+    }
+
     private static VariantResponse variant(Long price) {
         return new VariantResponse(UUID.randomUUID(), "SKU-1", "M", "Đen", price, null, 10, true, Instant.now());
     }
 
     private static ImageResponse image(String url, int sortOrder) {
-        return new ImageResponse(UUID.randomUUID(), null, url, sortOrder);
+        return new ImageResponse(UUID.randomUUID(), null, url, UUID.randomUUID(), sortOrder);
     }
 }

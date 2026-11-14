@@ -65,7 +65,8 @@ class AdminBannerControllerTest {
 
     private static BannerResponse response(UUID id) {
         return new BannerResponse(
-            id, BannerPlacement.HOME_CAROUSEL, "Sale thu", "http://s3.test/a.webp", null, "/search", 1, true,
+            id, BannerPlacement.HOME_CAROUSEL, "Sale thu", "http://s3.test/a.webp", null,
+            UUID.randomUUID(), null, "/search", 1, true,
             null, null, ScheduleState.RUNNING, Instant.now()
         );
     }

@@ -22,6 +22,9 @@ public record PopupResponse(
     @Schema(description = "URL public ảnh popup, null = popup chỉ có chữ")
     @Nullable String imageUrl,
 
+    @Schema(description = "Id upload ảnh popup — FE echo lại khi cập nhật popup, null = popup chỉ có chữ")
+    @Nullable UUID imageUploadId,
+
     @Nullable String ctaLabel,
 
     @Nullable String linkUrl,
@@ -53,6 +56,7 @@ public record PopupResponse(
             popup.getTitle(),
             popup.getBody(),
             imageUrl,
+            popup.getImageUploadId(),
             popup.getCtaLabel(),
             popup.getLinkUrl(),
             popup.getAudience(),

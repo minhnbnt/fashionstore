@@ -23,6 +23,10 @@ public record ProductResponse(
     @Schema(description = "So luot danh gia") long reviewCount,
     @Schema(description = "URL public video giới thiệu", nullable = true) @Nullable String videoUrl,
     @Schema(description = "URL public ảnh garment thử đồ ảo", nullable = true) @Nullable String garmentUrl,
+    @Schema(description = "Id upload video — FE echo lại khi cập nhật để giữ nguyên, null = chưa có", nullable = true)
+    @Nullable UUID videoUploadId,
+    @Schema(description = "Id upload garment — FE echo lại khi cập nhật để giữ nguyên, null = chưa có", nullable = true)
+    @Nullable UUID garmentUploadId,
     @Schema(description = "Hỗ trợ thử đồ ảo") Boolean tryOnEnabled,
     @Schema(nullable = true) @Nullable String material,
     @Schema(nullable = true) @Nullable String origin,
@@ -50,7 +54,7 @@ public record ProductResponse(
         this(
             id, shopId, categoryId, name, slug, description, status,
             variants, images, updatedAt, averageRating, reviewCount,
-            null, null, false, null, null, null, null, null, null, null, null
+            null, null, null, null, false, null, null, null, null, null, null, null, null
         );
     }
 }

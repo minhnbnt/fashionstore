@@ -21,13 +21,18 @@ import org.springframework.stereotype.Service;
 public class UploadService {
 
     private final S3Storage storage;
+    private final S3UrlService urlService;
     private final UploadRepository uploads;
 
     public PresignResponse presign(PresignRequest request) {
         var signed = storage.presign(request.contentType(), prefixOf(request.purpose()));
         var saved = uploads.save(Upload.create(signed.key(), request.contentType()));
 
-        return new PresignResponse(saved.getId(), signed.url(), signed.expiresAt());
+        return new PresignResponse(
+            saved.getId(),
+            signed.url(),
+            urlService.publicUrl(signed.key()),
+            signed.expiresAt());
     }
 
     private static String prefixOf(@Nullable UploadPurpose purpose) {

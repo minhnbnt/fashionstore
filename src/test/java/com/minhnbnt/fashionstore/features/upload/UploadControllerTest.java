@@ -68,7 +68,7 @@ class UploadControllerTest {
         var uploadId = UUID.randomUUID();
         var expiresAt = Instant.now().plusSeconds(600);
         when(uploads.presign(any()))
-            .thenReturn(new PresignResponse(uploadId, "http://x/put", expiresAt));
+            .thenReturn(new PresignResponse(uploadId, "http://x/put", "http://x/pub", expiresAt));
 
         mockMvc.perform(post("/api/uploads/presign")
                 .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())))
@@ -77,6 +77,7 @@ class UploadControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.uploadId").value(uploadId.toString()))
             .andExpect(jsonPath("$.uploadUrl").value("http://x/put"))
+            .andExpect(jsonPath("$.publicUrl").value("http://x/pub"))
             .andExpect(jsonPath("$.expiresAt").exists())
             .andExpect(jsonPath("$.key").doesNotExist());
     }
@@ -84,7 +85,7 @@ class UploadControllerTest {
     @Test
     void presignForwardsPurposeToService() throws Exception {
         when(uploads.presign(any()))
-            .thenReturn(new PresignResponse(UUID.randomUUID(), "http://x", Instant.now()));
+            .thenReturn(new PresignResponse(UUID.randomUUID(), "http://x", "http://x/pub", Instant.now()));
 
         mockMvc.perform(post("/api/uploads/presign")
                 .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())))

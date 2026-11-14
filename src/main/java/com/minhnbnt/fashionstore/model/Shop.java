@@ -331,12 +331,9 @@ public class Shop implements Persistable<UUID> {
         if (description != null) {
             this.description = description;
         }
-        if (logoUploadId != null) {
-            this.logoUploadId = logoUploadId;
-        }
-        if (bannerUploadId != null) {
-            this.bannerUploadId = bannerUploadId;
-        }
+        // Media: null = xoá (service quyết định), id = đặt/đổi. Giữ nguyên do service echo id cũ.
+        this.logoUploadId = logoUploadId;
+        this.bannerUploadId = bannerUploadId;
         updatedAt = Instant.now();
     }
 
