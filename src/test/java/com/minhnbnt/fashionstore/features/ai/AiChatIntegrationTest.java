@@ -9,10 +9,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
@@ -58,5 +61,22 @@ class AiChatIntegrationTest {
 
         aiChatService.deleteConversation(userId, conv.id());
         assertThat(aiChatService.listConversations(userId)).isEmpty();
+    }
+
+    @Test
+    void saveMessageWithInvalidMetadataRejected() {
+        var userId = UUID.randomUUID();
+        users.upsert(userId, new CreateUserRequest("ai-int-bad-" + userId + "@t.local", "AI Tester", null));
+
+        var conv = aiChatService.createConversation(userId, new CreateAiConversationRequest(null));
+
+        assertThatThrownBy(() -> aiChatService.saveMessage(
+            userId,
+            conv.id(),
+            new SaveAiMessageRequest("user", "Tìm áo khoác", "{khong phai json")
+        ))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST));
     }
 }

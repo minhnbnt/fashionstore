@@ -2,6 +2,7 @@ package com.minhnbnt.fashionstore.features.catalog;
 
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.catalog.ProductResponse;
+import com.minhnbnt.fashionstore.dto.catalog.ProductSummaryResponse;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,6 +73,44 @@ class CatalogServiceGetDetailsIntegrationTest {
         assertThat(catalogService.getDetails(List.of())).isEmpty();
     }
 
+    @Test
+    void skipsProductsFromShopsNotApproved() {
+        var pendingShopId = UUID.randomUUID();
+        jdbc.sql("INSERT INTO shop (id, name, slug, status) VALUES (:id, :name, :slug, 'PENDING')")
+            .param("id", pendingShopId)
+            .param("name", "Shop Chưa Duyệt")
+            .param("slug", "shop-pending-" + pendingShopId)
+            .update();
+        var hiddenProdId = UUID.randomUUID();
+        insertProduct(pendingShopId, hiddenProdId, "Áo Shop Chưa Duyệt", Instant.now().minusSeconds(100));
+
+        var responses = catalogService.getDetails(List.of(prod1Id, hiddenProdId, prod2Id));
+
+        assertThat(responses).extracting(ProductResponse::id).containsExactly(prod1Id, prod2Id);
+    }
+
+    @Test
+    void summariesKeepInputOrderAndMapCheapestVariantAndFirstImage() {
+        var summaries = catalogService.getSummaries(List.of(prod2Id, prod1Id));
+
+        assertThat(summaries).hasSize(2);
+        assertThat(summaries.get(0).id()).isEqualTo(prod2Id);
+        assertThat(summaries.get(0).minPrice()).isEqualTo(150000L);
+        assertThat(summaries.get(0).defaultImageKey()).isNull();
+        assertThat(summaries.get(0).rank()).isNull();
+        assertThat(summaries.get(1).id()).isEqualTo(prod1Id);
+        assertThat(summaries.get(1).minPrice()).isEqualTo(250000L);
+        assertThat(summaries.get(1).defaultImageKey()).isEqualTo("shop/ao-day-du-1.jpg");
+    }
+
+    @Test
+    void summariesSkipMissingIdsAndEmptyInputIsEmpty() {
+        assertThat(catalogService.getSummaries(List.of(prod1Id, UUID.randomUUID(), prod2Id)))
+            .extracting(ProductSummaryResponse::id)
+            .containsExactly(prod1Id, prod2Id);
+        assertThat(catalogService.getSummaries(List.of())).isEmpty();
+    }
+
     private void insertShop() {
         jdbc.sql("INSERT INTO shop (id, name, slug, status) VALUES (:id, :name, :slug, 'APPROVED')")
             .param("id", shopId)
@@ -89,12 +128,16 @@ class CatalogServiceGetDetailsIntegrationTest {
     }
 
     private void insertProduct(UUID productId, String name, Instant createdAt) {
+        insertProduct(shopId, productId, name, createdAt);
+    }
+
+    private void insertProduct(UUID productShopId, UUID productId, String name, Instant createdAt) {
         jdbc.sql("""
             INSERT INTO product (id, shop_id, category_id, name, slug, status, description, created_at)
             VALUES (:id, :shopId, :catId, :name, :slug, 'ACTIVE', 'mô tả', :createdAt)
             """)
             .param("id", productId)
-            .param("shopId", shopId)
+            .param("shopId", productShopId)
             .param("catId", categoryId)
             .param("name", name)
             .param("slug", "prod-" + productId)

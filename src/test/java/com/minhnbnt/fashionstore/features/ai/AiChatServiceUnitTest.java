@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.List;
@@ -38,6 +39,9 @@ class AiChatServiceUnitTest {
 
     @Mock
     private AiMessageRepository messageRepo;
+
+    @Mock
+    private ObjectMapper objectMapper;
 
     @InjectMocks
     private AiChatService service;

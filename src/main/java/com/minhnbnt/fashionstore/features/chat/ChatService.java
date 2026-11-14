@@ -8,6 +8,8 @@ import com.minhnbnt.fashionstore.dto.chat.SendMessageRequest;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatConversationRepository;
 import com.minhnbnt.fashionstore.features.chat.repository.ChatMessageRepository;
+import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
+import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.infrastructure.realtime.ChatRealtimePublisher;
@@ -50,6 +52,8 @@ public class ChatService {
     private final ShopAccessChecker access;
 
     private final ShopAuditService audit;
+
+    private final NotificationService notifications;
 
     private final ChatRealtimePublisher realtime;
 
@@ -161,6 +165,18 @@ public class ChatService {
                 chatDetail = chatDetail + ": \"" + preview + "\"";
             }
             audit.record(conv.getShopId(), userId, "CHAT_REPLY", "CONVERSATION", conv.getId(), chatDetail);
+
+            var shopName = shops.getShopName(conv.getShopId());
+
+            notifications.create(
+                Set.of(conv.getBuyerId()),
+                NotificationCategory.ACTIVITY,
+                "CHAT_MESSAGE",
+                "Tin nhắn mới từ " + shopName,
+                previewText,
+                null,
+                msg.getId()
+            );
         }
 
         realtime.publishChatMessage(recipients, toMessageResponse(msg));
@@ -254,6 +270,18 @@ public class ChatService {
         realtime.publishConversationEvent(
             recipients,
             new ConversationEvent(conv.getId(), ConversationEvent.Type.NEW_MESSAGE)
+        );
+
+        var shopName = shops.getShopName(conv.getShopId());
+
+        notifications.create(
+            Set.of(conv.getBuyerId()),
+            NotificationCategory.ACTIVITY,
+            "CHAT_MESSAGE",
+            "Tin nhắn mới từ " + shopName,
+            autoReplyText,
+            null,
+            autoMsg.getId()
         );
     }
 

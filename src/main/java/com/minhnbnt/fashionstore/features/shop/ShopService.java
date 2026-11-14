@@ -27,11 +27,13 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.StreamSupport;
@@ -318,6 +320,18 @@ public class ShopService {
             return false;
         }
         return shop.getStatus() == ShopStatus.APPROVED;
+    }
+
+    /** Batch của isShopApproved: 1 query findAllById thay vì 1 query mỗi shop. */
+    @Transactional(readOnly = true)
+    public Set<UUID> findApprovedShopIds(@NonNull Collection<UUID> shopIds) {
+        var approved = new HashSet<UUID>();
+        for (var shop : shops.findAllById(shopIds)) {
+            if (shop.getStatus() == ShopStatus.APPROVED) {
+                approved.add(shop.getId());
+            }
+        }
+        return approved;
     }
 
     @Transactional(readOnly = true)

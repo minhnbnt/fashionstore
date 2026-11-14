@@ -33,11 +33,6 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -86,15 +81,13 @@ public class DemoSeeder implements ApplicationRunner {
 
     private final String bucket;
 
+    private final DemoImageFetcher imageFetcher;
+
     private final DemoOrderSeeder orderSeeder;
 
     private final DemoEngagementSeeder engagementSeeder;
 
     private final DemoShopOpsSeeder opsSeeder;
-
-    private final HttpClient http = HttpClient.newBuilder()
-        .followRedirects(HttpClient.Redirect.NORMAL)
-        .build();
 
     public DemoSeeder(
         ShopService shopService,
@@ -104,6 +97,7 @@ public class DemoSeeder implements ApplicationRunner {
         CategoryRepository categoryRepository,
         S3Client s3,
         @Value("${s3.bucket}") String bucket,
+        DemoImageFetcher imageFetcher,
         OrderService orderService,
         ReviewService reviewService,
         ReturnRequestService returnRequestService,
@@ -121,6 +115,7 @@ public class DemoSeeder implements ApplicationRunner {
         this.categoryRepository = categoryRepository;
         this.s3 = s3;
         this.bucket = bucket;
+        this.imageFetcher = imageFetcher;
         this.orderSeeder = new DemoOrderSeeder(userService, orderService);
         this.engagementSeeder = new DemoEngagementSeeder(reviewService, returnRequestService, chatService);
         this.opsSeeder = new DemoShopOpsSeeder(
@@ -235,23 +230,17 @@ public class DemoSeeder implements ApplicationRunner {
     }
 
     private boolean uploadOne(String slug, int index, String key) {
-        try {
-            var request = HttpRequest.newBuilder(
-                URI.create("https://picsum.photos/seed/net-" + slug + "-" + index + "/600/750")
-            ).GET().build();
-            var body = http.send(request, HttpResponse.BodyHandlers.ofByteArray()).body();
-            s3.putObject(
-                PutObjectRequest.builder().bucket(bucket).key(key).contentType("image/jpeg").build(),
-                RequestBody.fromBytes(body)
-            );
-            return true;
-        } catch (IOException | InterruptedException | RuntimeException e) {
-            log.warn("Skipping demo image {}: {}", key, e.getMessage());
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
+
+        var body = imageFetcher.fetch("https://picsum.photos/seed/net-" + slug + "-" + index + "/600/750");
+        if (body.isEmpty()) {
             return false;
         }
+
+        s3.putObject(
+            PutObjectRequest.builder().bucket(bucket).key(key).contentType("image/jpeg").build(),
+            RequestBody.fromBytes(body.get())
+        );
+        return true;
     }
 
     private record DemoVariant(
