@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 // TODO(v10): backfill + SET NOT NULL on the eKYC columns required at registration, then drop their @Nullable here.
-// Keep @Nullable on genuinely optional fields (taxCode, businessCertKey, phone, address)
+// Keep @Nullable on genuinely optional fields (taxCode, businessCertUrl, phone, address)
 // and lifecycle fields (approvedAt, rejection reasons, owner join).
 public record AdminShopResponse(
     UUID id,
@@ -18,13 +18,13 @@ public record AdminShopResponse(
 
     String description,
 
-    @Schema(description = "S3 key, frontend tự ghép base URL", nullable = true)
+    @Schema(description = "URL logo public path-style, null nếu chưa có. Không trả S3 key.", nullable = true)
     @Nullable
-    String logoKey,
+    String logoUrl,
 
-    @Schema(description = "S3 key, frontend tự ghép base URL", nullable = true)
+    @Schema(description = "URL banner public path-style, null nếu chưa có. Không trả S3 key.", nullable = true)
     @Nullable
-    String bannerKey,
+    String bannerUrl,
 
     @Schema(example = "PENDING")
     String status,
@@ -88,21 +88,21 @@ public record AdminShopResponse(
     @Nullable
     String taxCode,
 
-    @Schema(description = "S3 key ảnh mặt trước CCCD", nullable = true)
+    @Schema(description = "URL presigned GET ảnh mặt trước CCCD, TTL ~15 phút", nullable = true)
     @Nullable
-    String idFrontKey,
+    String idFrontUrl,
 
-    @Schema(description = "S3 key ảnh mặt sau CCCD", nullable = true)
+    @Schema(description = "URL presigned GET ảnh mặt sau CCCD, TTL ~15 phút", nullable = true)
     @Nullable
-    String idBackKey,
+    String idBackUrl,
 
-    @Schema(description = "S3 key ảnh selfie cầm CCCD", nullable = true)
+    @Schema(description = "URL presigned GET ảnh selfie cầm CCCD, TTL ~15 phút", nullable = true)
     @Nullable
-    String idSelfieKey,
+    String idSelfieUrl,
 
-    @Schema(description = "S3 key giấy chứng nhận ĐKKD (nếu có)", nullable = true)
+    @Schema(description = "URL presigned GET giấy chứng nhận ĐKKD (nếu có), TTL ~15 phút", nullable = true)
     @Nullable
-    String businessCertKey,
+    String businessCertUrl,
 
     @Schema(description = "Tên ngân hàng thụ hưởng", nullable = true)
     @Nullable

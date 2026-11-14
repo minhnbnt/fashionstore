@@ -2,9 +2,12 @@ package com.minhnbnt.fashionstore.dto.shop;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
+
+import java.util.UUID;
 
 public record CreateShopRequest(
     @Schema(example = "Shop An")
@@ -22,13 +25,13 @@ public record CreateShopRequest(
     @Size(max = 2000, message = "Shop description must not exceed 2000 characters")
     String description,
 
-    @Schema(description = "S3 key logo gian hàng")
-    @NotBlank(message = "Shop logo key is required")
-    String logoKey,
+    @Schema(description = "Id upload logo gian hàng (đã PUT lên S3 qua /api/uploads/presign)")
+    @NotNull(message = "Shop logo upload is required")
+    UUID logoUploadId,
 
-    @Schema(description = "S3 key ảnh bìa gian hàng")
-    @NotBlank(message = "Shop banner key is required")
-    String bannerKey,
+    @Schema(description = "Id upload ảnh bìa gian hàng")
+    @NotNull(message = "Shop banner upload is required")
+    UUID bannerUploadId,
 
     @Schema(description = "Số điện thoại kho / hotline")
     @NotBlank(message = "Phone number is required")
@@ -68,21 +71,21 @@ public record CreateShopRequest(
     @Nullable
     String taxCode,
 
-    @Schema(description = "S3 key ảnh mặt trước CCCD")
-    @NotBlank(message = "ID front image key is required")
-    String idFrontKey,
+    @Schema(description = "Id upload ảnh mặt trước CCCD")
+    @NotNull(message = "ID front image upload is required")
+    UUID idFrontUploadId,
 
-    @Schema(description = "S3 key ảnh mặt sau CCCD")
-    @NotBlank(message = "ID back image key is required")
-    String idBackKey,
+    @Schema(description = "Id upload ảnh mặt sau CCCD")
+    @NotNull(message = "ID back image upload is required")
+    UUID idBackUploadId,
 
-    @Schema(description = "S3 key ảnh chân dung cầm CCCD")
-    @NotBlank(message = "ID selfie image key is required")
-    String idSelfieKey,
+    @Schema(description = "Id upload ảnh chân dung cầm CCCD")
+    @NotNull(message = "ID selfie image upload is required")
+    UUID idSelfieUploadId,
 
-    @Schema(description = "S3 key giấy chứng nhận ĐKKD (nếu có)", nullable = true)
+    @Schema(description = "Id upload giấy chứng nhận ĐKKD (nếu có)", nullable = true)
     @Nullable
-    String businessCertKey,
+    UUID businessCertUploadId,
 
     @Schema(description = "Tên ngân hàng thụ hưởng", example = "Vietcombank")
     @NotBlank(message = "Bank name is required")

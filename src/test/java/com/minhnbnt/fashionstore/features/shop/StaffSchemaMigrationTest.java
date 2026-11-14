@@ -4,6 +4,7 @@ import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,6 +21,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class StaffSchemaMigrationTest {
+
+    @Autowired
+
+    private UploadRepository uploads;
+
 
     @Autowired
     private JdbcClient jdbc;
@@ -60,7 +66,7 @@ class StaffSchemaMigrationTest {
     void seededManagerRoleHasAllPermissions() {
         // V28's UPDATE shop_role is a no-op on an empty DB; the same list is asserted here via initDefaultRoles.
         var ownerId = owner();
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, 
             "Schema Shop",
             "staff-schema-" + UUID.randomUUID()
         ));

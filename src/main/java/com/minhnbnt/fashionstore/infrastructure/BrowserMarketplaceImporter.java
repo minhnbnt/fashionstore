@@ -13,7 +13,9 @@ import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.model.Category;
+import com.minhnbnt.fashionstore.model.Upload;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
@@ -54,6 +56,7 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
     private final ShopService shopService;
     private final CatalogService catalogService;
     private final UserService userService;
+    private final UploadRepository uploads;
     private final ShopRepository shops;
     private final ShopMemberRepository members;
     private final CategoryRepository categories;
@@ -67,6 +70,7 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
         ShopService shopService,
         CatalogService catalogService,
         UserService userService,
+        UploadRepository uploads,
         ShopRepository shops,
         ShopMemberRepository members,
         CategoryRepository categories,
@@ -79,6 +83,7 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
         this.shopService = shopService;
         this.catalogService = catalogService;
         this.userService = userService;
+        this.uploads = uploads;
         this.shops = shops;
         this.members = members;
         this.categories = categories;
@@ -87,6 +92,11 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
         this.objectMapper = objectMapper;
         this.bucket = bucket;
         this.manifestPath = Path.of(manifest).toAbsolutePath().normalize();
+    }
+
+    /** Tạo row upload MỚI cho media seed (không lookup) — trả id để gắn vào request nghiệp vụ. */
+    private UUID seedUploadId(String s3Key, String contentType) {
+        return uploads.save(Upload.create(s3Key, contentType)).getId();
     }
 
     @Override
@@ -107,8 +117,7 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
                 skipped++;
             }
         }
-        log.info("Browser marketplace import complete: {} imported, {} skipped.", imported, skipped);
-    }
+        log.info("Browser marketplace import complete: {} imported, {} skipped.", imported, skipped);    }
 
     private ImportContext importContext() {
         var existing = shops.findBySlug(SHOP_SLUG).orElse(null);
@@ -127,8 +136,8 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
                 "Shopee & Lazada Import",
                 SHOP_SLUG,
                 "Dữ liệu nhập qua phiên Chrome tương tác trên máy phát triển.",
-                "seeds/market-logo.webp",
-                "seeds/market-banner.webp",
+                seedUploadId("seeds/market-logo.webp", "image/webp"),
+                seedUploadId("seeds/market-banner.webp", "image/webp"),
                 "0907777888",
                 "Kho tổng liên sàn, Hà Nội",
                 "INDIVIDUAL",
@@ -137,9 +146,9 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
                 "10/10/2020",
                 "Cục Cảnh sát QLHC về TTXH",
                 null,
-                "seeds/id-front.webp",
-                "seeds/id-back.webp",
-                "seeds/id-selfie.webp",
+                seedUploadId("seeds/id-front.webp", "image/webp"),
+                seedUploadId("seeds/id-back.webp", "image/webp"),
+                seedUploadId("seeds/id-selfie.webp", "image/webp"),
                 null,
                 "VietinBank",
                 "108877665544",

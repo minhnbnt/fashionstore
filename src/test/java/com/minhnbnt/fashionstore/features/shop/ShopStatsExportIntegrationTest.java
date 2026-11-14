@@ -4,6 +4,7 @@ import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ShopStatsExportIntegrationTest {
 
     @Autowired
+
+    private UploadRepository uploads;
+
+
+    @Autowired
     private ShopStatsService stats;
 
     @Autowired
@@ -49,7 +55,7 @@ class ShopStatsExportIntegrationTest {
         users.upsert(adminId, new CreateUserRequest("export-admin-" + adminId + "@t.local", "Export Admin"));
 
         var slug = "export-empty-" + UUID.randomUUID();
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         shopId = shop.id();
     }

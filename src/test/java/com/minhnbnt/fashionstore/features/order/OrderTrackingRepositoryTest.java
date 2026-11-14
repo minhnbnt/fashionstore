@@ -18,6 +18,7 @@ import com.minhnbnt.fashionstore.model.ReturnRequest;
 import com.minhnbnt.fashionstore.model.Review;
 import com.minhnbnt.fashionstore.test.ProductTestFixtures;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,6 +36,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
 class OrderTrackingRepositoryTest {
+
+    @Autowired
+
+    private UploadRepository uploads;
+
 
     @Autowired
     private OrderRepository orders;
@@ -75,7 +81,7 @@ class OrderTrackingRepositoryTest {
         var buyerId = mirroredUser();
         var adminId = mirroredUser();
         var suffix = UUID.randomUUID().toString().substring(0, 8);
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + suffix, "s-" + suffix));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop " + suffix, "s-" + suffix));
         shops.approve(adminId, shop.id());
 
         var product = catalog.createProduct(

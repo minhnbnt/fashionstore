@@ -15,6 +15,7 @@ import com.minhnbnt.fashionstore.model.ShopMember;
 import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.model.ShopRole;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,6 +37,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class SellerProductPermissionIntegrationTest {
+
+    @Autowired
+
+    private UploadRepository uploads;
+
 
     @Autowired
     private CatalogService catalog;
@@ -63,7 +69,7 @@ class SellerProductPermissionIntegrationTest {
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = mirroredUser();
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }

@@ -26,9 +26,9 @@ public class Shop implements Persistable<UUID> {
 
     private String description;
 
-    private @Nullable String logoKey;
+    private @Nullable UUID logoUploadId;
 
-    private @Nullable String bannerKey;
+    private @Nullable UUID bannerUploadId;
 
     private ShopStatus status;
 
@@ -54,9 +54,9 @@ public class Shop implements Persistable<UUID> {
 
     private @Nullable String idNumber;
 
-    private @Nullable String idDocKey;
+    private @Nullable UUID idDocUploadId;
 
-    private @Nullable String businessCertKey;
+    private @Nullable UUID businessCertUploadId;
 
     private @Nullable Double rating;
 
@@ -76,11 +76,11 @@ public class Shop implements Persistable<UUID> {
 
     private @Nullable String legalName;
 
-    private @Nullable String idFrontKey;
+    private @Nullable UUID idFrontUploadId;
 
-    private @Nullable String idBackKey;
+    private @Nullable UUID idBackUploadId;
 
-    private @Nullable String idSelfieKey;
+    private @Nullable UUID idSelfieUploadId;
 
     private @Nullable String idIssuedDate;
 
@@ -105,8 +105,8 @@ public class Shop implements Persistable<UUID> {
         String name,
         String slug,
         String description,
-        @Nullable String logoKey,
-        @Nullable String bannerKey,
+        @Nullable UUID logoUploadId,
+        @Nullable UUID bannerUploadId,
         ShopStatus status,
         @Nullable String statusReason,
         @Nullable UUID approvedBy,
@@ -119,8 +119,8 @@ public class Shop implements Persistable<UUID> {
         String sellerType,
         @Nullable String taxCode,
         @Nullable String idNumber,
-        @Nullable String idDocKey,
-        @Nullable String businessCertKey,
+        @Nullable UUID idDocUploadId,
+        @Nullable UUID businessCertUploadId,
         @Nullable Double rating,
         int ratingCount,
         int followerCount,
@@ -130,9 +130,9 @@ public class Shop implements Persistable<UUID> {
         @Nullable String autoReplyText,
         @Nullable String workingHours,
         @Nullable String legalName,
-        @Nullable String idFrontKey,
-        @Nullable String idBackKey,
-        @Nullable String idSelfieKey,
+        @Nullable UUID idFrontUploadId,
+        @Nullable UUID idBackUploadId,
+        @Nullable UUID idSelfieUploadId,
         @Nullable String idIssuedDate,
         @Nullable String idIssuedPlace,
         @Nullable String kycStatus,
@@ -144,8 +144,8 @@ public class Shop implements Persistable<UUID> {
         this.name = name;
         this.slug = slug;
         this.description = description;
-        this.logoKey = logoKey;
-        this.bannerKey = bannerKey;
+        this.logoUploadId = logoUploadId;
+        this.bannerUploadId = bannerUploadId;
         this.status = status;
         this.statusReason = statusReason;
         this.approvedBy = approvedBy;
@@ -172,8 +172,8 @@ public class Shop implements Persistable<UUID> {
         }
         this.taxCode = taxCode;
         this.idNumber = idNumber;
-        this.idDocKey = idDocKey;
-        this.businessCertKey = businessCertKey;
+        this.idDocUploadId = idDocUploadId;
+        this.businessCertUploadId = businessCertUploadId;
         this.rating = rating;
         this.ratingCount = ratingCount;
         this.followerCount = followerCount;
@@ -183,9 +183,9 @@ public class Shop implements Persistable<UUID> {
         this.autoReplyText = autoReplyText;
         this.workingHours = workingHours;
         this.legalName = legalName;
-        this.idFrontKey = idFrontKey;
-        this.idBackKey = idBackKey;
-        this.idSelfieKey = idSelfieKey;
+        this.idFrontUploadId = idFrontUploadId;
+        this.idBackUploadId = idBackUploadId;
+        this.idSelfieUploadId = idSelfieUploadId;
         this.idIssuedDate = idIssuedDate;
         this.idIssuedPlace = idIssuedPlace;
         if (kycStatus == null) {
@@ -214,8 +214,8 @@ public class Shop implements Persistable<UUID> {
         String name,
         String slug,
         String description,
-        @Nullable String logoKey,
-        @Nullable String bannerKey,
+        @Nullable UUID logoUploadId,
+        @Nullable UUID bannerUploadId,
         @Nullable String phone,
         @Nullable String address,
         @Nullable String sellerType,
@@ -224,10 +224,10 @@ public class Shop implements Persistable<UUID> {
         @Nullable String idIssuedDate,
         @Nullable String idIssuedPlace,
         @Nullable String taxCode,
-        @Nullable String idFrontKey,
-        @Nullable String idBackKey,
-        @Nullable String idSelfieKey,
-        @Nullable String businessCertKey,
+        @Nullable UUID idFrontUploadId,
+        @Nullable UUID idBackUploadId,
+        @Nullable UUID idSelfieUploadId,
+        @Nullable UUID businessCertUploadId,
         @Nullable String bankName,
         @Nullable String bankAccount,
         @Nullable String bankHolder) {
@@ -237,14 +237,14 @@ public class Shop implements Persistable<UUID> {
             effectiveSellerType = sellerType;
         }
         var shop = new Shop(
-            UUID.randomUUID(), name, slug, description, logoKey, bannerKey,
+            UUID.randomUUID(), name, slug, description, logoUploadId, bannerUploadId,
             ShopStatus.PENDING, null, null, null, now,
             phone, address, null, 2, effectiveSellerType,
-            taxCode, idNumber, idFrontKey, businessCertKey,
+            taxCode, idNumber, idFrontUploadId, businessCertUploadId,
             null, 0, 0,
             bankName, bankAccount, bankHolder,
             null, null,
-            legalName, idFrontKey, idBackKey, idSelfieKey, idIssuedDate, idIssuedPlace,
+            legalName, idFrontUploadId, idBackUploadId, idSelfieUploadId, idIssuedDate, idIssuedPlace,
             "PENDING_REVIEW", null, false,
             now, now
         );
@@ -321,18 +321,21 @@ public class Shop implements Persistable<UUID> {
     }
 
     public void updateDetails(
-        @Nullable String name, @Nullable String description, @Nullable String logoKey, @Nullable String bannerKey) {
+        @Nullable String name,
+        @Nullable String description,
+        @Nullable UUID logoUploadId,
+        @Nullable UUID bannerUploadId) {
         if (name != null) {
             this.name = name;
         }
         if (description != null) {
             this.description = description;
         }
-        if (logoKey != null) {
-            this.logoKey = logoKey;
+        if (logoUploadId != null) {
+            this.logoUploadId = logoUploadId;
         }
-        if (bannerKey != null) {
-            this.bannerKey = bannerKey;
+        if (bannerUploadId != null) {
+            this.bannerUploadId = bannerUploadId;
         }
         updatedAt = Instant.now();
     }

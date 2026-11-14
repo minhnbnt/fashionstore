@@ -14,6 +14,7 @@ import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.ProductViolationType;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class BannedKeywordServiceTest {
+
+    @Autowired
+
+    private UploadRepository uploads;
+
 
     @Autowired
     private AdminProductService adminProducts;
@@ -52,7 +58,7 @@ class BannedKeywordServiceTest {
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = mirroredUser();
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }

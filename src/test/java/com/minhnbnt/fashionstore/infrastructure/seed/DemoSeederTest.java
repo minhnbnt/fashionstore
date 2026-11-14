@@ -16,6 +16,7 @@ import com.minhnbnt.fashionstore.features.shop.ShopDecorationService;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.features.shop.ShopStaffService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.model.ShopStatus;
 
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,9 @@ class DemoSeederTest {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private UploadRepository uploads;
 
     @Autowired
     private ShopRepository shops;
@@ -94,6 +98,7 @@ class DemoSeederTest {
             shopService,
             catalogService,
             userService,
+            uploads,
             shops,
             categories,
             s3,

@@ -14,6 +14,7 @@ import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.test.ProductTestFixtures;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -31,6 +32,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
 class CartReorderServiceTest {
+
+    @Autowired
+
+    private UploadRepository uploads;
+
 
     @Autowired
     private CartService carts;
@@ -58,7 +64,7 @@ class CartReorderServiceTest {
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = mirroredUser();
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }

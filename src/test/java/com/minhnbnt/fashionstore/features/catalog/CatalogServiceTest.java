@@ -27,6 +27,7 @@ import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.Category;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +47,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class CatalogServiceTest {
+
+    @Autowired
+
+    private UploadRepository uploads;
+
 
     @Autowired
     private CatalogService catalog;
@@ -73,7 +79,7 @@ class CatalogServiceTest {
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = mirroredUser();
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }
@@ -108,7 +114,7 @@ class CatalogServiceTest {
     @Test
     void createOnPendingShopIsForbidden() {
         var ownerId = mirroredUser();
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop Pend", "shop-pend-cat"));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop Pend", "shop-pend-cat"));
 
         assertThatThrownBy(() -> catalog.createProduct(ownerId, shop.id(), productRequest("ao-pend")))
             .isInstanceOf(ResponseStatusException.class)
@@ -405,7 +411,7 @@ class CatalogServiceTest {
     void productCreationStatusDependsOnShopTrust() {
         var ownerId = mirroredUser();
         var adminId = mirroredUser();
-        var req = com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop Trust", "shop-trust-test");
+        var req = com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest(uploads, "Shop Trust", "shop-trust-test");
         var shop = shops.register(ownerId, req);
         shops.approve(adminId, shop.id());
 
@@ -516,7 +522,7 @@ class CatalogServiceTest {
     void adminCanApproveAndRejectPendingProduct() {
         var ownerId = mirroredUser();
         var adminId = mirroredUser();
-        var req = com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest(
+        var req = com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest(uploads, 
             "Shop Moderation", "shop-moderation"
         );
         var shop = shops.register(ownerId, req);
@@ -1025,7 +1031,7 @@ class CatalogServiceTest {
         var pendingOwnerId = mirroredUser();
         var pendingShop = shops.register(
             pendingOwnerId,
-            ShopTestFixtures.createRequest("Shop Pending Batch", "shop-pending-batch")
+            ShopTestFixtures.createRequest(uploads, "Shop Pending Batch", "shop-pending-batch")
         );
 
         var active1 = catalog.createProduct(ownerId, shopId, productRequest("batch-p1"));

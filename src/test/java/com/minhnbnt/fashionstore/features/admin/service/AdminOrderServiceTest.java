@@ -22,6 +22,7 @@ import com.minhnbnt.fashionstore.model.AdminCancelReason;
 import com.minhnbnt.fashionstore.model.OrderAlert;
 import com.minhnbnt.fashionstore.model.OrderStatus;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +50,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AdminOrderServiceTest {
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
+    @Autowired
+
+    private UploadRepository uploads;
+
 
     @Autowired
     private AdminOrderService adminOrders;
@@ -82,7 +88,7 @@ class AdminOrderServiceTest {
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = mirroredUser();
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }

@@ -7,6 +7,8 @@ import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
 import com.minhnbnt.fashionstore.dto.shop.ShopResponse;
 import com.minhnbnt.fashionstore.dto.shop.UpdateShopProfileRequest;
 import com.minhnbnt.fashionstore.dto.shop.UpdateShopRequest;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.Shop;
 import com.minhnbnt.fashionstore.model.ShopMember;
@@ -54,6 +56,10 @@ public class ShopService {
 
     private final ShopAccessChecker access;
 
+    private final UploadRepository uploads;
+
+    private final S3UrlService s3Urls;
+
     @Transactional
     public ShopResponse register(@NonNull UUID ownerId, @NonNull CreateShopRequest request) {
 
@@ -66,6 +72,15 @@ public class ShopService {
             );
         }
 
+        validateImageUpload(request.logoUploadId(), "Shop logo");
+        validateImageUpload(request.bannerUploadId(), "Shop banner");
+        validateImageUpload(request.idFrontUploadId(), "ID front");
+        validateImageUpload(request.idBackUploadId(), "ID back");
+        validateImageUpload(request.idSelfieUploadId(), "ID selfie");
+        if (request.businessCertUploadId() != null) {
+            validateBusinessCertUpload(request.businessCertUploadId());
+        }
+
         var sellerType = trimOrNull(request.sellerType());
         if (sellerType == null) {
             sellerType = "INDIVIDUAL";
@@ -74,8 +89,8 @@ public class ShopService {
             request.name().trim(),
             request.slug().trim(),
             request.description().trim(),
-            request.logoKey().trim(),
-            request.bannerKey().trim(),
+            request.logoUploadId(),
+            request.bannerUploadId(),
             request.phone().trim(),
             request.address().trim(),
             sellerType,
@@ -84,10 +99,10 @@ public class ShopService {
             request.idIssuedDate().trim(),
             request.idIssuedPlace().trim(),
             trimOrNull(request.taxCode()),
-            request.idFrontKey().trim(),
-            request.idBackKey().trim(),
-            request.idSelfieKey().trim(),
-            trimOrNull(request.businessCertKey()),
+            request.idFrontUploadId(),
+            request.idBackUploadId(),
+            request.idSelfieUploadId(),
+            request.businessCertUploadId(),
             request.bankName().trim(),
             request.bankAccount().trim(),
             request.bankHolder().trim()
@@ -187,7 +202,7 @@ public class ShopService {
         var shop = lockedShop(id);
         access.requireShopRole(userId, id, MemberRole.OWNER, MemberRole.STAFF);
 
-        shop.updateDetails(request.name(), request.description(), request.logoKey(), request.bannerKey());
+        shop.updateDetails(request.name(), request.description(), request.logoUploadId(), request.bannerUploadId());
         return toResponse(shops.save(shop));
     }
 
@@ -247,7 +262,7 @@ public class ShopService {
         var ids = members.findShopIdsByUser(userId);
         return StreamSupport.stream(shops.findAllById(ids).spliterator(), false)
             .sorted(Comparator.comparing(Shop::getCreatedAt).reversed())
-            .map(ShopService::toResponse)
+            .map(this::toResponse)
             .toList();
     }
 
@@ -411,14 +426,61 @@ public class ShopService {
         return trimmed;
     }
 
-    public static ShopResponse toResponse(Shop shop) {
+    /** Upload phải tồn tại và content-type {@code image/*}. */
+    private void validateImageUpload(UUID uploadId, String field) {
+
+        var upload = uploads.findById(uploadId)
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, field + " upload not found"));
+
+        if (!isSupportedImage(upload.getContentType())) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, field + " upload is not a supported image");
+        }
+    }
+
+    /** Giấy chứng nhận ĐKKD: ảnh hoặc PDF. */
+    private void validateBusinessCertUpload(UUID uploadId) {
+
+        var upload = uploads.findById(uploadId)
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, "Business certificate upload not found"));
+
+        var contentType = upload.getContentType();
+        var supported = isSupportedImage(contentType) || contentType.equals("application/pdf");
+        if (!supported) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, "Business certificate upload must be an image or PDF");
+        }
+    }
+
+    /**
+     * Chỉ nhận ảnh trình duyệt render được. Bỏ {@code image/svg+xml}: bucket public read,
+     * mở thẳng URL thì script trong file chạy được (cùng lý do với avatar).
+     */
+    private static boolean isSupportedImage(String contentType) {
+
+        return contentType.startsWith("image/") && !contentType.equals("image/svg+xml");
+    }
+
+    private @Nullable String mediaUrlOf(@Nullable UUID uploadId) {
+
+        if (uploadId == null) {
+            return null;
+        }
+
+        // FK bảo đảm upload tồn tại; thiếu là lỗi dữ liệu, fail loud.
+        return s3Urls.publicUrl(uploads.findById(uploadId).orElseThrow().getS3Key());
+    }
+
+    public ShopResponse toResponse(Shop shop) {
         return new ShopResponse(
             shop.getId(),
             shop.getName(),
             shop.getSlug(),
             shop.getDescription(),
-            shop.getLogoKey(),
-            shop.getBannerKey(),
+            mediaUrlOf(shop.getLogoUploadId()),
+            mediaUrlOf(shop.getBannerUploadId()),
             shop.getStatus().name(),
             shop.getStatusReason(),
             shop.getPhone(),
@@ -434,15 +496,6 @@ public class ShopService {
             shop.getBankHolder(),
             shop.getAutoReplyText(),
             shop.getWorkingHours(),
-            shop.getLegalName(),
-            shop.getIdNumber(),
-            shop.getIdIssuedDate(),
-            shop.getIdIssuedPlace(),
-            shop.getTaxCode(),
-            shop.getIdFrontKey(),
-            shop.getIdBackKey(),
-            shop.getIdSelfieKey(),
-            shop.getBusinessCertKey(),
             shop.getKycStatus(),
             shop.getKycRejectionReason(),
             shop.isTrusted(),

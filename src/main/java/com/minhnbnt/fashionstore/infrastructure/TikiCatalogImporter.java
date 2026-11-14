@@ -13,7 +13,9 @@ import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.model.Category;
+import com.minhnbnt.fashionstore.model.Upload;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
@@ -63,6 +65,7 @@ public class TikiCatalogImporter implements ApplicationRunner {
     private final ShopService shopService;
     private final CatalogService catalogService;
     private final UserService userService;
+    private final UploadRepository uploads;
     private final ShopRepository shops;
     private final CategoryRepository categories;
     private final ProductRepository products;
@@ -80,6 +83,7 @@ public class TikiCatalogImporter implements ApplicationRunner {
         ShopService shopService,
         CatalogService catalogService,
         UserService userService,
+        UploadRepository uploads,
         ShopRepository shops,
         CategoryRepository categories,
         ProductRepository products,
@@ -92,6 +96,7 @@ public class TikiCatalogImporter implements ApplicationRunner {
         this.shopService = shopService;
         this.catalogService = catalogService;
         this.userService = userService;
+        this.uploads = uploads;
         this.shops = shops;
         this.categories = categories;
         this.products = products;
@@ -100,6 +105,11 @@ public class TikiCatalogImporter implements ApplicationRunner {
         this.objectMapper = objectMapper;
         this.bucket = bucket;
         this.productsPerCategory = normalizedLimit(productsPerCategory);
+    }
+
+    /** Tạo row upload MỚI cho media seed (không lookup) — trả id để gắn vào request nghiệp vụ. */
+    private UUID seedUploadId(String s3Key, String contentType) {
+        return uploads.save(Upload.create(s3Key, contentType)).getId();
     }
 
     @Override
@@ -135,8 +145,8 @@ public class TikiCatalogImporter implements ApplicationRunner {
                 "Tiki Fashion Import",
                 SHOP_SLUG,
                 "Dữ liệu tham khảo được nhập từ danh mục công khai của Tiki.",
-                "seeds/tiki-logo.webp",
-                "seeds/tiki-banner.webp",
+                seedUploadId("seeds/tiki-logo.webp", "image/webp"),
+                seedUploadId("seeds/tiki-banner.webp", "image/webp"),
                 "0909888999",
                 "Kho tổng Tiki, TP. Hồ Chí Minh",
                 "INDIVIDUAL",
@@ -145,9 +155,9 @@ public class TikiCatalogImporter implements ApplicationRunner {
                 "15/03/2020",
                 "Cục Cảnh sát QLHC về TTXH",
                 null,
-                "seeds/id-front.webp",
-                "seeds/id-back.webp",
-                "seeds/id-selfie.webp",
+                seedUploadId("seeds/id-front.webp", "image/webp"),
+                seedUploadId("seeds/id-back.webp", "image/webp"),
+                seedUploadId("seeds/id-selfie.webp", "image/webp"),
                 null,
                 "Techcombank",
                 "19036668889999",
