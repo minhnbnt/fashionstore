@@ -27,7 +27,9 @@ import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.Category;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
 import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
+import com.minhnbnt.fashionstore.model.Upload;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,7 +40,10 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,6 +56,12 @@ class CatalogServiceTest {
     @Autowired
 
     private UploadRepository uploads;
+
+    @Autowired
+    private S3UrlService s3Urls;
+
+    /** Key ảnh đã tạo cho từng productRequest(slug) — dùng cho assertion URL ảnh đầu. */
+    private final Map<String, List<String>> productImageKeysBySlug = new HashMap<>();
 
 
     @Autowired
@@ -92,6 +103,14 @@ class CatalogServiceTest {
     }
 
     private CreateProductRequest productRequest(String slug) {
+        var imageIds = new ArrayList<UUID>();
+        var imageKeys = new ArrayList<String>();
+        for (int i = 1; i <= 3; i++) {
+            var key = uniqueKey("img" + i);
+            imageKeys.add(key);
+            imageIds.add(uploads.save(Upload.create(key, "image/webp")).getId());
+        }
+        productImageKeysBySlug.put(slug, imageKeys);
         return new CreateProductRequest(
             "Áo Thun " + slug,
             slug,
@@ -99,12 +118,22 @@ class CatalogServiceTest {
             testCategory(),
             List.of(new CreateVariantRequest("SKU-" + slug, "M", "Den", 100000L, null, 10, true)),
             List.of(
-                new ImageItemRequest("img1.jpg", null, 0),
-                new ImageItemRequest("img2.jpg", null, 1),
-                new ImageItemRequest("img3.jpg", null, 2)
+                new ImageItemRequest(imageIds.get(0), null, 0),
+                new ImageItemRequest(imageIds.get(1), null, 1),
+                new ImageItemRequest(imageIds.get(2), null, 2)
             ),
             null, null, null, null, null, null, null, null, null, null, null, "ACTIVE"
         );
+    }
+
+    /** Key unique mỗi lần gọi — s3_key UNIQUE của upload sẽ đụng nếu tái dùng key cố định. */
+    private String uniqueKey(String base) {
+        return base + "-" + UUID.randomUUID().toString().substring(0, 8) + ".webp";
+    }
+
+    /** Row upload MỚI (không lookup) cho request test — trả id để gắn vào ImageItemRequest. */
+    private UUID newImageUpload(String base) {
+        return uploads.save(Upload.create(uniqueKey(base), "image/webp")).getId();
     }
 
     private static void assertStatus(ResponseStatusException e, HttpStatus status) {
@@ -161,7 +190,7 @@ class CatalogServiceTest {
             ownerId,
             shopB,
             created.id(),
-            new AttachImagesRequest(List.of(new ImageItemRequest("k1.jpg", null, 0)))
+            new AttachImagesRequest(List.of(new ImageItemRequest(newImageUpload("k1.jpg"), null, 0)))
         )).isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.NOT_FOUND));
     }
@@ -217,9 +246,9 @@ class CatalogServiceTest {
             catId,
             withDefault,
             List.of(
-                new ImageItemRequest("img1.jpg", null, 0),
-                new ImageItemRequest("img2.jpg", null, 1),
-                new ImageItemRequest("img3.jpg", null, 2)
+                new ImageItemRequest(newImageUpload("img1.jpg"), null, 0),
+                new ImageItemRequest(newImageUpload("img2.jpg"), null, 1),
+                new ImageItemRequest(newImageUpload("img3.jpg"), null, 2)
             ),
             null, null, null, null, null, null, null, null, null, null, null, "ACTIVE"
         );
@@ -424,9 +453,9 @@ class CatalogServiceTest {
             "Ao Hidden Shop", "ao-hidden-shop", "Desc", testCategory(),
             List.of(new CreateVariantRequest("SKU-HIDDEN", "M", "Den", 100000L, null, 10, true)),
             List.of(
-                new ImageItemRequest("img1.jpg", null, 0),
-                new ImageItemRequest("img2.jpg", null, 1),
-                new ImageItemRequest("img3.jpg", null, 2)
+                new ImageItemRequest(newImageUpload("img1.jpg"), null, 0),
+                new ImageItemRequest(newImageUpload("img2.jpg"), null, 1),
+                new ImageItemRequest(newImageUpload("img3.jpg"), null, 2)
             ),
             null, null, null, null, null, null, null, null, null, null, null, "HIDDEN"
         );
@@ -451,9 +480,9 @@ class CatalogServiceTest {
             "Ao Thuc Te Ao", "ao-thuc-te-ao", "Mo ta", testCategory(),
             List.of(new CreateVariantRequest("SKU-TRY-ON", "M", "Trang", 120000L, null, 10, true)),
             List.of(
-                new ImageItemRequest("img1.jpg", null, 0),
-                new ImageItemRequest("img2.jpg", null, 1),
-                new ImageItemRequest("img3.jpg", null, 2)
+                new ImageItemRequest(newImageUpload("img1.jpg"), null, 0),
+                new ImageItemRequest(newImageUpload("img2.jpg"), null, 1),
+                new ImageItemRequest(newImageUpload("img3.jpg"), null, 2)
             ),
             null, null, true, null, null, null, null, null, null, null, null, "ACTIVE"
         );
@@ -476,9 +505,9 @@ class CatalogServiceTest {
             "Áo Thun Nam", "ao-thun-nam-cat", "Mo ta", UUID.randomUUID(),
             List.of(new CreateVariantRequest("SKU-CAT", "M", "Den", 100000L, null, 10, true)),
             List.of(
-                new ImageItemRequest("img1.jpg", null, 0),
-                new ImageItemRequest("img2.jpg", null, 1),
-                new ImageItemRequest("img3.jpg", null, 2)
+                new ImageItemRequest(newImageUpload("img1.jpg"), null, 0),
+                new ImageItemRequest(newImageUpload("img2.jpg"), null, 1),
+                new ImageItemRequest(newImageUpload("img3.jpg"), null, 2)
             ),
             null, null, null, null, null, null, null, null, null, null, null, "ACTIVE"
         );
@@ -501,9 +530,9 @@ class CatalogServiceTest {
             "Áo Thun Nam", "ao-thun-nam-pkg", "Mo ta", testCategory(),
             List.of(new CreateVariantRequest("SKU-PKG", "M", "Den", 100000L, null, 10, true)),
             List.of(
-                new ImageItemRequest("img1.jpg", null, 0),
-                new ImageItemRequest("img2.jpg", null, 1),
-                new ImageItemRequest("img3.jpg", null, 2)
+                new ImageItemRequest(newImageUpload("img1.jpg"), null, 0),
+                new ImageItemRequest(newImageUpload("img2.jpg"), null, 1),
+                new ImageItemRequest(newImageUpload("img3.jpg"), null, 2)
             ),
             null, null, null, null, null, null, null,
             -10, 20, 10, 5, "ACTIVE"
@@ -552,6 +581,9 @@ class CatalogServiceTest {
         var ownerId = mirroredUser();
         var shopId = approvedShop(ownerId, "shop-edit-audit");
 
+        var garmentKey = uniqueKey("garment-new");
+        var garmentUploadId = uploads.save(Upload.create(garmentKey, "image/webp")).getId();
+
         var created = catalog.createProduct(ownerId, shopId, productRequest("ao-edit-test"));
         var initialVariant = created.variants().getFirst();
 
@@ -584,11 +616,11 @@ class CatalogServiceTest {
                 )
             ),
             List.of(
-                new ImageItemRequest("img-new-1.jpg", null, 0),
-                new ImageItemRequest("img-new-2.jpg", null, 1)
+                new ImageItemRequest(newImageUpload("img-new-1.jpg"), null, 0),
+                new ImageItemRequest(newImageUpload("img-new-2.jpg"), null, 1)
             ),
             null,
-            "garment-new.png",
+            garmentUploadId,
             true,
             "100% Linen",
             "Việt Nam",
@@ -600,8 +632,8 @@ class CatalogServiceTest {
         var updated = catalog.updateProduct(ownerId, shopId, created.id(), updateReq);
         assertThat(updated.name()).isEqualTo("Áo Thun Cập Nhật");
         assertThat(updated.description()).isEqualTo("Mô tả mới đã cập nhật");
-        assertThat(updated.videoKey()).isNull();
-        assertThat(updated.garmentKey()).isEqualTo("garment-new.png");
+        assertThat(updated.videoUrl()).isNull();
+        assertThat(updated.garmentUrl()).isEqualTo(s3Urls.publicUrl(garmentKey));
         assertThat(updated.tryOnEnabled()).isTrue();
         assertThat(updated.material()).isEqualTo("100% Linen");
         assertThat(updated.weightGrams()).isEqualTo(300);
@@ -1051,7 +1083,8 @@ class CatalogServiceTest {
         assertThat(summaries.get(0).id()).isEqualTo(active2.id());
         assertThat(summaries.get(0).shopId()).isEqualTo(shopId);
         assertThat(summaries.get(0).minPrice()).isEqualTo(275000L);
-        assertThat(summaries.get(0).defaultImageKey()).isEqualTo("img1.jpg");
+        var batchP2ImageKeys = Objects.requireNonNull(productImageKeysBySlug.get("batch-p2"));
+        assertThat(summaries.get(0).defaultImageUrl()).isEqualTo(s3Urls.publicUrl(batchP2ImageKeys.get(0)));
         assertThat(summaries.get(0).rank()).isNull();
         assertThat(summaries.get(1).id()).isEqualTo(active1.id());
         assertThat(summaries.get(1).minPrice()).isEqualTo(100000L);

@@ -109,13 +109,15 @@ class CatalogControllerTest {
                      "description":"Mô tả chi tiết áo thun",
                      "categoryId":"%s",
                      "images":[
-                       {"s3Key":"p/1.jpg","sortOrder":0},
-                       {"s3Key":"p/2.jpg","sortOrder":1},
-                       {"s3Key":"p/3.jpg","sortOrder":2}
+                       {"uploadId":"%s","sortOrder":0},
+                       {"uploadId":"%s","sortOrder":1},
+                       {"uploadId":"%s","sortOrder":2}
                      ],
                      "variants":[{"sku":"SKU-1","size":"M","color":"Đen",
                       "price":100000,"stockQuantity":10,"defaultVariant":true}]}
-                    """.formatted(categoryId)))
+                    """.formatted(
+                        categoryId,
+                        UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID())))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.slug").value("ao-thun"));
     }
@@ -130,8 +132,8 @@ class CatalogControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"name":"Áo thun cao cấp","slug":"ao-thun","description":"Mô tả",
-                    "categoryId":"%s","images":[{"s3Key":"1.jpg","sortOrder":0},
-                    {"s3Key":"2.jpg","sortOrder":1},{"s3Key":"3.jpg","sortOrder":2}],
+                    "categoryId":"%s","images":[{"uploadId":"10000000-0000-0000-0000-000000000000","sortOrder":0},
+                    {"uploadId":"10000000-0000-0000-0000-000000000000","sortOrder":1},{"uploadId":"10000000-0000-0000-0000-000000000000","sortOrder":2}],
                     "variants":[]}
                     """.formatted(UUID.randomUUID())))
             .andExpect(status().isBadRequest());
@@ -150,8 +152,8 @@ class CatalogControllerTest {
                      "description":"Mô tả chi tiết",
                      "categoryId":"%s",
                      "images":[
-                       {"s3Key":"p/1.jpg","sortOrder":0},
-                       {"s3Key":"p/2.jpg","sortOrder":1}
+                       {"uploadId":"10000000-0000-0000-0000-000000000000","sortOrder":0},
+                       {"uploadId":"10000000-0000-0000-0000-000000000000","sortOrder":1}
                      ],
                      "variants":[{"sku":"SKU-1","size":"M","color":"Đen",
                       "price":100000,"stockQuantity":10,"defaultVariant":true}]}
@@ -169,7 +171,7 @@ class CatalogControllerTest {
             if (i > 1) {
                 images.append(",");
             }
-            images.append("\"s3Key\":\"p/%d.jpg\",\"sortOrder\":%d".formatted(i, i - 1));
+            images.append("\"uploadId\":\"%s\",\"sortOrder\":%d".formatted(UUID.randomUUID(), i - 1));
         }
 
         mockMvc.perform(post("/api/shops/{shopId}/products", shopId)
@@ -199,9 +201,9 @@ class CatalogControllerTest {
                      "description":"Mô tả chi tiết",
                      "categoryId":"%s",
                      "images":[
-                       {"s3Key":"p/1.jpg","sortOrder":0},
-                       {"s3Key":"p/2.jpg","sortOrder":1},
-                       {"s3Key":"p/3.jpg","sortOrder":2}
+                       {"uploadId":"10000000-0000-0000-0000-000000000000","sortOrder":0},
+                       {"uploadId":"10000000-0000-0000-0000-000000000000","sortOrder":1},
+                       {"uploadId":"10000000-0000-0000-0000-000000000000","sortOrder":2}
                      ],
                      "variants":[{"sku":"SKU-1","size":"M","color":"Đen",
                       "price":100000,"stockQuantity":10,"defaultVariant":true}]}

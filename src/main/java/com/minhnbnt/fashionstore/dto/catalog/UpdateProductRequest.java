@@ -47,13 +47,13 @@ public record UpdateProductRequest(
     @Valid
     List<ImageItemRequest> images,
 
-    @Schema(description = "S3 key video giới thiệu sản phẩm (tối đa 60s), null = giữ nguyên", nullable = true)
+    @Schema(description = "Upload id video giới thiệu sản phẩm (tối đa 60s), null = giữ nguyên", nullable = true)
     @Nullable
-    String videoKey,
+    UUID videoUploadId,
 
-    @Schema(description = "S3 key ảnh sản phẩm phẳng cho Virtual Try-On, null = giữ nguyên", nullable = true)
+    @Schema(description = "Upload id ảnh sản phẩm phẳng cho Virtual Try-On, null = giữ nguyên", nullable = true)
     @Nullable
-    String garmentKey,
+    UUID garmentUploadId,
 
     @Schema(description = "Bật/tắt tính năng thử đồ ảo, null = giữ nguyên", nullable = true)
     @Nullable

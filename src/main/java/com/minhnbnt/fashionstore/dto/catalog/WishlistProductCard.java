@@ -9,7 +9,7 @@ public record WishlistProductCard(
     @Nullable String name,
     @Nullable String slug,
     @Nullable Long minPrice,
-    @Nullable String defaultImageKey,
+    @Nullable String defaultImageUrl,
     boolean available,
     @Nullable String unavailableReason
 ) {

@@ -224,7 +224,7 @@ public class DemoSeeder implements ApplicationRunner {
     private AttachImagesRequest toImageRequest(List<String> keys) {
         var items = new ArrayList<ImageItemRequest>();
         for (int i = 0; i < keys.size(); i++) {
-            items.add(new ImageItemRequest(keys.get(i), null, i));
+            items.add(new ImageItemRequest(seedUploadId(keys.get(i), "image/jpeg"), null, i));
         }
         return new AttachImagesRequest(items);
     }

@@ -24,7 +24,7 @@ public class ProductImage implements Persistable<UUID> {
 
     private @Nullable UUID variantId;
 
-    private String s3Key;
+    private UUID uploadId;
 
     private int sortOrder;
 
@@ -33,8 +33,8 @@ public class ProductImage implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
-    public static ProductImage create(UUID productId, @Nullable UUID variantId, String s3Key, int sortOrder) {
-        return new ProductImage(UUID.randomUUID(), productId, variantId, s3Key, sortOrder, Instant.now(), true);
+    public static ProductImage create(UUID productId, @Nullable UUID variantId, UUID uploadId, int sortOrder) {
+        return new ProductImage(UUID.randomUUID(), productId, variantId, uploadId, sortOrder, Instant.now(), true);
     }
 
     @Override

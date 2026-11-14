@@ -1,6 +1,7 @@
 package com.minhnbnt.fashionstore.features.catalog.repository;
 
 import com.minhnbnt.fashionstore.dto.catalog.ProductSort;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -17,6 +18,8 @@ import java.util.UUID;
 public class ProductSearchRepository {
 
     private final JdbcClient jdbc;
+
+    private final S3UrlService s3Urls;
 
     // Phải giữ y hệt expression lúc tạo idx_product_bm25 (V2), lệch là planner bỏ qua index.
     private static final String DOCUMENT = "(coalesce(p.name, '') || ' ' || coalesce(p.description, ''))";
@@ -40,7 +43,7 @@ public class ProductSearchRepository {
         String name,
         String slug,
         long minPrice,
-        @Nullable String defaultImageKey,
+        @Nullable String defaultImageUrl,
         @Nullable Double rank
     ) {
     }
@@ -79,11 +82,12 @@ public class ProductSearchRepository {
                 GROUP BY product_id
             ),
             covers AS (
-                SELECT DISTINCT ON (product_id)
-                    product_id,
-                    s3_key
-                FROM product_image
-                ORDER BY product_id, sort_order
+                SELECT DISTINCT ON (pi.product_id)
+                    pi.product_id,
+                    u.s3_key
+                FROM product_image pi
+                JOIN upload u ON u.id = pi.upload_id
+                ORDER BY pi.product_id, pi.sort_order
             )
             SELECT
                 p.id AS id,
@@ -111,10 +115,18 @@ public class ProductSearchRepository {
                 rs.getString("name"),
                 rs.getString("slug"),
                 rs.getLong("min_price"),
-                rs.getString("default_image"),
+                publicUrlOf(rs.getString("default_image")),
                 rs.getObject("rank", Double.class)
             ))
             .list();
+    }
+
+    private @Nullable String publicUrlOf(@Nullable String s3Key) {
+
+        if (s3Key == null) {
+            return null;
+        }
+        return s3Urls.publicUrl(s3Key);
     }
 
     public long count(Criteria criteria) {

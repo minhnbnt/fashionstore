@@ -25,7 +25,9 @@ public final class CatalogMapper {
         List<VariantResponse> variants,
         List<ImageResponse> images,
         @Nullable Double averageRating,
-        long reviewCount
+        long reviewCount,
+        @Nullable String videoUrl,
+        @Nullable String garmentUrl
     ) {
         return new ProductResponse(
             product.getId(),
@@ -40,8 +42,8 @@ public final class CatalogMapper {
             product.getUpdatedAt(),
             averageRating,
             reviewCount,
-            product.getVideoKey(),
-            product.getGarmentKey(),
+            videoUrl,
+            garmentUrl,
             product.isTryOnEnabled(),
             product.getMaterial(),
             product.getOrigin(),
@@ -68,11 +70,11 @@ public final class CatalogMapper {
         );
     }
 
-    public static ImageResponse toImageResponse(ProductImage image) {
+    public static ImageResponse toImageResponse(ProductImage image, @Nullable String url) {
         return new ImageResponse(
             image.getId(),
             image.getVariantId(),
-            image.getS3Key(),
+            Objects.requireNonNull(url, "upload row missing for image " + image.getId()),
             image.getSortOrder()
         );
     }
@@ -84,7 +86,7 @@ public final class CatalogMapper {
             hit.name(),
             hit.slug(),
             hit.minPrice(),
-            hit.defaultImageKey(),
+            hit.defaultImageUrl(),
             hit.rank()
         );
     }
@@ -96,7 +98,7 @@ public final class CatalogMapper {
             product.name(),
             product.slug(),
             minVariantPrice(product.variants()),
-            firstImageKey(product.images()),
+            firstImageUrl(product.images()),
             null
         );
     }
@@ -109,11 +111,11 @@ public final class CatalogMapper {
             .orElse(null);
     }
 
-    private static @Nullable String firstImageKey(List<ImageResponse> images) {
+    private static @Nullable String firstImageUrl(List<ImageResponse> images) {
         if (images.isEmpty()) {
             return null;
         }
-        return images.get(0).s3Key();
+        return images.get(0).url();
     }
 
     public static CategoryResponse toCategoryResponse(Category category) {

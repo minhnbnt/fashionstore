@@ -21,11 +21,11 @@ public record CartItemResponse(
     @Schema(description = "Ten product hien tai")
     String productName,
 
-    @Schema(description = "S3 key anh dai dien, null neu chua co", nullable = true)
+    @Schema(description = "URL public ảnh đại diện, null nếu chưa có", nullable = true)
     @Nullable
-    String imageKey,
+    String imageUrl,
 
-    @Schema(description = "Nhan dang variant, vd 'M / Den'")
+    @Schema(description = "Nhận dạng variant, vd 'M / Den'")
     String variantLabel,
 
     @Schema(description = "SKU hien tai")

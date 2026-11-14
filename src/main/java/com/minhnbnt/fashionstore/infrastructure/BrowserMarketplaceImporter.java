@@ -243,7 +243,9 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
                 context.ownerId(),
                 context.shopId(),
                 product.id(),
-                new AttachImagesRequest(List.of(new ImageItemRequest(key, null, 0)))
+                new AttachImagesRequest(List.of(
+                    new ImageItemRequest(seedUploadId(key, contentType(imagePath)), null, 0)
+                ))
             );
             return true;
         } catch (IOException | RuntimeException e) {

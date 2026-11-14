@@ -20,7 +20,7 @@ class CatalogMapperTest {
         var response = new ProductResponse(
             id, shopId, null, "Áo thun", "ao-thun", "Mô tả", "ACTIVE",
             List.of(variant(300000L), variant(150000L)),
-            List.of(image("p/1.jpg", 0), image("p/2.jpg", 1)),
+            List.of(image("http://s3.test/p/1.jpg", 0), image("p/2.jpg", 1)),
             Instant.now(), null, 0L
         );
 
@@ -31,7 +31,7 @@ class CatalogMapperTest {
         assertThat(summary.name()).isEqualTo("Áo thun");
         assertThat(summary.slug()).isEqualTo("ao-thun");
         assertThat(summary.minPrice()).isEqualTo(150000L);
-        assertThat(summary.defaultImageKey()).isEqualTo("p/1.jpg");
+        assertThat(summary.defaultImageUrl()).isEqualTo("http://s3.test/p/1.jpg");
         assertThat(summary.rank()).isNull();
     }
 
@@ -39,7 +39,7 @@ class CatalogMapperTest {
     void noVariantMeansNullMinPrice() {
         var response = new ProductResponse(
             UUID.randomUUID(), UUID.randomUUID(), null, "Áo thun", "ao-thun", "Mô tả", "ACTIVE",
-            List.of(), List.of(image("p/1.jpg", 0)),
+            List.of(), List.of(image("http://s3.test/p/1.jpg", 0)),
             Instant.now(), null, 0L
         );
 
@@ -49,7 +49,7 @@ class CatalogMapperTest {
     }
 
     @Test
-    void noImageMeansNullDefaultImageKey() {
+    void noImageMeansNullDefaultImageUrl() {
         var response = new ProductResponse(
             UUID.randomUUID(), UUID.randomUUID(), null, "Áo thun", "ao-thun", "Mô tả", "ACTIVE",
             List.of(variant(100000L)), List.of(),
@@ -58,14 +58,14 @@ class CatalogMapperTest {
 
         var summary = CatalogMapper.toSummary(response);
 
-        assertThat(summary.defaultImageKey()).isNull();
+        assertThat(summary.defaultImageUrl()).isNull();
     }
 
     private static VariantResponse variant(Long price) {
         return new VariantResponse(UUID.randomUUID(), "SKU-1", "M", "Đen", price, null, 10, true, Instant.now());
     }
 
-    private static ImageResponse image(String s3Key, int sortOrder) {
-        return new ImageResponse(UUID.randomUUID(), null, s3Key, sortOrder);
+    private static ImageResponse image(String url, int sortOrder) {
+        return new ImageResponse(UUID.randomUUID(), null, url, sortOrder);
     }
 }

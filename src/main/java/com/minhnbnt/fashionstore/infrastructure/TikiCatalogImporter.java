@@ -272,7 +272,9 @@ public class TikiCatalogImporter implements ApplicationRunner {
                 RequestBody.fromBytes(image.bytes())
             );
             var product = catalogService.createProduct(ownerId, shopId, productRequest);
-            var imageRequest = new AttachImagesRequest(List.of(new ImageItemRequest(key, null, 0)));
+            var imageRequest = new AttachImagesRequest(List.of(
+                new ImageItemRequest(seedUploadId(key, image.contentType()), null, 0)
+            ));
             catalogService.attachImages(ownerId, shopId, product.id(), imageRequest);
             return true;
         } catch (IOException | InterruptedException | RuntimeException e) {

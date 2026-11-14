@@ -57,9 +57,9 @@ public record AdminProductResponse(
     @Schema(description = "Số biến thể")
     long variantCount,
 
-    @Schema(description = "S3 key ảnh đầu tiên, frontend tự ghép base URL", nullable = true)
+    @Schema(description = "URL public ảnh đại diện", nullable = true)
     @Nullable
-    String imageKey,
+    String imageUrl,
 
     Instant createdAt,
 
