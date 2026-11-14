@@ -130,8 +130,20 @@ class OrderTrackingRepositoryTest {
         var latestReturns = returns.findByOrderIdInOrderByCreatedAtDesc(List.of(created.id()));
         assertThat(latestReturns).hasSize(1);
 
-        var r = Review.create(product.id(), buyerId, "An", 5, "Tot");
-        r.update(4, "Sua");
+        var r = Review.create(
+            product.id(),
+            buyerId,
+            created.id(),
+            "An",
+            "M",
+            5,
+            "San pham rat tot va dep",
+            new String[0],
+            null,
+            new String[0],
+            false
+        );
+        r.update(4, "Sua lai nhan xet chi tiet", new String[0], null, new String[0], false);
         reviews.save(r);
 
         var mine = reviews.findByBuyerIdOrderByUpdatedAtDescCreatedAtDesc(buyerId);

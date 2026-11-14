@@ -982,6 +982,45 @@ public class OrderService {
     }
 
     /**
+     * Xác thực đơn hàng hoàn thành (DELIVERED + receivedAt != null) thuộc về buyer và có chứa productId,
+     * đồng thời gộp các phân loại hàng (variantLabel) đã đặt của sản phẩm này trong đơn.
+     */
+    @Transactional(readOnly = true)
+    public @Nullable String resolveCompletedOrderProductVariant(
+        @NonNull UUID buyerId,
+        @NonNull UUID orderId,
+        @NonNull UUID productId
+    ) {
+        var order = orders.findById(orderId).orElse(null);
+        if (order == null || !order.getBuyerId().equals(buyerId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found");
+        }
+        if (order.getStatus() != OrderStatus.DELIVERED || order.getReceivedAt() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only completed orders can be reviewed");
+        }
+
+        var foundProduct = false;
+        var variantLabels = new LinkedHashSet<String>();
+        for (var item : items.findByOrderId(orderId)) {
+            if (!productId.equals(item.getProductId())) {
+                continue;
+            }
+            foundProduct = true;
+            var rawLabel = item.getVariantLabel();
+            if (rawLabel != null && !rawLabel.isBlank()) {
+                variantLabels.add(rawLabel.trim());
+            }
+        }
+        if (!foundProduct) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product is not part of this order");
+        }
+        if (variantLabels.isEmpty()) {
+            return null;
+        }
+        return String.join(", ", variantLabels);
+    }
+
+    /**
      * Danh sách shop mà user được xem đơn: chỉ shop đã cấp ORDER_READ.
      */
     private List<UUID> orderReadableShopIds(UUID userId) {

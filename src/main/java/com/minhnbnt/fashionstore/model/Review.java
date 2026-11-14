@@ -27,11 +27,25 @@ public class Review implements Persistable<UUID> {
 
     private UUID buyerId;
 
+    private @Nullable UUID orderId;
+
     private String buyerDisplayName;
+
+    private @Nullable String variantLabel;
 
     private int stars;
 
     private @Nullable String comment;
+
+    private String[] imageKeys;
+
+    private @Nullable String videoKey;
+
+    private String[] tags;
+
+    private boolean isAnonymous;
+
+    private int helpfulCount;
 
     private @Nullable String sellerReply;
 
@@ -52,15 +66,33 @@ public class Review implements Persistable<UUID> {
     private boolean newRecord;
 
     public static Review create(
-        UUID productId, UUID buyerId, String buyerDisplayName, int stars, @Nullable String comment) {
+        UUID productId,
+        UUID buyerId,
+        @Nullable UUID orderId,
+        String buyerDisplayName,
+        @Nullable String variantLabel,
+        int stars,
+        String comment,
+        String[] imageKeys,
+        @Nullable String videoKey,
+        String[] tags,
+        boolean isAnonymous
+    ) {
         var now = Instant.now();
         return new Review(
             UUID.randomUUID(),
             productId,
             buyerId,
+            orderId,
             buyerDisplayName,
+            variantLabel,
             stars,
             comment,
+            imageKeys,
+            videoKey,
+            tags,
+            isAnonymous,
+            0,
             null,
             null,
             false,
@@ -68,16 +100,28 @@ public class Review implements Persistable<UUID> {
             null,
             now,
             now,
-            true);
+            true
+        );
     }
 
-    public void update(int stars, @Nullable String comment) {
+    public void update(
+        int stars,
+        String comment,
+        String[] imageKeys,
+        @Nullable String videoKey,
+        String[] tags,
+        boolean isAnonymous
+    ) {
         if (this.editedAt != null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Review has already been edited once");
         }
         var now = Instant.now();
         this.stars = stars;
         this.comment = comment;
+        this.imageKeys = imageKeys;
+        this.videoKey = videoKey;
+        this.tags = tags;
+        this.isAnonymous = isAnonymous;
         this.editedAt = now;
         this.updatedAt = now;
     }
