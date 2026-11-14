@@ -28,6 +28,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -124,6 +125,21 @@ class DemoSeederTest {
         if (fresh) {
             // 9 demo products, khong hon khong kem
             assertThat(products.count()).isEqualTo(before + 9);
+
+            // Ảnh seed đẩy S3 phải có row upload: placeholder shop/KYC tạo sẵn,
+            // ảnh sản phẩm do fetcher nạp bytes rồi putObject + tạo row.
+            assertThat(uploads.findByS3Key("demo/logo.webp")).isPresent();
+            assertThat(uploads.findByS3Key("demo/banner.webp")).isPresent();
+            assertThat(uploads.findByS3Key("demo/id-front.webp")).isPresent();
+            var productImage = uploads.findByS3Key("demo/ao-thun-oversize-1.jpg").orElseThrow();
+            assertThat(productImage.getContentType()).isEqualTo("image/jpeg");
+            assertThat(uploads.findByS3Key("demo/vay-hoa-nhi-2.jpg")).isPresent();
+
+            // Object của ảnh đẩy S3 tồn tại thật trong bucket test.
+            s3.headObject(HeadObjectRequest.builder()
+                .bucket(bucket)
+                .key("demo/ao-thun-oversize-1.jpg")
+                .build());
         }
 
         var shop = shops.findBySlug("net-lab").orElseThrow();
