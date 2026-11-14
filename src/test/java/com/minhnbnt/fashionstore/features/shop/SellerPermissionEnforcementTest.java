@@ -147,7 +147,7 @@ class SellerPermissionEnforcementTest {
 
     private UUID pendingReturn(UUID shopId, UUID buyerId) {
         var orderId = pendingOrder(shopId, buyerId);
-        var request = ReturnRequest.create(orderId, shopId, buyerId, "DEFECT", null, new String[0]);
+        var request = ReturnRequest.create(orderId, shopId, buyerId, "DEFECT", null);
 
         return returnRepository.save(request).getId();
     }

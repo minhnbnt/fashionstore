@@ -32,8 +32,8 @@ public record ReturnRequestResponse(
     @Schema(description = "Mô tả chi tiết", nullable = true)
     @Nullable String description,
 
-    @Schema(description = "Danh sách S3 key ảnh/video bằng chứng")
-    List<String> evidenceKeys,
+    @Schema(description = "File bằng chứng dưới dạng URL public")
+    List<ReturnEvidenceResponse> evidence,
 
     @Schema(description = "Trạng thái yêu cầu đổi/trả")
     String status,

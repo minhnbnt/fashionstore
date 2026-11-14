@@ -129,7 +129,7 @@ class OrderTrackingRepositoryTest {
         var ready = orders.findDeliveredReadyForAutoComplete(now.minus(7, ChronoUnit.DAYS));
         assertThat(ready).extracting(Order::getId).contains(created.id());
 
-        returns.save(ReturnRequest.create(created.id(), shop.id(), buyerId, "DAMAGED", "Loi", new String[0]));
+        returns.save(ReturnRequest.create(created.id(), shop.id(), buyerId, "DAMAGED", "Loi"));
         var afterReturn = orders.findDeliveredReadyForAutoComplete(now.minus(7, ChronoUnit.DAYS));
         assertThat(afterReturn).noneMatch(o -> o.getId().equals(created.id()));
 
