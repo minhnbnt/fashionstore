@@ -37,10 +37,6 @@ public class Review implements Persistable<UUID> {
 
     private @Nullable String comment;
 
-    private String[] imageKeys;
-
-    private @Nullable String videoKey;
-
     private String[] tags;
 
     private boolean isAnonymous;
@@ -73,8 +69,6 @@ public class Review implements Persistable<UUID> {
         @Nullable String variantLabel,
         int stars,
         String comment,
-        String[] imageKeys,
-        @Nullable String videoKey,
         String[] tags,
         boolean isAnonymous
     ) {
@@ -88,8 +82,6 @@ public class Review implements Persistable<UUID> {
             variantLabel,
             stars,
             comment,
-            imageKeys,
-            videoKey,
             tags,
             isAnonymous,
             0,
@@ -107,8 +99,6 @@ public class Review implements Persistable<UUID> {
     public void update(
         int stars,
         String comment,
-        String[] imageKeys,
-        @Nullable String videoKey,
         String[] tags,
         boolean isAnonymous
     ) {
@@ -118,8 +108,6 @@ public class Review implements Persistable<UUID> {
         var now = Instant.now();
         this.stars = stars;
         this.comment = comment;
-        this.imageKeys = imageKeys;
-        this.videoKey = videoKey;
         this.tags = tags;
         this.isAnonymous = isAnonymous;
         this.editedAt = now;

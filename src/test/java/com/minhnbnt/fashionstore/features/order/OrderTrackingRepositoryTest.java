@@ -145,11 +145,9 @@ class OrderTrackingRepositoryTest {
             5,
             "San pham rat tot va dep",
             new String[0],
-            null,
-            new String[0],
             false
         );
-        r.update(4, "Sua lai nhan xet chi tiet", new String[0], null, new String[0], false);
+        r.update(4, "Sua lai nhan xet chi tiet", new String[0], false);
         reviews.save(r);
 
         var mine = reviews.findByBuyerIdOrderByUpdatedAtDescCreatedAtDesc(buyerId);

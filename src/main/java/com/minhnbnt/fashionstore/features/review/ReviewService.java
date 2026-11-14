@@ -5,6 +5,7 @@ import com.minhnbnt.fashionstore.dto.review.RatingSummary;
 import com.minhnbnt.fashionstore.dto.review.ReplyReviewRequest;
 import com.minhnbnt.fashionstore.dto.review.ReportReviewRequest;
 import com.minhnbnt.fashionstore.dto.review.ReviewHelpfulResponse;
+import com.minhnbnt.fashionstore.dto.review.ReviewMediaResponse;
 import com.minhnbnt.fashionstore.dto.review.ReviewResponse;
 import com.minhnbnt.fashionstore.dto.review.ReviewSummaryResponse;
 import com.minhnbnt.fashionstore.dto.review.SellerReviewResponse;
@@ -15,13 +16,18 @@ import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
 import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.review.repository.ReviewHelpfulRepository;
+import com.minhnbnt.fashionstore.features.review.repository.ReviewMediaRepository;
 import com.minhnbnt.fashionstore.features.review.repository.ReviewRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.infrastructure.media.VideoMetadataService;
 import com.minhnbnt.fashionstore.model.Review;
+import com.minhnbnt.fashionstore.model.ReviewMedia;
 import com.minhnbnt.fashionstore.model.ReviewSort;
 import com.minhnbnt.fashionstore.model.ReviewTag;
 import com.minhnbnt.fashionstore.model.ShopPermission;
+import com.minhnbnt.fashionstore.model.Upload;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -34,10 +40,12 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -54,6 +62,8 @@ public class ReviewService {
 
     private final ReviewHelpfulRepository helpfulRepository;
 
+    private final ReviewMediaRepository media;
+
     private final ProductStockService productStock;
 
     private final OrderService orderService;
@@ -67,6 +77,10 @@ public class ReviewService {
     private final NotificationService notifications;
 
     private final VideoMetadataService videoMetadataService;
+
+    private final UploadRepository uploads;
+
+    private final S3UrlService s3Urls;
 
     @Transactional(readOnly = true)
     public List<ReviewResponse> getReviews(
@@ -155,10 +169,10 @@ public class ReviewService {
 
         var variantLabel = orderService.resolveCompletedOrderProductVariant(buyerId, request.orderId(), productId);
         var normalizedComment = normalizeAndValidateComment(request.comment());
-        var normalizedImages = normalizeAndValidateImageKeys(request.imageKeys());
-        var normalizedVideo = normalizeVideoKey(request.videoKey());
-        if (normalizedVideo != null) {
-            videoMetadataService.validateVideoDuration(normalizedVideo, MAX_REVIEW_VIDEO_SECONDS);
+        var imageUploadIds = validateImageUploads(request.imageUploadIds());
+        var videoUpload = validateVideoUpload(request.videoUploadId());
+        if (videoUpload != null) {
+            videoMetadataService.validateVideoDuration(videoUpload.getS3Key(), MAX_REVIEW_VIDEO_SECONDS);
         }
         var normalizedTags = ReviewTag.normalizeAndValidate(request.tags());
 
@@ -171,13 +185,13 @@ public class ReviewService {
             variantLabel,
             request.stars(),
             normalizedComment,
-            normalizedImages,
-            normalizedVideo,
             normalizedTags,
             request.anonymous()
         );
+        var saved = reviews.save(review);
+        saveMedia(saved.getId(), imageUploadIds, videoUpload);
 
-        return toResponse(reviews.save(review), buyerId, false, Set.of());
+        return toSingleResponse(saved, buyerId, false, Set.of());
     }
 
     @Transactional
@@ -192,25 +206,26 @@ public class ReviewService {
         }
 
         var normalizedComment = normalizeAndValidateComment(request.comment());
-        var normalizedImages = normalizeAndValidateImageKeys(request.imageKeys());
-        var normalizedVideo = normalizeVideoKey(request.videoKey());
-        if (normalizedVideo != null && !normalizedVideo.equals(review.getVideoKey())) {
-            videoMetadataService.validateVideoDuration(normalizedVideo, MAX_REVIEW_VIDEO_SECONDS);
+        var imageUploadIds = validateImageUploads(request.imageUploadIds());
+        var videoUpload = validateVideoUpload(request.videoUploadId());
+        if (videoUpload != null && !videoUpload.getId().equals(videoUploadIdOf(reviewId))) {
+            videoMetadataService.validateVideoDuration(videoUpload.getS3Key(), MAX_REVIEW_VIDEO_SECONDS);
         }
         var normalizedTags = ReviewTag.normalizeAndValidate(request.tags());
 
         review.update(
             request.stars(),
             normalizedComment,
-            normalizedImages,
-            normalizedVideo,
             normalizedTags,
             request.anonymous()
         );
 
         var saved = reviews.save(review);
+        media.deleteByReviewId(saved.getId());
+        saveMedia(saved.getId(), imageUploadIds, videoUpload);
+
         var helpfulIds = helpfulRepository.findHelpfulReviewIds(buyerId, List.of(saved.getId()));
-        return toResponse(saved, buyerId, false, helpfulIds);
+        return toSingleResponse(saved, buyerId, false, helpfulIds);
     }
 
     @Transactional
@@ -262,9 +277,12 @@ public class ReviewService {
             list = reviews.findByShopIdOrderByCreatedAtDesc(shopId);
         }
 
+        var grouped = mediaByReviewId(list);
+        var urls = urlMapForGroups(grouped);
+
         var responses = new ArrayList<SellerReviewResponse>();
         for (var review : list) {
-            responses.add(toSellerResponse(review));
+            responses.add(toSellerResponse(review, grouped.getOrDefault(review.getId(), List.of()), urls));
         }
 
         return responses;
@@ -305,7 +323,7 @@ public class ReviewService {
             saved.getId()
         );
 
-        return toSellerResponse(saved);
+        return toSingleSellerResponse(saved);
     }
 
     @Transactional
@@ -327,7 +345,7 @@ public class ReviewService {
             "Báo cáo đánh giá: " + request.reason()
         );
 
-        return toSellerResponse(saved);
+        return toSingleSellerResponse(saved);
     }
 
     /**
@@ -361,9 +379,13 @@ public class ReviewService {
             helpfulIds = helpfulRepository.findHelpfulReviewIds(currentUserId, reviewIds);
         }
 
+        var grouped = mediaByReviewId(list);
+        var urls = urlMapForGroups(grouped);
+
         var responses = new ArrayList<ReviewResponse>(list.size());
         for (var review : list) {
-            responses.add(toResponse(review, currentUserId, maskAnonymous, helpfulIds));
+            responses.add(
+                toResponse(review, grouped.getOrDefault(review.getId(), List.of()), urls, currentUserId, maskAnonymous, helpfulIds));
         }
         return responses;
     }
@@ -399,33 +421,75 @@ public class ReviewService {
         return trimmed;
     }
 
-    private static String[] normalizeAndValidateImageKeys(@Nullable List<String> rawImageKeys) {
-        if (rawImageKeys == null || rawImageKeys.isEmpty()) {
-            return new String[0];
-        }
-        if (rawImageKeys.size() > MAX_REVIEW_IMAGES) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Maximum 5 review images allowed");
-        }
-        var keys = new LinkedHashSet<String>();
-        for (var raw : rawImageKeys) {
-            var trimmed = raw.trim();
-            if (trimmed.isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image key must not be blank");
-            }
-            keys.add(trimmed);
-        }
-        return keys.toArray(String[]::new);
+    /**
+     * Chỉ nhận ảnh trình duyệt render được. Bỏ {@code image/svg+xml}: bucket public read,
+     * mở thẳng URL thì script trong file chạy được (cùng lý do với avatar, ảnh sản phẩm).
+     */
+    private static boolean isSupportedImage(String contentType) {
+
+        return contentType.startsWith("image/") && !contentType.equals("image/svg+xml");
     }
 
-    private static @Nullable String normalizeVideoKey(@Nullable String rawVideoKey) {
-        if (rawVideoKey == null) {
+    private List<UUID> validateImageUploads(@Nullable List<UUID> rawIds) {
+
+        if (rawIds == null || rawIds.isEmpty()) {
+            return List.of();
+        }
+        // Giữ behavior cũ của normalizeAndValidateImageKeys: dedupe giữ thứ tự.
+        var ids = new LinkedHashSet<UUID>(rawIds);
+        if (ids.size() > MAX_REVIEW_IMAGES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Maximum 5 review images allowed");
+        }
+        for (var id : ids) {
+            var upload = uploads.findById(id).orElse(null);
+            if (upload == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Review image upload not found");
+            }
+            if (!isSupportedImage(upload.getContentType())) {
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Review image upload must be a supported image");
+            }
+        }
+        return List.copyOf(ids);
+    }
+
+    private @Nullable Upload validateVideoUpload(@Nullable UUID videoUploadId) {
+
+        if (videoUploadId == null) {
             return null;
         }
-        var trimmed = rawVideoKey.trim();
-        if (trimmed.isEmpty()) {
-            return null;
+        var upload = uploads.findById(videoUploadId).orElse(null);
+        if (upload == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Review video upload not found");
         }
-        return trimmed;
+        if (!upload.getContentType().startsWith("video/")) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, "Review video upload must be a video");
+        }
+        return upload;
+    }
+
+    private void saveMedia(UUID reviewId, List<UUID> imageUploadIds, @Nullable Upload videoUpload) {
+
+        var rows = new ArrayList<ReviewMedia>(imageUploadIds.size() + 1);
+        for (var i = 0; i < imageUploadIds.size(); i++) {
+            rows.add(ReviewMedia.create(reviewId, imageUploadIds.get(i), ReviewMedia.KIND_IMAGE, i));
+        }
+        if (videoUpload != null) {
+            // Video xếp sau toàn bộ ảnh trong thứ tự hiển thị.
+            rows.add(ReviewMedia.create(reviewId, videoUpload.getId(), ReviewMedia.KIND_VIDEO, imageUploadIds.size()));
+        }
+        media.saveAll(rows);
+    }
+
+    private @Nullable UUID videoUploadIdOf(UUID reviewId) {
+
+        for (var m : media.findByReviewIdOrderBySortOrderAsc(reviewId)) {
+            if (ReviewMedia.KIND_VIDEO.equals(m.getKind())) {
+                return m.getUploadId();
+            }
+        }
+        return null;
     }
 
     private record ShopReview(Review review, UUID shopId) {
@@ -453,8 +517,78 @@ public class ReviewService {
         return Collections.unmodifiableList(list);
     }
 
-    private static ReviewResponse toResponse(
+    private Map<UUID, List<ReviewMedia>> mediaByReviewId(List<Review> list) {
+
+        if (list.isEmpty()) {
+            return Map.of();
+        }
+        var ids = new ArrayList<UUID>(list.size());
+        for (var review : list) {
+            ids.add(review.getId());
+        }
+        var grouped = new HashMap<UUID, List<ReviewMedia>>();
+        for (var m : media.findByReviewIdIn(ids)) {
+            grouped.computeIfAbsent(m.getReviewId(), key -> new ArrayList<>()).add(m);
+        }
+        for (var group : grouped.values()) {
+            group.sort(Comparator.comparingInt(ReviewMedia::getSortOrder));
+        }
+        return grouped;
+    }
+
+    /** Batch uploadId -> URL public cho một nhóm media. */
+    private Map<UUID, String> urlMapFor(Collection<ReviewMedia> mediaList) {
+
+        var uploadIds = new ArrayList<UUID>(mediaList.size());
+        for (var m : mediaList) {
+            uploadIds.add(m.getUploadId());
+        }
+        var urls = new HashMap<UUID, String>();
+        for (var upload : uploads.findAllById(uploadIds)) {
+            urls.put(upload.getId(), s3Urls.publicUrl(upload.getS3Key()));
+        }
+        return urls;
+    }
+
+    private Map<UUID, String> urlMapForGroups(Map<UUID, List<ReviewMedia>> grouped) {
+
+        var all = new ArrayList<ReviewMedia>();
+        for (var group : grouped.values()) {
+            all.addAll(group);
+        }
+        return urlMapFor(all);
+    }
+
+    private List<ReviewMediaResponse> toMediaResponses(List<ReviewMedia> mediaList, Map<UUID, String> urls) {
+
+        var responses = new ArrayList<ReviewMediaResponse>(mediaList.size());
+        for (var m : mediaList) {
+            // FK + validate phía request bảo đảm upload tồn tại; thiếu là lỗi dữ liệu, fail loud.
+            responses.add(new ReviewMediaResponse(Objects.requireNonNull(urls.get(m.getUploadId())), m.getKind()));
+        }
+        return responses;
+    }
+
+    private ReviewResponse toSingleResponse(
         Review review,
+        @Nullable UUID currentUserId,
+        boolean maskAnonymous,
+        Set<UUID> helpfulIds
+    ) {
+        var mediaList = media.findByReviewIdOrderBySortOrderAsc(review.getId());
+        return toResponse(review, mediaList, urlMapFor(mediaList), currentUserId, maskAnonymous, helpfulIds);
+    }
+
+    private SellerReviewResponse toSingleSellerResponse(Review review) {
+
+        var mediaList = media.findByReviewIdOrderBySortOrderAsc(review.getId());
+        return toSellerResponse(review, mediaList, urlMapFor(mediaList));
+    }
+
+    private ReviewResponse toResponse(
+        Review review,
+        List<ReviewMedia> mediaList,
+        Map<UUID, String> urls,
         @Nullable UUID currentUserId,
         boolean maskAnonymous,
         Set<UUID> helpfulIds
@@ -476,8 +610,7 @@ public class ReviewService {
             review.getVariantLabel(),
             review.getStars(),
             review.getComment(),
-            toStringList(review.getImageKeys()),
-            review.getVideoKey(),
+            toMediaResponses(mediaList, urls),
             toStringList(review.getTags()),
             review.isAnonymous(),
             mine,
@@ -492,7 +625,11 @@ public class ReviewService {
         );
     }
 
-    private static SellerReviewResponse toSellerResponse(Review review) {
+    private SellerReviewResponse toSellerResponse(
+        Review review,
+        List<ReviewMedia> mediaList,
+        Map<UUID, String> urls
+    ) {
         var editedAt = review.getEditedAt();
         var edited = editedAt != null;
         var displayName = review.getBuyerDisplayName();
@@ -508,8 +645,7 @@ public class ReviewService {
             review.getVariantLabel(),
             review.getStars(),
             review.getComment(),
-            toStringList(review.getImageKeys()),
-            review.getVideoKey(),
+            toMediaResponses(mediaList, urls),
             toStringList(review.getTags()),
             review.isAnonymous(),
             review.getHelpfulCount(),

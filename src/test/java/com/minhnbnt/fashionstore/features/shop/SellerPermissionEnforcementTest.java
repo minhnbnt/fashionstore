@@ -170,8 +170,6 @@ class SellerPermissionEnforcementTest {
             5,
             "San pham dung mo ta va dep",
             new String[0],
-            null,
-            new String[0],
             false
         );
 

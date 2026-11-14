@@ -2,6 +2,7 @@ package com.minhnbnt.fashionstore.features.review;
 
 import com.minhnbnt.fashionstore.config.SecurityConfig;
 import com.minhnbnt.fashionstore.dto.review.ReviewHelpfulResponse;
+import com.minhnbnt.fashionstore.dto.review.ReviewMediaResponse;
 import com.minhnbnt.fashionstore.dto.review.ReviewResponse;
 import com.minhnbnt.fashionstore.dto.review.ReviewSummaryResponse;
 import com.minhnbnt.fashionstore.features.review.controller.MyReviewController;
@@ -56,8 +57,7 @@ class ReviewControllerTest {
             "M · Đen",
             5,
             "Vai day dan va rat dep.",
-            List.of("img-1.jpg"),
-            null,
+            List.of(new ReviewMediaResponse("http://s3.test/fashionstore/img-1.jpg", "IMAGE")),
             List.of(ReviewTag.QUALITY_GOOD),
             false,
             true,
