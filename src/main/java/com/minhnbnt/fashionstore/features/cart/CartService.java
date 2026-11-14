@@ -5,8 +5,11 @@ import com.minhnbnt.fashionstore.dto.cart.CartItemRequest;
 import com.minhnbnt.fashionstore.dto.cart.CartItemResponse;
 import com.minhnbnt.fashionstore.dto.cart.CartResponse;
 import com.minhnbnt.fashionstore.dto.cart.CheckoutBlockedItem;
+import com.minhnbnt.fashionstore.dto.cart.ReorderItemIssue;
+import com.minhnbnt.fashionstore.dto.cart.ReorderResponse;
 import com.minhnbnt.fashionstore.dto.order.CheckoutItemRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
+import com.minhnbnt.fashionstore.dto.order.OrderItemResponse;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
 import com.minhnbnt.fashionstore.features.cart.repository.CartItemRepository;
 import com.minhnbnt.fashionstore.features.cart.repository.CartRepository;
@@ -206,6 +209,131 @@ public class CartService {
         items.deleteAll(checked);
 
         return placed;
+    }
+
+    @Transactional
+    public ReorderResponse reorder(@NonNull UUID buyerId, @NonNull UUID orderId) {
+        var order = orders.getDetail(buyerId, orderId);
+        if (!shops.isShopApproved(order.shopId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Shop is not active for reorder");
+        }
+
+        var cart = getOrCreate(buyerId);
+        var existingByVariant = new LinkedHashMap<UUID, CartItem>();
+        if (!cart.isNew()) {
+            for (var existing : items.findByCartIdOrderByCreatedAtAsc(cart.getId())) {
+                existingByVariant.put(existing.getVariantId(), existing);
+            }
+        }
+
+        var dirtyItems = new LinkedHashMap<UUID, CartItem>();
+        var adjustedItems = new ArrayList<ReorderItemIssue>();
+        var skippedItems = new ArrayList<ReorderItemIssue>();
+        for (var orderItem : order.items()) {
+            reorderLine(
+                orderItem,
+                cart.getId(),
+                existingByVariant,
+                dirtyItems,
+                adjustedItems,
+                skippedItems
+            );
+        }
+
+        if (!dirtyItems.isEmpty()) {
+            cart.touch();
+            carts.save(cart);
+            items.saveAll(dirtyItems.values());
+        }
+
+        return new ReorderResponse(
+            getCart(buyerId),
+            order.items().size(),
+            order.items().size() - skippedItems.size(),
+            adjustedItems.size(),
+            skippedItems.size(),
+            adjustedItems,
+            skippedItems
+        );
+    }
+
+    private void reorderLine(
+        OrderItemResponse orderItem,
+        UUID cartId,
+        Map<UUID, CartItem> existingByVariant,
+        Map<UUID, CartItem> dirtyItems,
+        List<ReorderItemIssue> adjustedItems,
+        List<ReorderItemIssue> skippedItems
+    ) {
+        int requested = orderItem.quantity();
+        var productId = orderItem.productId();
+        var variantId = orderItem.variantId();
+        if (productId == null) {
+            skippedItems.add(issue(orderItem, "PRODUCT_DELETED", 0));
+            return;
+        }
+        var product = catalog.findProductById(productId).orElse(null);
+        if (product == null) {
+            skippedItems.add(issue(orderItem, "PRODUCT_DELETED", 0));
+            return;
+        }
+        if (product.getStatus() != ProductStatus.ACTIVE) {
+            skippedItems.add(issue(orderItem, "PRODUCT_UNAVAILABLE", 0));
+            return;
+        }
+        if (variantId == null) {
+            skippedItems.add(issue(orderItem, "VARIANT_UNAVAILABLE", 0));
+            return;
+        }
+        var variant = catalog.findVariantById(variantId).orElse(null);
+        if (variant == null) {
+            skippedItems.add(issue(orderItem, "VARIANT_UNAVAILABLE", 0));
+            return;
+        }
+        int stock = variant.getStockQuantity();
+        if (stock <= 0) {
+            skippedItems.add(issue(orderItem, "OUT_OF_STOCK", 0));
+            return;
+        }
+        var existing = existingByVariant.get(variantId);
+        int existingQty = 0;
+        if (existing != null) {
+            existingQty = existing.getQuantity();
+        }
+        int remainingRoom = stock - existingQty;
+        if (remainingRoom <= 0) {
+            skippedItems.add(issue(orderItem, "CART_MAXED", 0));
+            return;
+        }
+
+        int toAdd = Math.min(requested, remainingRoom);
+        if (toAdd < requested) {
+            adjustedItems.add(issue(orderItem, "STOCK_LIMITED", toAdd));
+        }
+        if (existing != null) {
+            existing.increaseQuantity(toAdd);
+            dirtyItems.put(variantId, existing);
+            return;
+        }
+        var newItem = CartItem.create(cartId, variantId, toAdd, variant.getPrice());
+        existingByVariant.put(variantId, newItem);
+        dirtyItems.put(variantId, newItem);
+    }
+
+    private static ReorderItemIssue issue(
+        OrderItemResponse orderItem,
+        String reason,
+        int addedQuantity
+    ) {
+        return new ReorderItemIssue(
+            orderItem.productId(),
+            orderItem.variantId(),
+            orderItem.productName(),
+            orderItem.variantLabel(),
+            reason,
+            orderItem.quantity(),
+            addedQuantity
+        );
     }
 
     private Cart getOrCreate(UUID buyerId) {

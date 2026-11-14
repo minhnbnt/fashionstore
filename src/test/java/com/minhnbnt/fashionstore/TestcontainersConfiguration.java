@@ -126,8 +126,8 @@ public class TestcontainersConfiguration {
     }
 
     @Bean
-    JdbcConnectionDetails jdbcConnectionDetails(PostgreSQLContainer container) {
-        return new PerContextConnectionDetails(container);
+    JdbcConnectionDetails jdbcConnectionDetails() {
+        return new PerContextConnectionDetails(postgresContainer());
     }
 
     private static final class PerContextConnectionDetails implements JdbcConnectionDetails {

@@ -4,14 +4,23 @@ import com.minhnbnt.fashionstore.test.ProductTestFixtures;
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
+import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
+import com.minhnbnt.fashionstore.dto.order.AddOrderTrackingEventRequest;
+import com.minhnbnt.fashionstore.dto.order.ApproveReturnRequest;
+import com.minhnbnt.fashionstore.dto.order.BuyerCancelOrderRequest;
 import com.minhnbnt.fashionstore.dto.order.CancelOrderRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutItemRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
+import com.minhnbnt.fashionstore.dto.order.CreateReturnRequest;
+import com.minhnbnt.fashionstore.dto.order.RejectReturnRequest;
+import com.minhnbnt.fashionstore.dto.order.ShipOrderRequest;
 import com.minhnbnt.fashionstore.dto.shop.CreateShopRequest;
 import com.minhnbnt.fashionstore.features.catalog.CatalogService;
+import com.minhnbnt.fashionstore.features.catalog.repository.ProductImageRepository;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.model.ProductImage;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +51,12 @@ class OrderServiceTest {
 
     @Autowired
     private UserService users;
+
+    @Autowired
+    private ReturnRequestService returnRequests;
+
+    @Autowired
+    private ProductImageRepository productImages;
 
     @Autowired
     private com.minhnbnt.fashionstore.features.notification.NotificationRepository notifications;
@@ -328,7 +343,7 @@ class OrderServiceTest {
         assertThat(buyerPage1.getFirst().category()).isEqualTo("ORDER");
         assertThat(buyerPage1.getFirst().type()).isEqualTo("ORDER_CONFIRMED");
         assertThat(buyerPage1.getFirst().title()).isEqualTo("Đơn #" + created.code() + " đã được xác nhận");
-        assertThat(buyerPage1.getFirst().link()).isEqualTo("/account");
+        assertThat(buyerPage1.getFirst().link()).isEqualTo("/account/orders/" + created.id());
 
         // Ship
         orders.ship(ownerId, created.id());
@@ -337,7 +352,7 @@ class OrderServiceTest {
         assertThat(buyerPage2.getFirst().category()).isEqualTo("ORDER");
         assertThat(buyerPage2.getFirst().type()).isEqualTo("ORDER_SHIPPED");
         assertThat(buyerPage2.getFirst().title()).isEqualTo("Đơn #" + created.code() + " đang được giao");
-        assertThat(buyerPage2.getFirst().link()).isEqualTo("/account");
+        assertThat(buyerPage2.getFirst().link()).isEqualTo("/account/orders/" + created.id());
 
         // Deliver
         orders.deliver(ownerId, created.id());
@@ -346,7 +361,7 @@ class OrderServiceTest {
         assertThat(buyerPage3.getFirst().category()).isEqualTo("ORDER");
         assertThat(buyerPage3.getFirst().type()).isEqualTo("ORDER_DELIVERED");
         assertThat(buyerPage3.getFirst().title()).isEqualTo("Đơn #" + created.code() + " đã được giao");
-        assertThat(buyerPage3.getFirst().link()).isEqualTo("/account");
+        assertThat(buyerPage3.getFirst().link()).isEqualTo("/account/orders/" + created.id());
     }
 
     @Test
@@ -398,7 +413,7 @@ class OrderServiceTest {
         assertThat(cancelNotif.type()).isEqualTo("ORDER_CANCELLED");
         assertThat(cancelNotif.title()).isEqualTo("Đơn #" + created.code() + " đã bị hủy");
         assertThat(cancelNotif.body()).isEqualTo("Đơn #" + created.code() + " đã bị hủy: Hết hàng");
-        assertThat(cancelNotif.link()).isEqualTo("/account");
+        assertThat(cancelNotif.link()).isEqualTo("/account/orders/" + created.id());
     }
 
     @Test
@@ -468,6 +483,130 @@ class OrderServiceTest {
 
         orders.cancel(buyerId, created.id());
         assertThat(catalog.findVariantById(variantId).orElseThrow().getStockQuantity()).isEqualTo(10);
+    }
+
+    @Test
+    void enrichesOrderAndItemsWithVariantImagePriorityAndAvailability() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-order-enrich");
+        var variantId = variantInShop(ownerId, shopId, "ao-order-enrich", "SKU-ORDER-ENR", 10);
+        var variant = catalog.findVariantById(variantId).orElseThrow();
+        productImages.save(ProductImage.create(variant.getProductId(), null, "products/generic.jpg", 0));
+        productImages.save(ProductImage.create(variant.getProductId(), variantId, "products/variant.jpg", 1));
+
+        var created = orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+        );
+        assertThat(created.shopName()).isEqualTo("Shop shop-order-enrich");
+        assertThat(created.shopSlug()).isEqualTo("shop-order-enrich");
+        assertThat(created.items().getFirst().imageKey()).isEqualTo("products/variant.jpg");
+        assertThat(created.items().getFirst().productAvailable()).isTrue();
+
+        catalog.updateProduct(
+            ownerId,
+            shopId,
+            variant.getProductId(),
+            new UpdateProductRequest(null, null, null, "HIDDEN", null)
+        );
+        var reloaded = orders.getMine(buyerId);
+        assertThat(reloaded.getFirst().items().getFirst().productAvailable()).isFalse();
+    }
+
+    @Test
+    void shipAndTrackingEventsRecordHistoryAuditAndLongAddress() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-order-track");
+        var variantId = variantInShop(ownerId, shopId, "ao-order-track", "SKU-ORDER-TRK", 10);
+        var longAddress = "So nha 123, " + "Duong Dai Lo Thang Long, ".repeat(12) + "Ha Noi";
+        var created = orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", longAddress, 0L)
+        );
+
+        orders.confirm(ownerId, created.id());
+        var shipped = orders.ship(ownerId, created.id(), new ShipOrderRequest("  ", "GHTK-889"));
+        assertThat(shipped.shippingCarrier()).isEqualTo("GHN");
+        assertThat(shipped.trackingCode()).isEqualTo("GHTK-889");
+        assertThat(shipped.shippedAt()).isNotNull();
+
+        orders.addTrackingEvent(
+            ownerId,
+            created.id(),
+            new AddOrderTrackingEventRequest("IN_TRANSIT", "Da roi kho Ha Noi", "Kho HN", "Xe tai X01")
+        );
+        var trackingList = orders.getBuyerTracking(buyerId, created.id());
+        assertThat(trackingList).hasSize(2);
+        assertThat(trackingList.getFirst().statusCode()).isEqualTo("IN_TRANSIT");
+        assertThat(trackingList.get(1).statusCode()).isEqualTo("PICKED_UP");
+
+        var delivered = orders.deliver(ownerId, created.id());
+        assertThat(delivered.deliveredAt()).isNotNull();
+        assertThat(delivered.autoCompleteAt()).isNotNull();
+        assertThat(orders.getSellerTracking(ownerId, created.id())).hasSize(3);
+        assertThat(orders.getSellerTracking(ownerId, created.id()).getFirst().location()).isEqualTo(longAddress);
+
+        assertThatThrownBy(() -> orders.addTrackingEvent(
+            ownerId,
+            created.id(),
+            new AddOrderTrackingEventRequest("CUSTOM", "Tre", null, null)
+        )).isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void buyerCancelWithReasonsAndConfirmReceiptReturnLock() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-order-cr");
+        var variantId = variantInShop(ownerId, shopId, "ao-order-cr", "SKU-ORDER-CR", 10);
+
+        var toCancel = orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+        );
+        assertThatThrownBy(() -> orders.cancel(buyerId, toCancel.id(), new BuyerCancelOrderRequest("OTHER", "  ")))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+
+        var cancelled = orders.cancel(
+            buyerId,
+            toCancel.id(),
+            new BuyerCancelOrderRequest("CHANGE_MIND", "Doi mau khac")
+        );
+        assertThat(cancelled.cancelReason()).isEqualTo("CHANGE_MIND");
+        assertThat(cancelled.cancelNote()).isEqualTo("Doi mau khac");
+        assertThat(orders.getBuyerTimeline(buyerId, toCancel.id())).hasSize(2);
+
+        var order = orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+        );
+        orders.confirm(ownerId, order.id());
+        orders.ship(ownerId, order.id(), null);
+        orders.deliver(ownerId, order.id());
+
+        var ret = returnRequests.create(buyerId, order.id(), new CreateReturnRequest("DAMAGED", "Rach", List.of()));
+        assertThat(orders.getDetail(buyerId, order.id()).autoCompleteAt()).isNull();
+        assertThat(orders.getDetail(buyerId, order.id()).returnStatus()).isEqualTo("REQUESTED");
+        assertThatThrownBy(() -> orders.confirmReceipt(buyerId, order.id()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+
+        returnRequests.reject(ownerId, ret.id(), new RejectReturnRequest("Khong du dieu kien"));
+        var received1 = orders.confirmReceipt(buyerId, order.id());
+        var received2 = orders.confirmReceipt(buyerId, order.id());
+        assertThat(received1.receivedAt()).isNotNull();
+        assertThat(received2.receivedAt()).isEqualTo(received1.receivedAt());
+        assertThat(received2.autoCompleteAt()).isNull();
+
+        var timeline = orders.getBuyerTimeline(buyerId, order.id());
+        long receiptCount = timeline.stream()
+            .filter(t -> "DELIVERED".equals(t.fromStatus()) && "DELIVERED".equals(t.toStatus()))
+            .count();
+        assertThat(receiptCount).isEqualTo(1L);
     }
 }
 

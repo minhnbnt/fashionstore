@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.features.catalog;
 
+import com.minhnbnt.fashionstore.features.catalog.repository.ProductImageRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.StockMovementRepository;
@@ -10,12 +11,17 @@ import com.minhnbnt.fashionstore.model.ProductVariant;
 import com.minhnbnt.fashionstore.model.StockMovement;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,6 +31,7 @@ public class ProductStockService {
 
     private final ProductRepository products;
     private final ProductVariantRepository variants;
+    private final ProductImageRepository images;
     private final StockMovementRepository movements;
     private final ShopService shops;
 
@@ -90,5 +97,62 @@ public class ProductStockService {
             Instant.now(),
             true
         ));
+    }
+
+    public record ProductDisplayInfo(
+        UUID productId,
+        boolean available,
+        @Nullable String defaultImageKey,
+        Map<UUID, String> variantImageKeys
+    ) {}
+
+    @Transactional(readOnly = true)
+    public Map<UUID, ProductDisplayInfo> findProductDisplayInfos(@NonNull Collection<UUID> productIds) {
+        if (productIds.isEmpty()) {
+            return Map.of();
+        }
+        var productsById = new LinkedHashMap<UUID, Product>();
+        var shopIds = new LinkedHashSet<UUID>();
+        products.findAllById(productIds).forEach(product -> {
+            productsById.put(product.getId(), product);
+            shopIds.add(product.getShopId());
+        });
+        if (productsById.isEmpty()) {
+            return Map.of();
+        }
+        var shopSummaries = shops.findShopSummariesByIds(shopIds);
+        var genericDefault = new LinkedHashMap<UUID, String>();
+        var anyDefault = new LinkedHashMap<UUID, String>();
+        var variantImages = new LinkedHashMap<UUID, Map<UUID, String>>();
+        for (var image : images.findByProductIdInOrderBySortOrderAsc(productsById.keySet())) {
+            anyDefault.putIfAbsent(image.getProductId(), image.getS3Key());
+            if (image.getVariantId() == null) {
+                genericDefault.putIfAbsent(image.getProductId(), image.getS3Key());
+            } else {
+                variantImages
+                    .computeIfAbsent(image.getProductId(), ignored -> new LinkedHashMap<>())
+                    .putIfAbsent(image.getVariantId(), image.getS3Key());
+            }
+        }
+        var result = new LinkedHashMap<UUID, ProductDisplayInfo>();
+        for (var entry : productsById.entrySet()) {
+            var productId = entry.getKey();
+            var product = entry.getValue();
+            var shop = shopSummaries.get(product.getShopId());
+            boolean available = product.getStatus() == ProductStatus.ACTIVE
+                && shop != null
+                && shop.approved();
+            var defaultKey = genericDefault.get(productId);
+            if (defaultKey == null) {
+                defaultKey = anyDefault.get(productId);
+            }
+            result.put(productId, new ProductDisplayInfo(
+                productId,
+                available,
+                defaultKey,
+                variantImages.getOrDefault(productId, Map.of())
+            ));
+        }
+        return result;
     }
 }

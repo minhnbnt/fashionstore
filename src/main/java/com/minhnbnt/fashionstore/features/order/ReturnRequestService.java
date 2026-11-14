@@ -4,10 +4,13 @@ import com.minhnbnt.fashionstore.dto.order.ApproveReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.CreateReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.RejectReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.ReturnRequestResponse;
+import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
+import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.ReturnRequestRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.model.Order;
 import com.minhnbnt.fashionstore.model.OrderStatus;
 import com.minhnbnt.fashionstore.model.ReturnRequest;
 import com.minhnbnt.fashionstore.model.ReturnStatus;
@@ -23,13 +26,25 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class ReturnRequestService {
+
+    private static final List<String> ALLOWED_REASONS = List.of(
+        "WRONG_ITEM",
+        "DAMAGED",
+        "NOT_AS_DESCRIBED",
+        "CHANGE_MIND",
+        "OTHER"
+    );
 
     private final ReturnRequestRepository returns;
 
@@ -41,6 +56,8 @@ public class ReturnRequestService {
 
     private final ShopAuditService audit;
 
+    private final NotificationService notifications;
+
     @Transactional
     public ReturnRequestResponse create(
         @NonNull UUID buyerId,
@@ -48,16 +65,23 @@ public class ReturnRequestService {
         @NonNull CreateReturnRequest request
     ) {
         var order = orders.findById(orderId).orElse(null);
-        if (order == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found");
-        }
-        if (!order.getBuyerId().equals(buyerId)) {
+        if (order == null || !order.getBuyerId().equals(buyerId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found");
         }
         if (order.getStatus() != OrderStatus.DELIVERED) {
             throw new ResponseStatusException(
                 HttpStatus.CONFLICT,
                 "Return request can only be created for delivered orders"
+            );
+        }
+        var reason = request.reason().trim().toUpperCase(Locale.ROOT);
+        if (!ALLOWED_REASONS.contains(reason)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid return reason: " + request.reason());
+        }
+        if (returns.existsBlockingByOrderId(order.getId())) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Order already has an active or completed return request"
             );
         }
 
@@ -70,12 +94,23 @@ public class ReturnRequestService {
             order.getId(),
             order.getShopId(),
             buyerId,
-            request.reason(),
+            reason,
             request.description(),
             evidenceArr
         );
 
-        return toResponse(returns.save(returnReq));
+        var saved = returns.save(returnReq);
+        notifications.create(
+            shops.findActiveUserIdsByShop(saved.getShopId()),
+            NotificationCategory.SELLING,
+            "RETURN_REQUESTED",
+            "Yêu cầu đổi/trả cho đơn #" + order.getCode(),
+            "Khách hàng vừa gửi yêu cầu đổi/trả cho đơn #" + order.getCode() + ".",
+            "/shop?shopId=" + saved.getShopId() + "&tab=returns&orderId=" + saved.getOrderId(),
+            saved.getId()
+        );
+
+        return toResponse(saved, order);
     }
 
     @Transactional(readOnly = true)
@@ -92,23 +127,19 @@ public class ReturnRequestService {
             shopIds = returnProcessShopIds(userId);
         }
 
-        var result = new ArrayList<ReturnRequestResponse>();
+        var list = new ArrayList<ReturnRequest>();
         for (var sId : shopIds) {
-            List<ReturnRequest> list;
             if (statusFilter != null && !statusFilter.isBlank()) {
-                list = returns.findByShopIdAndStatusOrderByCreatedAtDesc(
+                list.addAll(returns.findByShopIdAndStatusOrderByCreatedAtDesc(
                     sId,
                     ReturnStatus.valueOf(statusFilter.toUpperCase(Locale.ROOT))
-                );
+                ));
             } else {
-                list = returns.findByShopIdOrderByCreatedAtDesc(sId);
-            }
-            for (var item : list) {
-                result.add(toResponse(item));
+                list.addAll(returns.findByShopIdOrderByCreatedAtDesc(sId));
             }
         }
-        result.sort((a, b) -> b.createdAt().compareTo(a.createdAt()));
-        return result;
+        list.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+        return toResponses(list);
     }
 
     @Transactional(readOnly = true)
@@ -118,7 +149,7 @@ public class ReturnRequestService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Return request not found");
         }
         access.requireShopPermission(userId, req.getShopId(), ShopPermission.RETURN_PROCESS);
-        return toResponse(req);
+        return toResponses(List.of(req)).getFirst();
     }
 
     @Transactional
@@ -142,7 +173,19 @@ public class ReturnRequestService {
         }
         audit.record(saved.getShopId(), userId, "RETURN_APPROVE", "RETURN", saved.getId(), approveDetail);
 
-        return toResponse(saved);
+        var order = findOrderOrNull(saved.getOrderId());
+        var label = orderLabel(order);
+        notifications.create(
+            Set.of(saved.getBuyerId()),
+            NotificationCategory.ORDER,
+            "RETURN_APPROVED",
+            "Yêu cầu đổi/trả " + label + " đã được chấp thuận",
+            "Shop đã chấp thuận yêu cầu đổi/trả cho đơn " + label + ".",
+            "/account/orders/" + saved.getOrderId(),
+            saved.getId()
+        );
+
+        return toResponse(saved, order);
     }
 
     @Transactional
@@ -166,7 +209,19 @@ public class ReturnRequestService {
         }
         audit.record(saved.getShopId(), userId, "RETURN_REJECT", "RETURN", saved.getId(), detail);
 
-        return toResponse(saved);
+        var order = findOrderOrNull(saved.getOrderId());
+        var label = orderLabel(order);
+        notifications.create(
+            Set.of(saved.getBuyerId()),
+            NotificationCategory.ORDER,
+            "RETURN_REJECTED",
+            "Yêu cầu đổi/trả " + label + " bị từ chối",
+            "Yêu cầu đổi/trả cho đơn " + label + " đã bị từ chối: " + request.sellerNote(),
+            "/account/orders/" + saved.getOrderId(),
+            saved.getId()
+        );
+
+        return toResponse(saved, order);
     }
 
     @Transactional
@@ -189,14 +244,24 @@ public class ReturnRequestService {
         }
         audit.record(saved.getShopId(), userId, "RETURN_COMPLETE", "RETURN", saved.getId(), completeDetail);
 
-        return toResponse(saved);
+        var order = findOrderOrNull(saved.getOrderId());
+        var label = orderLabel(order);
+        notifications.create(
+            Set.of(saved.getBuyerId()),
+            NotificationCategory.ORDER,
+            "RETURN_COMPLETED",
+            "Đổi/trả " + label + " đã hoàn tất",
+            "Yêu cầu đổi/trả cho đơn " + label + " đã được hoàn tất.",
+            "/account/orders/" + saved.getOrderId(),
+            saved.getId()
+        );
+
+        return toResponse(saved, order);
     }
 
     @Transactional(readOnly = true)
     public List<ReturnRequestResponse> listBuyerReturns(@NonNull UUID buyerId) {
-        return returns.findByBuyerIdOrderByCreatedAtDesc(buyerId).stream()
-            .map(ReturnRequestService::toResponse)
-            .toList();
+        return toResponses(returns.findByBuyerIdOrderByCreatedAtDesc(buyerId));
     }
 
     /**
@@ -204,9 +269,7 @@ public class ReturnRequestService {
      */
     @Transactional(readOnly = true)
     public List<ReturnRequestResponse> listForOrder(@NonNull UUID orderId) {
-        return returns.findByOrderIdOrderByCreatedAtDesc(orderId).stream()
-            .map(ReturnRequestService::toResponse)
-            .toList();
+        return toResponses(returns.findByOrderIdOrderByCreatedAtDesc(orderId));
     }
 
     /**
@@ -223,15 +286,55 @@ public class ReturnRequestService {
         return result;
     }
 
-    private static ReturnRequestResponse toResponse(ReturnRequest req) {
+    private @Nullable Order findOrderOrNull(UUID orderId) {
+        for (var order : orders.findAllById(List.of(orderId))) {
+            return order;
+        }
+        return null;
+    }
+
+    private static String orderLabel(@Nullable Order order) {
+        if (order == null) {
+            return "";
+        }
+        return "#" + order.getCode();
+    }
+
+    private List<ReturnRequestResponse> toResponses(List<ReturnRequest> requests) {
+        if (requests.isEmpty()) {
+            return List.of();
+        }
+        var orderIds = new LinkedHashSet<UUID>();
+        for (var req : requests) {
+            orderIds.add(req.getOrderId());
+        }
+        Map<UUID, Order> ordersById = new LinkedHashMap<>();
+        orders.findAllById(orderIds).forEach(order -> ordersById.put(order.getId(), order));
+
+        var result = new ArrayList<ReturnRequestResponse>(requests.size());
+        for (var req : requests) {
+            result.add(toResponse(req, ordersById.get(req.getOrderId())));
+        }
+        return result;
+    }
+
+    private static ReturnRequestResponse toResponse(ReturnRequest req, @Nullable Order order) {
         List<String> evidence = List.of();
         if (req.getEvidenceKeys() != null) {
             evidence = Arrays.asList(req.getEvidenceKeys());
+        }
+        String orderCode = "";
+        String orderStatus = OrderStatus.DELIVERED.name();
+        if (order != null) {
+            orderCode = order.getCode();
+            orderStatus = order.getStatus().name();
         }
 
         return new ReturnRequestResponse(
             req.getId(),
             req.getOrderId(),
+            orderCode,
+            orderStatus,
             req.getShopId(),
             req.getBuyerId(),
             req.getReason(),

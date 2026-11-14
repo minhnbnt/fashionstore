@@ -6,6 +6,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.UUID;
 
 public record OrderItemResponse(
+    @Schema(description = "ID dòng sản phẩm trong đơn")
     UUID id,
 
     @Schema(nullable = true)
@@ -16,16 +17,29 @@ public record OrderItemResponse(
     @Nullable
     UUID variantId,
 
+    @Schema(description = "Tên sản phẩm")
     String productName,
 
+    @Schema(description = "Phân loại biến thể")
     String variantLabel,
 
+    @Schema(description = "Mã SKU")
     String sku,
 
+    @Schema(description = "Đơn giá lúc mua")
     long unitPrice,
 
+    @Schema(description = "Số lượng")
     int quantity,
 
-    long lineTotal
+    @Schema(description = "Thành tiền")
+    long lineTotal,
+
+    @Schema(description = "Storage key ảnh đại diện sản phẩm/biến thể", nullable = true)
+    @Nullable
+    String imageKey,
+
+    @Schema(description = "Sản phẩm còn đang mở bán hay đã ẩn/ngừng bán")
+    boolean productAvailable
 ) {
 }

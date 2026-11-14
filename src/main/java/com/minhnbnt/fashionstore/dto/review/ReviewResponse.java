@@ -12,6 +12,8 @@ public record ReviewResponse(
     @Schema(description = "Ten hien thi luc viet, doi ten sau khong viet lai lich su") String buyerDisplayName,
     @Schema int stars,
     @Schema(nullable = true) @Nullable String comment,
+    @Schema boolean edited,
+    @Schema(nullable = true) @Nullable Instant editedAt,
     @Schema Instant createdAt,
     @Schema Instant updatedAt
 ) {

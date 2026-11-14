@@ -2,15 +2,18 @@ package com.minhnbnt.fashionstore.features.review;
 
 import com.minhnbnt.fashionstore.config.SecurityConfig;
 import com.minhnbnt.fashionstore.dto.review.ReviewResponse;
+import com.minhnbnt.fashionstore.features.review.controller.MyReviewController;
 import com.minhnbnt.fashionstore.features.review.controller.ReviewController;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.List;
@@ -26,7 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(ReviewController.class)
+@WebMvcTest({ReviewController.class, MyReviewController.class})
 @Import(SecurityConfig.class)
 class ReviewControllerTest {
 
@@ -46,6 +49,8 @@ class ReviewControllerTest {
             "An",
             5,
             "Vai dep",
+            false,
+            null,
             Instant.now(),
             Instant.now()
         );
@@ -89,13 +94,43 @@ class ReviewControllerTest {
     }
 
     @Test
-    void deletesReview() throws Exception {
+    void editReviewSecondTimeReturnsConflict() throws Exception {
+        var userId = UUID.randomUUID();
+        var productId = UUID.randomUUID();
+        when(reviews.updateReview(any(), any(), any()))
+            .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "Review has already been edited once"));
+
+        mockMvc.perform(put("/api/products/{productId}/reviews", productId)
+                .with(jwt().jwt(builder -> builder.subject(userId.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"stars\": 4}"))
+            .andExpect(status().isConflict());
+    }
+
+    @Test
+    void deleteReviewReturnsMethodNotAllowed() throws Exception {
         var userId = UUID.randomUUID();
         var productId = UUID.randomUUID();
 
         mockMvc.perform(delete("/api/products/{productId}/reviews", productId)
                 .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
-            .andExpect(status().isNoContent());
+            .andExpect(status().isMethodNotAllowed());
+    }
+
+    @Test
+    void listsMyReviewsAndRequiresAuth() throws Exception {
+        var userId = UUID.randomUUID();
+        var productId = UUID.randomUUID();
+        when(reviews.listMine(userId)).thenReturn(List.of(response(productId)));
+
+        mockMvc.perform(get("/api/reviews/mine"))
+            .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/reviews/mine")
+                .with(jwt().jwt(builder -> builder.subject(userId.toString()))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].productId").value(productId.toString()))
+            .andExpect(jsonPath("$[0].edited").value(false));
     }
 
     @Test
