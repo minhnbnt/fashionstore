@@ -36,6 +36,8 @@
 - Bucket và policy đọc ẩn danh (`s3:GetObject`, `Principal: *`) do `S3Config` bảo đảm lúc tạo `S3Client` khi app khởi động: `headBucket` → thiếu thì tạo mới, policy luôn put lại (idempotent, lỗi S3 chỉ warn, không chặn boot). Frontend tự ghép `{public-base-url}/{key}`, base URL xem `config/springboot.yml` (`s3.public-base-url`).
 - URL ảnh public là path-style trên chính port S3, bucket name làm prefix: `http://localhost:9000/fashionstore/{key}`.
 - SDK gửi checksum mặc định bị một số S3-compatible gateway từ chối (`Invalid payload signature`): `S3Client` cấu hình `requestChecksumCalculation(WHEN_REQUIRED)` — xem `S3Config.java`. Không đụng `S3Presigner`.
+- GC rác upload — **producer** (đã có từ `V37__upload_centralization.sql`): trigger `trg_upload_gc` sau mỗi INSERT vào `upload` đẩy message `{upload_id, s3_key}` vào pgmq queue `upload_gc` với delay 24h (`pgmq.send(..., 86400)` — row presign mà client không PUT là rác có chủ đích). Backfill V37 cũng bắn message cho cả row cũ — vô hại, message nằm chờ. Message mang cả `s3_key` để consumer xoá được object kể cả khi row `upload` đã bị xoá trước đó.
+- TODO (consumer GC — **change riêng**, chưa làm): job định kỳ đọc `upload_gc`, với message đã visible: gọi hàm `upload_is_referenced(upload_id)` (check FK từ mọi bảng nghiệp vụ — viết sau khi đủ cột FK từ V38–V44) → không được tham chiếu thì xoá object S3 theo `s3_key` + row `upload`, rồi `pgmq.delete('upload_gc', msg_id)` ack. FK thật là "vệ sĩ": DELETE row đang bị tham chiếu nổ constraint, không xoá nhầm file đang dùng.
 
 ## Demo seed (dev-only)
 
