@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 import org.flywaydb.core.Flyway;
@@ -164,7 +165,7 @@ class ProductUploadMigrationTest {
         try (var connection = connection()) {
 
             // Ảnh chung + ảnh variant cùng map đúng upload theo s3_key.
-            var imageKeys = java.util.List.of(IMAGE_KEY, VARIANT_IMAGE_KEY);
+            var imageKeys = List.of(IMAGE_KEY, VARIANT_IMAGE_KEY);
             for (var expectedKey : imageKeys) {
 
                 try (var statement = connection.prepareStatement("""
@@ -233,7 +234,7 @@ class ProductUploadMigrationTest {
     void fkBlocksDeletingReferencedUpload() {
 
         // "Vệ sĩ" (design D5): consumer GC xoá upload đang bị tham chiếu phải nổ constraint.
-        var referencedKeys = java.util.List.of(IMAGE_KEY, VIDEO_KEY, GARMENT_KEY);
+        var referencedKeys = List.of(IMAGE_KEY, VIDEO_KEY, GARMENT_KEY);
         for (var key : referencedKeys) {
 
             var finalKey = key;

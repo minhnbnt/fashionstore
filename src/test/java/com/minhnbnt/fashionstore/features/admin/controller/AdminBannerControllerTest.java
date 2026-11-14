@@ -57,14 +57,15 @@ class AdminBannerControllerTest {
 
     private static String body(String linkUrl) {
         return """
-            {"placement":"HOME_CAROUSEL","title":"Sale thu","imageKey":"a.webp",
+            {"placement":"HOME_CAROUSEL","title":"Sale thu",
+             "imageUploadId":"10000000-0000-0000-0000-000000000000",
              "linkUrl":"%s","sortOrder":1,"active":true}
             """.formatted(linkUrl);
     }
 
     private static BannerResponse response(UUID id) {
         return new BannerResponse(
-            id, BannerPlacement.HOME_CAROUSEL, "Sale thu", "a.webp", null, "/search", 1, true,
+            id, BannerPlacement.HOME_CAROUSEL, "Sale thu", "http://s3.test/a.webp", null, "/search", 1, true,
             null, null, ScheduleState.RUNNING, Instant.now()
         );
     }

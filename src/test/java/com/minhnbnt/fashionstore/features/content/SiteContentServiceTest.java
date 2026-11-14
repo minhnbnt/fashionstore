@@ -11,6 +11,8 @@ import com.minhnbnt.fashionstore.dto.content.PublicPopupResponse;
 import com.minhnbnt.fashionstore.dto.content.SitePageRequest;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.features.identity.UserService;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.model.BannerPlacement;
 import com.minhnbnt.fashionstore.model.FaqCategory;
 import com.minhnbnt.fashionstore.model.PageFooterGroup;
@@ -18,6 +20,7 @@ import com.minhnbnt.fashionstore.model.PageStatus;
 import com.minhnbnt.fashionstore.model.PopupAudience;
 import com.minhnbnt.fashionstore.model.PopupFrequency;
 import com.minhnbnt.fashionstore.model.ScheduleState;
+import com.minhnbnt.fashionstore.model.Upload;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,13 +60,25 @@ class SiteContentServiceTest {
     @Autowired
     private UserService users;
 
+    @Autowired
+    private UploadRepository uploads;
+
+    @Autowired
+    private S3UrlService s3Urls;
+
     private UUID admin() {
         var id = UUID.randomUUID();
         users.upsert(id, new CreateUserRequest("admin-" + id + "@t.local", "Admin"));
         return id;
     }
 
-    private static BannerRequest banner(
+    /** Row upload MỚI với key unique mỗi lần gọi — s3_key UNIQUE sẽ đụng nếu tái dùng key. */
+    private UUID newImageUpload(String base) {
+        var key = base + "-" + UUID.randomUUID().toString().substring(0, 8) + ".webp";
+        return uploads.save(Upload.create(key, "image/webp")).getId();
+    }
+
+    private BannerRequest banner(
         String title,
         int sortOrder,
         boolean active,
@@ -71,7 +86,7 @@ class SiteContentServiceTest {
         @Nullable Instant endsAt
     ) {
         return new BannerRequest(
-            BannerPlacement.HOME_STRIP, title, title + ".webp", null, "/search?q=ao",
+            BannerPlacement.HOME_STRIP, title, newImageUpload("banner-" + title), null, "/search?q=ao",
             sortOrder, active, startsAt, endsAt
         );
     }
@@ -125,6 +140,61 @@ class SiteContentServiceTest {
         banners.delete(created.id());
         assertThatThrownBy(() -> banners.delete(created.id()))
             .satisfies(e -> assertStatus(e, HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    void bannerResponseExposesPublicUrls() {
+        var adminId = admin();
+        var request = banner("strip-url", 0, true, null, null);
+        var created = banners.create(adminId, request);
+
+        var expectedUrl = s3Urls.publicUrl(uploads.findById(request.imageUploadId()).orElseThrow().getS3Key());
+        assertThat(created.imageUrl()).isEqualTo(expectedUrl);
+        assertThat(created.mobileImageUrl()).isNull();
+
+        var running = banners.running(BannerPlacement.HOME_STRIP).stream()
+            .filter(b -> b.id().equals(created.id()))
+            .toList();
+        assertThat(running.getFirst().imageUrl()).isEqualTo(expectedUrl);
+    }
+
+    @Test
+    void bannerRejectsUnknownOrNonImageUpload() {
+        var adminId = admin();
+
+        // uploadId không tồn tại
+        assertThatThrownBy(() -> banners.create(adminId, new BannerRequest(
+            BannerPlacement.HOME_STRIP, "Ảnh lạ", UUID.randomUUID(), null, null,
+            0, true, null, null
+        ))).satisfies(e -> assertStatus(e, HttpStatus.BAD_REQUEST));
+
+        // upload là video, không phải ảnh
+        var videoKey = "banner-video-" + UUID.randomUUID().toString().substring(0, 8) + ".mp4";
+        var videoId = uploads.save(Upload.create(videoKey, "video/mp4")).getId();
+        assertThatThrownBy(() -> banners.create(adminId, new BannerRequest(
+            BannerPlacement.HOME_STRIP, "Ảnh video", videoId, null, null,
+            0, true, null, null
+        ))).satisfies(e -> assertStatus(e, HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void popupWithImageExposesPublicUrl() {
+        var adminId = admin();
+        var imageId = newImageUpload("popup-img");
+        var created = popups.create(adminId, new PopupRequest(
+            "popup-anh", "Giảm 50%", null, imageId, "Mua ngay", "/search", PopupAudience.ALL,
+            PopupFrequency.ONCE_PER_DAY, 2, 1, true, null, null
+        ));
+
+        var expectedUrl = s3Urls.publicUrl(uploads.findById(imageId).orElseThrow().getS3Key());
+        assertThat(created.imageUrl()).isEqualTo(expectedUrl);
+        assertThat(popups.running()).extracting(PublicPopupResponse::id).contains(created.id());
+
+        // uploadId lạ bị chặn
+        assertThatThrownBy(() -> popups.update(adminId, created.id(), new PopupRequest(
+            "popup-anh", "Giảm 50%", null, UUID.randomUUID(), "Mua ngay", "/search", PopupAudience.ALL,
+            PopupFrequency.ONCE_PER_DAY, 2, 1, true, null, null
+        ))).satisfies(e -> assertStatus(e, HttpStatus.BAD_REQUEST));
     }
 
     @Test

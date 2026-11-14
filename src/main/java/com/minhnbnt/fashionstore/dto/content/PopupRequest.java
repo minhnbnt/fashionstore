@@ -12,6 +12,7 @@ import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
+import java.util.UUID;
 
 public record PopupRequest(
     @Schema(description = "Tên nội bộ cho admin", example = "Popup 11.11")
@@ -27,9 +28,8 @@ public record PopupRequest(
     @Size(max = 500)
     @Nullable String body,
 
-    @Schema(description = "S3 key ảnh popup. Cần tiêu đề hoặc ảnh")
-    @Size(max = 255)
-    @Nullable String imageKey,
+    @Schema(description = "Upload id ảnh popup (từ /api/uploads/presign). Cần tiêu đề hoặc ảnh", format = "uuid")
+    @Nullable UUID imageUploadId,
 
     @Schema(description = "Chữ trên nút CTA", example = "Mua ngay")
     @Size(max = 40)

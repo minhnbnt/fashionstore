@@ -32,7 +32,7 @@ public class SitePopup implements Persistable<UUID> {
 
     private @Nullable String body;
 
-    private @Nullable String imageKey;
+    private @Nullable UUID imageUploadId;
 
     private @Nullable String ctaLabel;
 
@@ -65,7 +65,7 @@ public class SitePopup implements Persistable<UUID> {
         String name,
         @Nullable String title,
         @Nullable String body,
-        @Nullable String imageKey,
+        @Nullable UUID imageUploadId,
         @Nullable String ctaLabel,
         @Nullable String linkUrl,
         PopupAudience audience,
@@ -99,7 +99,7 @@ public class SitePopup implements Persistable<UUID> {
         popup.update(name,
             title,
             body,
-            imageKey,
+            imageUploadId,
             ctaLabel,
             linkUrl,
             audience,
@@ -117,7 +117,7 @@ public class SitePopup implements Persistable<UUID> {
         String name,
         @Nullable String title,
         @Nullable String body,
-        @Nullable String imageKey,
+        @Nullable UUID imageUploadId,
         @Nullable String ctaLabel,
         @Nullable String linkUrl,
         PopupAudience audience,
@@ -131,15 +131,14 @@ public class SitePopup implements Persistable<UUID> {
         ContentFields.requireValidWindow(startsAt, endsAt);
 
         var cleanTitle = ContentFields.optional(title);
-        var cleanImageKey = ContentFields.optional(imageKey);
-        if (cleanTitle == null && cleanImageKey == null) {
+        if (cleanTitle == null && imageUploadId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Popup needs an image or a title");
         }
 
         this.name = name.trim();
         this.title = cleanTitle;
         this.body = ContentFields.optional(body);
-        this.imageKey = cleanImageKey;
+        this.imageUploadId = imageUploadId;
         this.ctaLabel = ContentFields.optional(ctaLabel);
         this.linkUrl = ContentFields.optional(linkUrl);
         this.audience = audience;

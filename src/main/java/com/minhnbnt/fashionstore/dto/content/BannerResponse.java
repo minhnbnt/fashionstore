@@ -14,13 +14,14 @@ public record BannerResponse(
 
     BannerPlacement placement,
 
+    @Schema(description = "Tên banner, dùng làm alt ảnh", example = "Sale thu đông -50%")
     String title,
 
-    @Schema(description = "S3 key ảnh desktop")
-    String imageKey,
+    @Schema(description = "URL public ảnh desktop")
+    String imageUrl,
 
-    @Schema(description = "S3 key ảnh mobile, null = dùng ảnh desktop")
-    @Nullable String mobileImageKey,
+    @Schema(description = "URL public ảnh mobile, null = dùng ảnh desktop")
+    @Nullable String mobileImageUrl,
 
     @Nullable String linkUrl,
 
@@ -38,13 +39,17 @@ public record BannerResponse(
     Instant updatedAt
 ) {
 
-    public static BannerResponse of(SiteBanner banner, Instant now) {
+    public static BannerResponse of(
+        SiteBanner banner,
+        String imageUrl,
+        @Nullable String mobileImageUrl,
+        Instant now) {
         return new BannerResponse(
             banner.getId(),
             banner.getPlacement(),
             banner.getTitle(),
-            banner.getImageKey(),
-            banner.getMobileImageKey(),
+            imageUrl,
+            mobileImageUrl,
             banner.getLinkUrl(),
             banner.getSortOrder(),
             banner.isActive(),
