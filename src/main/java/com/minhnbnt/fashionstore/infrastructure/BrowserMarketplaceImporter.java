@@ -120,7 +120,7 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
         }
 
         var ownerId = UUID.randomUUID();
-        userService.upsert(ownerId, new CreateUserRequest("browser-import@local", "Browser Import", null));
+        userService.upsert(ownerId, new CreateUserRequest("browser-import@local", "Browser Import"));
         var shop = shopService.register(
             ownerId,
             new CreateShopRequest(

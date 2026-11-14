@@ -65,7 +65,7 @@ class OrderTrackingRepositoryTest {
 
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("tr-" + id + "@t.local", "U", null));
+        users.upsert(id, new CreateUserRequest("tr-" + id + "@t.local", "U"));
         return id;
     }
 

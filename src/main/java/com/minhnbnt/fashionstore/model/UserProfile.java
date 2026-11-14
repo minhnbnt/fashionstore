@@ -27,7 +27,7 @@ public class UserProfile implements Persistable<UUID> {
 
     private String displayName;
 
-    private @Nullable String avatarKey;
+    private @Nullable UUID avatarUploadId;
 
     private UserRole role;
 
@@ -41,9 +41,9 @@ public class UserProfile implements Persistable<UUID> {
     @Getter(AccessLevel.NONE)
     private boolean newRecord;
 
-    public static UserProfile create(UUID id, String email, String displayName, @Nullable String avatarKey) {
+    public static UserProfile create(UUID id, String email, String displayName) {
         return new UserProfile(
-            id, email, displayName, avatarKey, UserRole.CUSTOMER, AccountStatus.ACTIVE, null, Instant.now(), true);
+            id, email, displayName, null, UserRole.CUSTOMER, AccountStatus.ACTIVE, null, Instant.now(), true);
     }
 
     public void rename(String displayName) {
@@ -54,8 +54,8 @@ public class UserProfile implements Persistable<UUID> {
         this.email = email;
     }
 
-    public void changeAvatar(@Nullable String avatarKey) {
-        this.avatarKey = avatarKey;
+    public void changeAvatar(@Nullable UUID avatarUploadId) {
+        this.avatarUploadId = avatarUploadId;
     }
 
     /**

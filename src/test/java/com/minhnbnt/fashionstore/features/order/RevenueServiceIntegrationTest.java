@@ -51,7 +51,7 @@ class RevenueServiceIntegrationTest {
 
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U", null));
+        users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U"));
         return id;
     }
 

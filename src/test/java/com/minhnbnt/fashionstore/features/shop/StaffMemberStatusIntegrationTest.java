@@ -87,7 +87,7 @@ class StaffMemberStatusIntegrationTest {
 
     private UUID user(String prefix) {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest(prefix + "-" + id + "@t.local", prefix, null));
+        users.upsert(id, new CreateUserRequest(prefix + "-" + id + "@t.local", prefix));
         return id;
     }
 

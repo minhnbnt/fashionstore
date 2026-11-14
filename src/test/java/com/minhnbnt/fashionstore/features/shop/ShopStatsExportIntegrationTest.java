@@ -43,10 +43,10 @@ class ShopStatsExportIntegrationTest {
     @BeforeEach
     void setUp() {
         ownerId = UUID.randomUUID();
-        users.upsert(ownerId, new CreateUserRequest("export-" + ownerId + "@t.local", "Export Owner", null));
+        users.upsert(ownerId, new CreateUserRequest("export-" + ownerId + "@t.local", "Export Owner"));
 
         var adminId = UUID.randomUUID();
-        users.upsert(adminId, new CreateUserRequest("export-admin-" + adminId + "@t.local", "Export Admin", null));
+        users.upsert(adminId, new CreateUserRequest("export-admin-" + adminId + "@t.local", "Export Admin"));
 
         var slug = "export-empty-" + UUID.randomUUID();
         var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));

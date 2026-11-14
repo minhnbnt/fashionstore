@@ -138,7 +138,7 @@ public class DemoSeeder implements ApplicationRunner {
         log.info("Seeding demo data (shop '{}')...", SHOP_SLUG);
 
         var ownerId = UUID.randomUUID();
-        userService.upsert(ownerId, new CreateUserRequest("demo-owner@local", "Demo Owner", null));
+        userService.upsert(ownerId, new CreateUserRequest("demo-owner@local", "Demo Owner"));
 
         var shop = shopService.register(
             ownerId,

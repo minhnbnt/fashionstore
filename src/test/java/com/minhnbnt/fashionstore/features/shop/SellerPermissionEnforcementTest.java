@@ -99,7 +99,7 @@ class SellerPermissionEnforcementTest {
 
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("perm-" + id + "@t.local", "Perm User", null));
+        users.upsert(id, new CreateUserRequest("perm-" + id + "@t.local", "Perm User"));
         return id;
     }
 

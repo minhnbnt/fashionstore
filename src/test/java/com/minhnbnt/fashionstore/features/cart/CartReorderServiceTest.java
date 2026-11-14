@@ -52,7 +52,7 @@ class CartReorderServiceTest {
 
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("re-" + id + "@t.local", "Buyer", null));
+        users.upsert(id, new CreateUserRequest("re-" + id + "@t.local", "Buyer"));
         return id;
     }
 

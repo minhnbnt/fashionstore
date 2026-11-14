@@ -128,7 +128,7 @@ public class TikiCatalogImporter implements ApplicationRunner {
         }
 
         var ownerId = UUID.randomUUID();
-        userService.upsert(ownerId, new CreateUserRequest("tiki-import@local", "Tiki Import", null));
+        userService.upsert(ownerId, new CreateUserRequest("tiki-import@local", "Tiki Import"));
         var created = shopService.register(
             ownerId,
             new CreateShopRequest(

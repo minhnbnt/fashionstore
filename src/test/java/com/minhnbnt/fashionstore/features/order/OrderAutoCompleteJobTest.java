@@ -57,7 +57,7 @@ class OrderAutoCompleteJobTest {
 
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("ac-" + id + "@t.local", "U", null));
+        users.upsert(id, new CreateUserRequest("ac-" + id + "@t.local", "U"));
         return id;
     }
 

@@ -30,7 +30,7 @@ class AiChatIntegrationTest {
     @Test
     void createConversationSaveMessagesWithJsonbMetadataAndReloadRoundtrips() {
         var userId = UUID.randomUUID();
-        users.upsert(userId, new CreateUserRequest("ai-int-" + userId + "@t.local", "AI Tester", null));
+        users.upsert(userId, new CreateUserRequest("ai-int-" + userId + "@t.local", "AI Tester"));
 
         var conv = aiChatService.createConversation(userId, new CreateAiConversationRequest("Tìm áo sơ mi"));
         assertThat(conv.id()).isNotNull();
@@ -66,7 +66,7 @@ class AiChatIntegrationTest {
     @Test
     void saveMessageWithInvalidMetadataRejected() {
         var userId = UUID.randomUUID();
-        users.upsert(userId, new CreateUserRequest("ai-int-bad-" + userId + "@t.local", "AI Tester", null));
+        users.upsert(userId, new CreateUserRequest("ai-int-bad-" + userId + "@t.local", "AI Tester"));
 
         var conv = aiChatService.createConversation(userId, new CreateAiConversationRequest(null));
 

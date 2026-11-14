@@ -253,7 +253,7 @@ class ShopAuditIntegrationTest {
 
     private UUID user(String prefix, String displayName) {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest(prefix + "-" + id + "@t.local", displayName, null));
+        users.upsert(id, new CreateUserRequest(prefix + "-" + id + "@t.local", displayName));
         return id;
     }
 

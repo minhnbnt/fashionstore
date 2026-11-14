@@ -16,9 +16,9 @@ public record UserResponse(
     @Schema(example = "An")
     String displayName,
 
-    @Schema(description = "S3 key của avatar, null nếu chưa có. Frontend tự ghép với base URL S3.")
+    @Schema(description = "URL avatar public path-style, null nếu chưa có. Không trả S3 key.")
     @Nullable
-    String avatarKey,
+    String avatarUrl,
 
     @Schema(description = "Role trên sàn", example = "CUSTOMER")
     String role,

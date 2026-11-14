@@ -63,7 +63,7 @@ class ReviewServiceTest {
 
     private UUID mirroredUser(String displayName) {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", displayName, null));
+        users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", displayName));
         return id;
     }
 

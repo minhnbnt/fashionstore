@@ -131,7 +131,7 @@ class ShopMemberRepositoryIntegrationTest {
 
     private UUID user() {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("member-access-" + id + "@t.local", "Member Access", null));
+        users.upsert(id, new CreateUserRequest("member-access-" + id + "@t.local", "Member Access"));
         return id;
     }
 

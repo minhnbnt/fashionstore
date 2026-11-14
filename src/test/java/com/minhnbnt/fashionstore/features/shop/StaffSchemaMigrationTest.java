@@ -80,7 +80,7 @@ class StaffSchemaMigrationTest {
 
     private UUID owner() {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("staff-schema-" + id + "@t.local", "Schema Owner", null));
+        users.upsert(id, new CreateUserRequest("staff-schema-" + id + "@t.local", "Schema Owner"));
         return id;
     }
 }

@@ -63,10 +63,10 @@ public class UserController {
     @PutMapping("/api/users/me/avatar")
     @Operation(
         summary = "Đổi ảnh đại diện",
-        description = "Nhận S3 key ảnh đã upload qua /api/uploads/presign. Gọi DELETE để xóa ảnh."
+        description = "Nhận uploadId của ảnh đã PUT lên S3 qua /api/uploads/presign. Gọi DELETE để xóa ảnh."
     )
     @ApiResponse(responseCode = "200", description = "Profile sau khi đổi ảnh")
-    @ApiResponse(responseCode = "400", description = "avatarKey không phải key ảnh đã upload")
+    @ApiResponse(responseCode = "400", description = "uploadId không tồn tại hoặc không phải ảnh hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @SecurityRequirement(name = "bearerAuth")
     public UserResponse changeAvatar(
@@ -75,7 +75,7 @@ public class UserController {
     ) {
         var subject = Objects.requireNonNull(jwt.getSubject());
 
-        return users.changeAvatar(UUID.fromString(subject), request.avatarKey());
+        return users.changeAvatar(UUID.fromString(subject), request.avatarUploadId());
     }
 
     @DeleteMapping("/api/users/me/avatar")

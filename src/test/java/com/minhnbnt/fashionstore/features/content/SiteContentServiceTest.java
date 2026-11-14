@@ -59,7 +59,7 @@ class SiteContentServiceTest {
 
     private UUID admin() {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("admin-" + id + "@t.local", "Admin", null));
+        users.upsert(id, new CreateUserRequest("admin-" + id + "@t.local", "Admin"));
         return id;
     }
 
