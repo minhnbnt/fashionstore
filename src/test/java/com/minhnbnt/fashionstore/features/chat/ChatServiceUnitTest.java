@@ -11,9 +11,12 @@ import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
 import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.infrastructure.realtime.ChatRealtimePublisher;
 import com.minhnbnt.fashionstore.model.ChatConversation;
 import com.minhnbnt.fashionstore.model.ChatMessage;
+import com.minhnbnt.fashionstore.model.Upload;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import org.junit.jupiter.api.Test;
@@ -23,6 +26,7 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -67,6 +71,12 @@ class ChatServiceUnitTest {
 
     @Mock
     private ChatRealtimePublisher realtime;
+
+    @Mock
+    private UploadRepository uploads;
+
+    @Mock
+    private S3UrlService s3Urls;
 
     @InjectMocks
     private ChatService chatService;
@@ -281,18 +291,62 @@ class ChatServiceUnitTest {
         var shopId = UUID.randomUUID();
         var convId = UUID.randomUUID();
         var conv = ChatConversation.create(shopId, buyerId);
+        var uploadId = UUID.randomUUID();
+        var uploadKey = "chat/" + UUID.randomUUID() + ".webp";
 
         when(conversations.findById(convId)).thenReturn(Optional.of(conv));
         when(shops.isMember(shopId, buyerId)).thenReturn(false);
+        when(uploads.findById(uploadId)).thenReturn(Optional.of(Upload.create(uploadKey, "image/webp")));
+        when(s3Urls.publicUrl(uploadKey)).thenReturn("http://s3.test/fashionstore/" + uploadKey);
 
-        var req = new SendMessageRequest(null, "chat/photo.jpg");
-        chatService.sendMessage(buyerId, convId, req);
+        var req = new SendMessageRequest(null, uploadId);
+        var resp = chatService.sendMessage(buyerId, convId, req);
 
         verify(messages).save(captor.capture());
         var savedMessage = captor.getValue();
         assertThat(savedMessage.getContent()).isEqualTo("");
-        assertThat(savedMessage.getImageKey()).isEqualTo("chat/photo.jpg");
+        assertThat(savedMessage.getImageUploadId()).isEqualTo(uploadId);
         assertThat(conv.getLastMessageText()).isEqualTo("[Hình ảnh]");
+        // Response trả URL truy cập được, không trả key.
+        assertThat(resp.imageUrl()).isEqualTo("http://s3.test/fashionstore/" + uploadKey);
+    }
+
+    @Test
+    void sendMessageRejectsUnknownImageUpload() {
+        var buyerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var conv = ChatConversation.create(shopId, buyerId);
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(shops.isMember(shopId, buyerId)).thenReturn(false);
+
+        var req = new SendMessageRequest(null, UUID.randomUUID());
+
+        assertThatThrownBy(() -> chatService.sendMessage(buyerId, convId, req))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void sendMessageRejectsNonImageUpload() {
+        var buyerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var convId = UUID.randomUUID();
+        var conv = ChatConversation.create(shopId, buyerId);
+        var videoId = UUID.randomUUID();
+
+        when(conversations.findById(convId)).thenReturn(Optional.of(conv));
+        when(shops.isMember(shopId, buyerId)).thenReturn(false);
+        when(uploads.findById(videoId)).thenReturn(Optional.of(Upload.create("chat/x.mp4", "video/mp4")));
+
+        var req = new SendMessageRequest(null, videoId);
+
+        assertThatThrownBy(() -> chatService.sendMessage(buyerId, convId, req))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
     @Test
@@ -359,7 +413,7 @@ class ChatServiceUnitTest {
         assertThatThrownBy(() -> chatService.sendMessage(buyerId, convId, req))
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(org.springframework.http.HttpStatus.BAD_REQUEST));
+                .isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
     @Test
@@ -385,7 +439,7 @@ class ChatServiceUnitTest {
         assertThatThrownBy(() -> chatService.sendMessage(buyerId, convId, req))
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(org.springframework.http.HttpStatus.BAD_REQUEST));
+                .isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
     @Test

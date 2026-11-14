@@ -2,6 +2,7 @@ package com.minhnbnt.fashionstore.features.identity;
 
 import com.minhnbnt.fashionstore.dto.admin.AdminUserResponse;
 import com.minhnbnt.fashionstore.dto.admin.StatusHistoryResponse;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
 import com.minhnbnt.fashionstore.infrastructure.SqlLike;
 import com.minhnbnt.fashionstore.model.AccountStatus;
 import com.minhnbnt.fashionstore.model.UserRole;
@@ -33,11 +34,15 @@ import java.util.stream.Collectors;
 public class UserAdminQueryRepository {
 
     private static final String SELECT = """
-        SELECT u.id, u.email, u.display_name, u.avatar_key, u.role, u.status, u.status_reason, u.created_at
+        SELECT u.id, u.email, u.display_name, av.s3_key AS avatar_s3_key,
+               u.role, u.status, u.status_reason, u.created_at
         FROM user_profile u
+        LEFT JOIN upload av ON av.id = u.avatar_upload_id
         """;
 
     private final JdbcClient jdbc;
+
+    private final S3UrlService s3Urls;
 
     public List<AdminUserResponse> search(
         @Nullable AccountStatus status,
@@ -56,7 +61,7 @@ public class UserAdminQueryRepository {
             .params(filter.params())
             .param("limit", size)
             .param("offset", (long) page * size)
-            .query(UserAdminQueryRepository::toAdminUser)
+            .query(this::toAdminUser)
             .list();
     }
 
@@ -168,16 +173,26 @@ public class UserAdminQueryRepository {
         return new Filter(String.join(" AND ", clauses), params);
     }
 
-    private static AdminUserResponse toAdminUser(ResultSet rs, int rowNum) throws SQLException {
+    private AdminUserResponse toAdminUser(ResultSet rs, int rowNum) throws SQLException {
+
+        var avatarS3Key = rs.getString("avatar_s3_key");
         return new AdminUserResponse(
             rs.getObject("id", UUID.class),
             rs.getString("email"),
             rs.getString("display_name"),
-            rs.getString("avatar_key"),
+            avatarUrlOf(avatarS3Key),
             rs.getString("role"),
             rs.getString("status"),
             rs.getString("status_reason"),
             rs.getObject("created_at", OffsetDateTime.class).toInstant()
         );
+    }
+
+    private @Nullable String avatarUrlOf(@Nullable String s3Key) {
+
+        if (s3Key == null) {
+            return null;
+        }
+        return s3Urls.publicUrl(s3Key);
     }
 }

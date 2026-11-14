@@ -5,9 +5,9 @@ Luồng 3 của sàn (`features/catalog/`). Đọc cùng `api-endpoints.md` (#10
 ## Ý tưởng trong 1 phút
 
 - **Giá nằm ở variant, không nằm ở product.** Cùng một cái áo, size M đen với size XL trắng giá khác nhau là bình thường. `minPrice` trong search chỉ là giá trị suy ra (`min(price)` các variant) để hiện "chỉ từ 99k".
-- **Đăng hàng 2 bước:** tạo product kèm variants trước (#11) → xin URL upload ảnh (#13) → gắn key ảnh vào product (#14). Giữa 2 bước product đã `ACTIVE` nhưng chưa ảnh, frontend tự chịu (hiện placeholder).
+- **Đăng hàng 2 bước:** tạo product kèm variants trước (#11) → presign + PUT ảnh (#13) → gắn `uploadId` vào product (#14). Giữa 2 bước product đã `ACTIVE` nhưng chưa ảnh, frontend tự chịu (hiện placeholder).
 - **Không còn DRAFT.** Migration `V3` bỏ trạng thái nháp, product đẻ ra là `ACTIVE` luôn. Muốn gỡ hàng thì flip sang `HIDDEN`, muốn bán lại thì flip về. Gate duy nhất còn lại là shop phải `APPROVED` mới được đăng và hiện hàng.
-- **DB chỉ lưu S3 key, không lưu URL.** Frontend tự ghép `{public-base-url}/{key}`.
+- **DB chỉ lưu `upload_id` (FK → bảng `upload`), key chỉ nằm trong `upload.s3_key`.** Backend trả URL hoàn chỉnh trong response (`url` public path-style + `uploadId` để echo), frontend không ghép URL tay.
 
 ## Ma trận quyền
 
@@ -83,15 +83,15 @@ Luật:
 
 ## #13 + #14 — Upload ảnh 3 bước
 
-1. `POST /api/uploads/presign` (auth) với `{"contentType": "image/jpeg"}` → nhận `{"key", "url", "expiresAt"}`. Content-type ngoài `image/*` → `400`.
-2. Frontend `PUT` file trực tiếp lên `url` (không qua backend).
-3. `POST /api/shops/{shopId}/products/{id}/images` (auth, `201`) để gắn key:
+1. `POST /api/uploads/presign` (auth) với `{"contentType": "image/jpeg"}` → nhận `{"uploadId", "uploadUrl", "publicUrl", "expiresAt"}`. Content-type ngoài `image/*`/`video/*` → `400`.
+2. Frontend `PUT` file trực tiếp lên `uploadUrl` (không qua backend).
+3. Gắn `uploadId` vào product — khi tạo (#11, `images` trong body) hoặc khi sửa (#12, full-replace):
 
 ```json
-{"images": [{"s3Key": "abc123.jpg", "variantId": null, "sortOrder": 0}]}
+{"images": [{"uploadId": "…uuid…", "variantId": null, "sortOrder": 0}]}
 ```
 
-`variantId` null = ảnh chung product, có giá trị = ảnh riêng variant đó (phải thuộc đúng product, không là `404`). `sortOrder` quyết định ảnh đại diện (nhỏ nhất lên trước).
+`variantId` null = ảnh chung product, có giá trị = ảnh riêng variant đó (phải thuộc đúng product, không là `404`). `sortOrder` quyết định ảnh đại diện (nhỏ nhất lên trước). Response trả `images: [{id, variantId, url, uploadId, sortOrder}]` — khi sửa, echo lại `uploadId` cũ để giữ nguyên, id mới để thay, **null/bỏ hẳn list item = xoá**.
 
 ## #15 — Chi tiết sản phẩm
 

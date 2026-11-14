@@ -68,7 +68,7 @@ public class WishlistService {
             card.name(),
             card.slug(),
             card.minPrice(),
-            card.defaultImageKey(),
+            card.defaultImageUrl(),
             card.available(),
             card.unavailableReason()
         );

@@ -27,17 +27,27 @@ import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.Category;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
+import com.minhnbnt.fashionstore.model.Upload;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.server.ResponseStatusException;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,6 +56,34 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class CatalogServiceTest {
+
+    @Autowired
+
+    private UploadRepository uploads;
+
+    @Autowired
+    private S3UrlService s3Urls;
+
+    @Autowired
+    private S3Client s3Client;
+
+    @Value("${s3.bucket}")
+    private String s3Bucket;
+
+    /** Key ảnh đã tạo cho từng productRequest(slug) — dùng cho assertion URL ảnh đầu. */
+    private final Map<String, List<String>> productImageKeysBySlug = new HashMap<>();
+
+    /** PUT object rỗng vào MinIO — video validate chỉ cần head/get, parse fail thì bỏ qua. */
+    private void putS3Object(String key, String contentType) {
+        s3Client.putObject(
+            PutObjectRequest.builder()
+                .bucket(s3Bucket)
+                .key(key)
+                .contentType(contentType)
+                .build(),
+            RequestBody.fromBytes(new byte[] {0, 0, 0, 0}));
+    }
+
 
     @Autowired
     private CatalogService catalog;
@@ -67,13 +105,13 @@ class CatalogServiceTest {
 
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U", null));
+        users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U"));
         return id;
     }
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = mirroredUser();
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }
@@ -86,6 +124,14 @@ class CatalogServiceTest {
     }
 
     private CreateProductRequest productRequest(String slug) {
+        var imageIds = new ArrayList<UUID>();
+        var imageKeys = new ArrayList<String>();
+        for (int i = 1; i <= 3; i++) {
+            var key = uniqueKey("img" + i);
+            imageKeys.add(key);
+            imageIds.add(uploads.save(Upload.create(key, "image/webp")).getId());
+        }
+        productImageKeysBySlug.put(slug, imageKeys);
         return new CreateProductRequest(
             "Áo Thun " + slug,
             slug,
@@ -93,12 +139,22 @@ class CatalogServiceTest {
             testCategory(),
             List.of(new CreateVariantRequest("SKU-" + slug, "M", "Den", 100000L, null, 10, true)),
             List.of(
-                new ImageItemRequest("img1.jpg", null, 0),
-                new ImageItemRequest("img2.jpg", null, 1),
-                new ImageItemRequest("img3.jpg", null, 2)
+                new ImageItemRequest(imageIds.get(0), null, 0),
+                new ImageItemRequest(imageIds.get(1), null, 1),
+                new ImageItemRequest(imageIds.get(2), null, 2)
             ),
             null, null, null, null, null, null, null, null, null, null, null, "ACTIVE"
         );
+    }
+
+    /** Key unique mỗi lần gọi — s3_key UNIQUE của upload sẽ đụng nếu tái dùng key cố định. */
+    private String uniqueKey(String base) {
+        return base + "-" + UUID.randomUUID().toString().substring(0, 8) + ".webp";
+    }
+
+    /** Row upload MỚI (không lookup) cho request test — trả id để gắn vào ImageItemRequest. */
+    private UUID newImageUpload(String base) {
+        return uploads.save(Upload.create(uniqueKey(base), "image/webp")).getId();
     }
 
     private static void assertStatus(ResponseStatusException e, HttpStatus status) {
@@ -108,7 +164,7 @@ class CatalogServiceTest {
     @Test
     void createOnPendingShopIsForbidden() {
         var ownerId = mirroredUser();
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop Pend", "shop-pend-cat"));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop Pend", "shop-pend-cat"));
 
         assertThatThrownBy(() -> catalog.createProduct(ownerId, shop.id(), productRequest("ao-pend")))
             .isInstanceOf(ResponseStatusException.class)
@@ -155,7 +211,7 @@ class CatalogServiceTest {
             ownerId,
             shopB,
             created.id(),
-            new AttachImagesRequest(List.of(new ImageItemRequest("k1.jpg", null, 0)))
+            new AttachImagesRequest(List.of(new ImageItemRequest(newImageUpload("k1.jpg"), null, 0)))
         )).isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.NOT_FOUND));
     }
@@ -211,9 +267,9 @@ class CatalogServiceTest {
             catId,
             withDefault,
             List.of(
-                new ImageItemRequest("img1.jpg", null, 0),
-                new ImageItemRequest("img2.jpg", null, 1),
-                new ImageItemRequest("img3.jpg", null, 2)
+                new ImageItemRequest(newImageUpload("img1.jpg"), null, 0),
+                new ImageItemRequest(newImageUpload("img2.jpg"), null, 1),
+                new ImageItemRequest(newImageUpload("img3.jpg"), null, 2)
             ),
             null, null, null, null, null, null, null, null, null, null, null, "ACTIVE"
         );
@@ -405,7 +461,7 @@ class CatalogServiceTest {
     void productCreationStatusDependsOnShopTrust() {
         var ownerId = mirroredUser();
         var adminId = mirroredUser();
-        var req = com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest("Shop Trust", "shop-trust-test");
+        var req = com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest(uploads, "Shop Trust", "shop-trust-test");
         var shop = shops.register(ownerId, req);
         shops.approve(adminId, shop.id());
 
@@ -418,9 +474,9 @@ class CatalogServiceTest {
             "Ao Hidden Shop", "ao-hidden-shop", "Desc", testCategory(),
             List.of(new CreateVariantRequest("SKU-HIDDEN", "M", "Den", 100000L, null, 10, true)),
             List.of(
-                new ImageItemRequest("img1.jpg", null, 0),
-                new ImageItemRequest("img2.jpg", null, 1),
-                new ImageItemRequest("img3.jpg", null, 2)
+                new ImageItemRequest(newImageUpload("img1.jpg"), null, 0),
+                new ImageItemRequest(newImageUpload("img2.jpg"), null, 1),
+                new ImageItemRequest(newImageUpload("img3.jpg"), null, 2)
             ),
             null, null, null, null, null, null, null, null, null, null, null, "HIDDEN"
         );
@@ -445,9 +501,9 @@ class CatalogServiceTest {
             "Ao Thuc Te Ao", "ao-thuc-te-ao", "Mo ta", testCategory(),
             List.of(new CreateVariantRequest("SKU-TRY-ON", "M", "Trang", 120000L, null, 10, true)),
             List.of(
-                new ImageItemRequest("img1.jpg", null, 0),
-                new ImageItemRequest("img2.jpg", null, 1),
-                new ImageItemRequest("img3.jpg", null, 2)
+                new ImageItemRequest(newImageUpload("img1.jpg"), null, 0),
+                new ImageItemRequest(newImageUpload("img2.jpg"), null, 1),
+                new ImageItemRequest(newImageUpload("img3.jpg"), null, 2)
             ),
             null, null, true, null, null, null, null, null, null, null, null, "ACTIVE"
         );
@@ -470,9 +526,9 @@ class CatalogServiceTest {
             "Áo Thun Nam", "ao-thun-nam-cat", "Mo ta", UUID.randomUUID(),
             List.of(new CreateVariantRequest("SKU-CAT", "M", "Den", 100000L, null, 10, true)),
             List.of(
-                new ImageItemRequest("img1.jpg", null, 0),
-                new ImageItemRequest("img2.jpg", null, 1),
-                new ImageItemRequest("img3.jpg", null, 2)
+                new ImageItemRequest(newImageUpload("img1.jpg"), null, 0),
+                new ImageItemRequest(newImageUpload("img2.jpg"), null, 1),
+                new ImageItemRequest(newImageUpload("img3.jpg"), null, 2)
             ),
             null, null, null, null, null, null, null, null, null, null, null, "ACTIVE"
         );
@@ -495,9 +551,9 @@ class CatalogServiceTest {
             "Áo Thun Nam", "ao-thun-nam-pkg", "Mo ta", testCategory(),
             List.of(new CreateVariantRequest("SKU-PKG", "M", "Den", 100000L, null, 10, true)),
             List.of(
-                new ImageItemRequest("img1.jpg", null, 0),
-                new ImageItemRequest("img2.jpg", null, 1),
-                new ImageItemRequest("img3.jpg", null, 2)
+                new ImageItemRequest(newImageUpload("img1.jpg"), null, 0),
+                new ImageItemRequest(newImageUpload("img2.jpg"), null, 1),
+                new ImageItemRequest(newImageUpload("img3.jpg"), null, 2)
             ),
             null, null, null, null, null, null, null,
             -10, 20, 10, 5, "ACTIVE"
@@ -516,7 +572,7 @@ class CatalogServiceTest {
     void adminCanApproveAndRejectPendingProduct() {
         var ownerId = mirroredUser();
         var adminId = mirroredUser();
-        var req = com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest(
+        var req = com.minhnbnt.fashionstore.test.ShopTestFixtures.createRequest(uploads, 
             "Shop Moderation", "shop-moderation"
         );
         var shop = shops.register(ownerId, req);
@@ -545,6 +601,9 @@ class CatalogServiceTest {
     void sellerCanUpdateProductAndTrackAuditLogs() {
         var ownerId = mirroredUser();
         var shopId = approvedShop(ownerId, "shop-edit-audit");
+
+        var garmentKey = uniqueKey("garment-new");
+        var garmentUploadId = uploads.save(Upload.create(garmentKey, "image/webp")).getId();
 
         var created = catalog.createProduct(ownerId, shopId, productRequest("ao-edit-test"));
         var initialVariant = created.variants().getFirst();
@@ -578,11 +637,11 @@ class CatalogServiceTest {
                 )
             ),
             List.of(
-                new ImageItemRequest("img-new-1.jpg", null, 0),
-                new ImageItemRequest("img-new-2.jpg", null, 1)
+                new ImageItemRequest(newImageUpload("img-new-1.jpg"), null, 0),
+                new ImageItemRequest(newImageUpload("img-new-2.jpg"), null, 1)
             ),
             null,
-            "garment-new.png",
+            garmentUploadId,
             true,
             "100% Linen",
             "Việt Nam",
@@ -594,8 +653,8 @@ class CatalogServiceTest {
         var updated = catalog.updateProduct(ownerId, shopId, created.id(), updateReq);
         assertThat(updated.name()).isEqualTo("Áo Thun Cập Nhật");
         assertThat(updated.description()).isEqualTo("Mô tả mới đã cập nhật");
-        assertThat(updated.videoKey()).isNull();
-        assertThat(updated.garmentKey()).isEqualTo("garment-new.png");
+        assertThat(updated.videoUrl()).isNull();
+        assertThat(updated.garmentUrl()).isEqualTo(s3Urls.publicUrl(garmentKey));
         assertThat(updated.tryOnEnabled()).isTrue();
         assertThat(updated.material()).isEqualTo("100% Linen");
         assertThat(updated.weightGrams()).isEqualTo(300);
@@ -681,6 +740,83 @@ class CatalogServiceTest {
             assertThat(log.changesSummary()).contains("Xóa mềm");
             assertThat(log.oldValues()).contains("status");
         });
+    }
+
+    @Test
+    void updateVideoEchoKeepsAndNullDeletes() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-video-echo");
+        var videoKey = uniqueKey("video-1");
+        var videoUploadId = uploads.save(Upload.create(videoKey, "video/mp4")).getId();
+        putS3Object(videoKey, "video/mp4");
+
+        var withVideo = new CreateProductRequest(
+            "Áo Có Video",
+            "ao-co-video",
+            "Mô tả",
+            testCategory(),
+            List.of(new CreateVariantRequest("SKU-VID", "M", "Den", 100000L, null, 10, true)),
+            List.of(new ImageItemRequest(newImageUpload("vid-img-1"), null, 0)),
+            videoUploadId,
+            null, null, null, null, null, null, null, null, null, null, "ACTIVE"
+        );
+        var created = catalog.createProduct(ownerId, shopId, withVideo);
+        assertThat(created.videoUrl()).isEqualTo(s3Urls.publicUrl(videoKey));
+        assertThat(created.videoUploadId()).isEqualTo(videoUploadId);
+
+        // Echo id cũ = giữ nguyên
+        var kept = catalog.updateProduct(
+            ownerId, shopId, created.id(),
+            new UpdateProductRequest(null, null, null, null, null, null, videoUploadId, null,
+                null, null, null, null, null, null, null, null, null));
+        assertThat(kept.videoUrl()).isEqualTo(s3Urls.publicUrl(videoKey));
+
+        // null = xoá video
+        var cleared = catalog.updateProduct(
+            ownerId, shopId, created.id(),
+            new UpdateProductRequest(null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null));
+        assertThat(cleared.videoUrl()).isNull();
+        assertThat(cleared.videoUploadId()).isNull();
+    }
+
+    @Test
+    void updateDeletingGarmentWhileTryOnEnabledIsRejected() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-garment-del");
+        var garmentKey = uniqueKey("garment-del");
+        var garmentUploadId = uploads.save(Upload.create(garmentKey, "image/webp")).getId();
+
+        var withGarment = new CreateProductRequest(
+            "Áo Try-On",
+            "ao-try-on",
+            "Mô tả",
+            testCategory(),
+            List.of(new CreateVariantRequest("SKU-TRY", "M", "Den", 100000L, null, 10, true)),
+            List.of(new ImageItemRequest(newImageUpload("try-img-1"), null, 0)),
+            null,
+            garmentUploadId,
+            true, null, null, null, null, null, null, null, null, "ACTIVE"
+        );
+        var created = catalog.createProduct(ownerId, shopId, withGarment);
+
+        // null = xoá garment nhưng tryOn vẫn bật -> 400
+        assertThatThrownBy(() -> catalog.updateProduct(
+            ownerId,
+            shopId,
+            created.id(),
+            new UpdateProductRequest(null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null))
+        ).isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
+
+        // Tắt tryOn rồi xoá garment thì hợp lệ
+        var ok = catalog.updateProduct(
+            ownerId, shopId, created.id(),
+            new UpdateProductRequest(null, null, null, null, null, null, null, null, false,
+                null, null, null, null, null, null, null, null));
+        assertThat(ok.tryOnEnabled()).isFalse();
+        assertThat(ok.garmentUrl()).isNull();
     }
 
     @Test
@@ -1025,7 +1161,7 @@ class CatalogServiceTest {
         var pendingOwnerId = mirroredUser();
         var pendingShop = shops.register(
             pendingOwnerId,
-            ShopTestFixtures.createRequest("Shop Pending Batch", "shop-pending-batch")
+            ShopTestFixtures.createRequest(uploads, "Shop Pending Batch", "shop-pending-batch")
         );
 
         var active1 = catalog.createProduct(ownerId, shopId, productRequest("batch-p1"));
@@ -1045,7 +1181,8 @@ class CatalogServiceTest {
         assertThat(summaries.get(0).id()).isEqualTo(active2.id());
         assertThat(summaries.get(0).shopId()).isEqualTo(shopId);
         assertThat(summaries.get(0).minPrice()).isEqualTo(275000L);
-        assertThat(summaries.get(0).defaultImageKey()).isEqualTo("img1.jpg");
+        var batchP2ImageKeys = Objects.requireNonNull(productImageKeysBySlug.get("batch-p2"));
+        assertThat(summaries.get(0).defaultImageUrl()).isEqualTo(s3Urls.publicUrl(batchP2ImageKeys.get(0)));
         assertThat(summaries.get(0).rank()).isNull();
         assertThat(summaries.get(1).id()).isEqualTo(active1.id());
         assertThat(summaries.get(1).minPrice()).isEqualTo(100000L);

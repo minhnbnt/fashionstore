@@ -5,6 +5,8 @@ import com.minhnbnt.fashionstore.dto.admin.StatusHistoryResponse;
 import com.minhnbnt.fashionstore.dto.common.PageResponse;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.dto.identity.UserResponse;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.model.AccountStatus;
 import com.minhnbnt.fashionstore.model.UserProfile;
 import com.minhnbnt.fashionstore.model.UserRole;
@@ -34,6 +36,10 @@ public class UserService {
 
     private final UserAdminQueryRepository adminQueries;
 
+    private final UploadRepository uploads;
+
+    private final S3UrlService s3Urls;
+
     @Transactional
     public UserResponse upsert(@NonNull UUID id, @NonNull CreateUserRequest request) {
 
@@ -46,12 +52,7 @@ public class UserService {
             return toResponse(users.save(profile));
         }
 
-        var created = UserProfile.create(
-            id,
-            request.email(),
-            request.displayName(),
-            request.avatarKey()
-        );
+        var created = UserProfile.create(id, request.email(), request.displayName());
 
         return toResponse(users.save(created));
     }
@@ -71,10 +72,11 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse changeAvatar(@NonNull UUID id, @NonNull String avatarKey) {
+    public UserResponse changeAvatar(@NonNull UUID id, @NonNull UUID avatarUploadId) {
+        validateAvatarUpload(avatarUploadId);
         var profile = lockedProfile(id);
 
-        profile.changeAvatar(avatarKey);
+        profile.changeAvatar(avatarUploadId);
         return toResponse(users.save(profile));
     }
 
@@ -154,7 +156,7 @@ public class UserService {
             profile.getId(),
             profile.getEmail(),
             profile.getDisplayName(),
-            profile.getAvatarKey(),
+            avatarUrlOf(profile),
             profile.getRole().name(),
             profile.getStatus().name(),
             profile.getStatusReason(),
@@ -190,12 +192,41 @@ public class UserService {
         return profile;
     }
 
-    private static UserResponse toResponse(UserProfile profile) {
+    /**
+     * Upload phải tồn tại và content-type {@code image/*}. Bỏ {@code image/svg+xml} vì
+     * bucket public read, mở thẳng URL thì script trong file chạy được (giữ hành vi cũ
+     * khi validate theo extension).
+     */
+    private void validateAvatarUpload(UUID avatarUploadId) {
+
+        var upload = uploads.findById(avatarUploadId)
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, "Avatar upload not found"));
+
+        var contentType = upload.getContentType();
+        if (!contentType.startsWith("image/") || contentType.equals("image/svg+xml")) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, "Avatar upload is not a supported image");
+        }
+    }
+
+    private @Nullable String avatarUrlOf(UserProfile profile) {
+
+        var uploadId = profile.getAvatarUploadId();
+        if (uploadId == null) {
+            return null;
+        }
+
+        // FK bảo đảm upload tồn tại; thiếu là lỗi dữ liệu, fail loud.
+        return s3Urls.publicUrl(uploads.findById(uploadId).orElseThrow().getS3Key());
+    }
+
+    private UserResponse toResponse(UserProfile profile) {
         return new UserResponse(
             profile.getId(),
             profile.getEmail(),
             profile.getDisplayName(),
-            profile.getAvatarKey(),
+            avatarUrlOf(profile),
             profile.getRole().name(),
             profile.getStatus().name(),
             profile.getStatusReason(),

@@ -20,6 +20,7 @@
 - `V15__admin_order_monitoring.sql`: ghi nhận bên hủy đơn (`BUYER`/`SELLER`/`ADMIN`) và index phục vụ màn giám sát toàn sàn.
 - `V16__public_holiday.sql`: lịch nghỉ/ngày làm bù cho SLA đơn hàng + trạng thái đồng bộ Calendarific; seed lịch 2026–2027.
 - `V28__shop_invitations.sql`: Bảng `shop_invitations` (lưu lời mời nhân sự với `token` 64 hex, `expires_at` 7 ngày, partial unique index `(shop_id, lower(email))` khi `accepted_at IS NULL`). Bảng `shop_member` bổ sung cột `status VARCHAR(20) DEFAULT 'ACTIVE'` với constraint CHECK `status IN ('ACTIVE', 'DEACTIVATED')`.
+- `V37__upload_centralization.sql` + `V38`–`V44`: tập trung file vào bảng `upload` — backfill dedupe key từ 16 cột/mảng của 12 bảng, thay cột key bằng `*_upload_id` FK (avatar, KYC, product media/video/garment, banner/popup, chat, review, return evidence); queue pgmq `upload_gc` + trigger producer (chi tiết mục S3 / file).
 - Repository Spring Data JDBC: derived query sắp nhiều cột (`OrderByAAscBAsc`) làm AOT repository sinh code không compile được → viết `@Query` SQL tay.
 
 ## Search BM25 (pg_textsearch)
@@ -32,10 +33,14 @@
 
 ## S3 / file
 
-- DB chỉ lưu **key** (`avatar_key`, `s3_key`), không lưu URL. Presign upload qua `S3Storage`, key sinh từ UUID + extension từ content-type.
-- Bucket và policy đọc ẩn danh (`s3:GetObject`, `Principal: *`) do `S3Config` bảo đảm lúc tạo `S3Client` khi app khởi động: `headBucket` → thiếu thì tạo mới, policy luôn put lại (idempotent, lỗi S3 chỉ warn, không chặn boot). Frontend tự ghép `{public-base-url}/{key}`, base URL xem `config/springboot.yml` (`s3.public-base-url`).
-- URL ảnh public là path-style trên chính port S3, bucket name làm prefix: `http://localhost:9000/fashionstore/{key}`.
-- SDK gửi checksum mặc định bị một số S3-compatible gateway từ chối (`Invalid payload signature`): `S3Client` cấu hình `requestChecksumCalculation(WHEN_REQUIRED)` — xem `S3Config.java`. Không đụng `S3Presigner`.
+- **File tập trung vào entity `upload`** (từ `V37__upload_centralization.sql` + FK V38–V44): bảng nghiệp vụ KHÔNG còn cột key — mọi cột media là `*_upload_id` UUID FK → `upload(id, s3_key UNIQUE, content_type, created_at)`. `upload.s3_key` là chỗ duy nhất chứa key; DB không lưu URL.
+- Presign upload: `POST /api/uploads/presign` tạo row `upload` ngay, trả `{uploadId, uploadUrl, publicUrl, expiresAt}` — **không trả key**. `purpose` (`media` mặc định | `kyc`) quyết định prefix: `kyc` đặt key dưới `kyc/` riêng tư; `media` ở gốc bucket. `S3Storage.presign` dùng `S3Presigner` (PUT).
+- Bucket policy: đọc ẩn danh chỉ áp gốc bucket; **Deny ẩn danh trên `kyc/*`** (`S3Config` put idempotent lúc boot, kiểm chứng bởi `S3KycPolicyIntegrationTest` trên versitygw thật). `headBucket` → thiếu thì tạo bucket.
+- Response nghiệp vụ trả **URL hoàn chỉnh** do `S3UrlService` build — media public path-style `http://localhost:9000/fashionstore/{key}`, giấy tờ KYC trả presigned GET TTL 15 phút (`s3.kyc-url-ttl`, mặc định `PT15M`). Frontend không ghép URL tay, không nhìn thấy key.
+- Cập nhật field media = "always state intent": echo `uploadId` cũ = giữ nguyên, id mới = thay, **null = xoá** (JSON không phân biệt absent/explicit null). Xoá garment khi try-on đang bật bị chặn 400.
+- SDK gửi checksum mặc định bị một số S3-compatible gateway từ chối (`Invalid payload signature`): `S3Client` cấu hình `requestChecksumCalculation(WHEN_REQUIRED)` — xem `S3Config.java`.
+- GC rác upload — **producer** (`V37__upload_centralization.sql`): trigger `trg_upload_gc` sau mỗi INSERT vào `upload` đẩy message `{upload_id, s3_key}` vào pgmq queue `upload_gc` với delay 24h (`pgmq.send(..., 86400)` — row presign mà client không PUT, hoặc media bị null = xoá là rác có chủ đích). Backfill V37 cũng bắn message cho cả row cũ — vô hại, message nằm chờ. Message mang cả `s3_key` để consumer xoá được object kể cả khi row `upload` đã bị xoá trước đó.
+- TODO (consumer GC — **change riêng**, chưa làm): job định kỳ đọc `upload_gc`, với message đã visible: gọi hàm `upload_is_referenced(upload_id)` (check FK từ mọi bảng nghiệp vụ — cột FK đã đủ từ V38–V44) → không được tham chiếu thì xoá object S3 theo `s3_key` + row `upload`, rồi `pgmq.delete('upload_gc', msg_id)` ack. FK thật là "vệ sĩ": DELETE row đang bị tham chiếu nổ constraint, không xoá nhầm file đang dùng.
 
 ## Demo seed (dev-only)
 

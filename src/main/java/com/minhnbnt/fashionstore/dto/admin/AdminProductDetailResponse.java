@@ -22,8 +22,8 @@ public record AdminProductDetailResponse(
     @Schema(description = "Báo cáo của sản phẩm (mọi trạng thái), mới nhất trước, tối đa 100")
     List<AdminProductReportResponse> reports,
 
-    @Schema(nullable = true) @Nullable String videoKey,
-    @Schema(nullable = true) @Nullable String garmentKey,
+    @Schema(description = "URL public video giới thiệu", nullable = true) @Nullable String videoUrl,
+    @Schema(description = "URL public ảnh garment", nullable = true) @Nullable String garmentUrl,
     @Schema(description = "Hỗ trợ thử đồ ảo") Boolean tryOnEnabled,
     @Schema(nullable = true) @Nullable String material,
     @Schema(nullable = true) @Nullable String origin,

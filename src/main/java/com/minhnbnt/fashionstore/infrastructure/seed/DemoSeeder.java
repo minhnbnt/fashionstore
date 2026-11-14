@@ -20,7 +20,9 @@ import com.minhnbnt.fashionstore.features.shop.ShopDecorationService;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.features.shop.ShopStaffService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.model.Category;
+import com.minhnbnt.fashionstore.model.Upload;
 
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -73,6 +75,8 @@ public class DemoSeeder implements ApplicationRunner {
 
     private final UserService userService;
 
+    private final UploadRepository uploads;
+
     private final ShopRepository shopRepository;
 
     private final CategoryRepository categoryRepository;
@@ -93,6 +97,7 @@ public class DemoSeeder implements ApplicationRunner {
         ShopService shopService,
         CatalogService catalogService,
         UserService userService,
+        UploadRepository uploads,
         ShopRepository shopRepository,
         CategoryRepository categoryRepository,
         S3Client s3,
@@ -111,6 +116,7 @@ public class DemoSeeder implements ApplicationRunner {
         this.shopService = shopService;
         this.catalogService = catalogService;
         this.userService = userService;
+        this.uploads = uploads;
         this.shopRepository = shopRepository;
         this.categoryRepository = categoryRepository;
         this.s3 = s3;
@@ -129,6 +135,11 @@ public class DemoSeeder implements ApplicationRunner {
         );
     }
 
+    /** Tạo row upload MỚI cho media seed (không lookup) — trả id để gắn vào request nghiệp vụ. */
+    private UUID seedUploadId(String s3Key, String contentType) {
+        return uploads.save(Upload.create(s3Key, contentType)).getId();
+    }
+
     @Override
     public void run(ApplicationArguments args) {
         if (shopRepository.findBySlug(SHOP_SLUG).isPresent()) {
@@ -138,7 +149,7 @@ public class DemoSeeder implements ApplicationRunner {
         log.info("Seeding demo data (shop '{}')...", SHOP_SLUG);
 
         var ownerId = UUID.randomUUID();
-        userService.upsert(ownerId, new CreateUserRequest("demo-owner@local", "Demo Owner", null));
+        userService.upsert(ownerId, new CreateUserRequest("demo-owner@local", "Demo Owner"));
 
         var shop = shopService.register(
             ownerId,
@@ -146,8 +157,8 @@ public class DemoSeeder implements ApplicationRunner {
                 SHOP_NAME,
                 SHOP_SLUG,
                 "Mặc đẹp là nét riêng của bạn.",
-                "demo/logo.webp",
-                "demo/banner.webp",
+                seedUploadId("demo/logo.webp", "image/webp"),
+                seedUploadId("demo/banner.webp", "image/webp"),
                 "0901234567",
                 "123 Đường Thời Trang, Hà Nội",
                 "INDIVIDUAL",
@@ -156,9 +167,9 @@ public class DemoSeeder implements ApplicationRunner {
                 "01/01/2021",
                 "Cục Cảnh sát QLHC về TTXH",
                 null,
-                "demo/id-front.webp",
-                "demo/id-back.webp",
-                "demo/id-selfie.webp",
+                seedUploadId("demo/id-front.webp", "image/webp"),
+                seedUploadId("demo/id-back.webp", "image/webp"),
+                seedUploadId("demo/id-selfie.webp", "image/webp"),
                 null,
                 "Vietcombank",
                 "0123456789",
@@ -213,7 +224,7 @@ public class DemoSeeder implements ApplicationRunner {
     private AttachImagesRequest toImageRequest(List<String> keys) {
         var items = new ArrayList<ImageItemRequest>();
         for (int i = 0; i < keys.size(); i++) {
-            items.add(new ImageItemRequest(keys.get(i), null, i));
+            items.add(new ImageItemRequest(seedUploadId(keys.get(i), "image/jpeg"), null, i));
         }
         return new AttachImagesRequest(items);
     }

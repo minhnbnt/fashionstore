@@ -27,9 +27,9 @@ public class S3Storage {
 
     private final S3Presigner presigner;
 
-    public PresignedUpload presign(String contentType) {
+    public PresignedUpload presign(String contentType, String prefix) {
 
-        var key = UUID.randomUUID() + "." + extensionOf(contentType);
+        var key = prefix + UUID.randomUUID() + "." + extensionOf(contentType);
 
         var request = PutObjectRequest.builder()
             .bucket(bucket)

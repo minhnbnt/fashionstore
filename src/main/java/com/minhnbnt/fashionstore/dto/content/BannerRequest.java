@@ -11,6 +11,7 @@ import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
+import java.util.UUID;
 
 public record BannerRequest(
     @Schema(description = "Vị trí hiển thị", example = "HOME_CAROUSEL")
@@ -22,14 +23,12 @@ public record BannerRequest(
     @Size(max = 120)
     String title,
 
-    @Schema(description = "S3 key ảnh desktop (từ /api/uploads/presign)", example = "3f1c....webp")
-    @NotBlank
-    @Size(max = 255)
-    String imageKey,
+    @Schema(description = "Upload id ảnh desktop (từ /api/uploads/presign)", format = "uuid")
+    @NotNull
+    UUID imageUploadId,
 
-    @Schema(description = "S3 key ảnh mobile, bỏ trống thì dùng ảnh desktop")
-    @Size(max = 255)
-    @Nullable String mobileImageKey,
+    @Schema(description = "Upload id ảnh mobile, bỏ trống thì dùng ảnh desktop", format = "uuid")
+    @Nullable UUID mobileImageUploadId,
 
     @Schema(description = "Link khi bấm: đường dẫn nội bộ hoặc URL http(s)", example = "/search?q=ao%20khoac")
     @Size(max = 500)

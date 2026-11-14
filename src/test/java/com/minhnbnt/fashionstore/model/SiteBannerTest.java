@@ -17,12 +17,14 @@ class SiteBannerTest {
 
     @Test
     void createTrimsAndDropsBlankOptionals() {
+        var imageId = UUID.randomUUID();
         var banner = SiteBanner.create(
-            BannerPlacement.HOME_CAROUSEL, "  Sale thu  ", "a.webp", "  ", " ", 1, true, null, null, ADMIN_ID
+            BannerPlacement.HOME_CAROUSEL, "  Sale thu  ", imageId, null, " ", 1, true, null, null, ADMIN_ID
         );
 
         assertThat(banner.getTitle()).isEqualTo("Sale thu");
-        assertThat(banner.getMobileImageKey()).isNull();
+        assertThat(banner.getImageUploadId()).isEqualTo(imageId);
+        assertThat(banner.getMobileImageUploadId()).isNull();
         assertThat(banner.getLinkUrl()).isNull();
         assertThat(banner.getUpdatedBy()).isEqualTo(ADMIN_ID);
         assertThat(banner.isNew()).isTrue();
@@ -33,7 +35,7 @@ class SiteBannerTest {
         var start = Instant.parse("2026-10-20T00:00:00Z");
 
         assertThatThrownBy(() -> SiteBanner.create(
-            BannerPlacement.HOME_STRIP, "Sale", "a.webp", null, "/search", 0, true, start, start, ADMIN_ID
+            BannerPlacement.HOME_STRIP, "Sale", UUID.randomUUID(), null, "/search", 0, true, start, start, ADMIN_ID
         ))
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
@@ -43,19 +45,21 @@ class SiteBannerTest {
     @Test
     void updateReplacesEveryField() {
         var banner = SiteBanner.create(
-            BannerPlacement.HOME_CAROUSEL, "Sale", "a.webp", null, null, 0, true, null, null, ADMIN_ID
+            BannerPlacement.HOME_CAROUSEL, "Sale", UUID.randomUUID(), null, null, 0, true, null, null, ADMIN_ID
         );
         var start = Instant.parse("2026-10-20T00:00:00Z");
         var end = start.plus(Duration.ofDays(3));
         var editor = UUID.randomUUID();
+        var newImageId = UUID.randomUUID();
+        var newMobileImageId = UUID.randomUUID();
 
         banner.update(
-            BannerPlacement.HOME_STRIP, "Tết", "b.webp", "b-m.webp", "/search?q=ao", 5, false, start, end, editor
+            BannerPlacement.HOME_STRIP, "Tết", newImageId, newMobileImageId, "/search?q=ao", 5, false, start, end, editor
         );
 
         assertThat(banner.getPlacement()).isEqualTo(BannerPlacement.HOME_STRIP);
-        assertThat(banner.getImageKey()).isEqualTo("b.webp");
-        assertThat(banner.getMobileImageKey()).isEqualTo("b-m.webp");
+        assertThat(banner.getImageUploadId()).isEqualTo(newImageId);
+        assertThat(banner.getMobileImageUploadId()).isEqualTo(newMobileImageId);
         assertThat(banner.getLinkUrl()).isEqualTo("/search?q=ao");
         assertThat(banner.getSortOrder()).isEqualTo(5);
         assertThat(banner.isActive()).isFalse();

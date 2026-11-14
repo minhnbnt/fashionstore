@@ -26,14 +26,15 @@ class SitePopupTest {
 
     @Test
     void imageOnlyPopupIsFine() {
+        var imageId = UUID.randomUUID();
         var popup = SitePopup.create(
-            "Sale 10.10", null, null, "p.webp", " ", "/search",
+            "Sale 10.10", null, null, imageId, " ", "/search",
             PopupAudience.GUEST, PopupFrequency.ONCE, 3, 10, true, null, null, ADMIN_ID
         );
 
         assertThat(popup.getTitle()).isNull();
         assertThat(popup.getCtaLabel()).isNull();
-        assertThat(popup.getImageKey()).isEqualTo("p.webp");
+        assertThat(popup.getImageUploadId()).isEqualTo(imageId);
         assertThat(popup.getAudience()).isEqualTo(PopupAudience.GUEST);
         assertThat(popup.getDelaySeconds()).isEqualTo(3);
         assertThat(popup.getPriority()).isEqualTo(10);

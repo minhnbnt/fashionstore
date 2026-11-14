@@ -18,6 +18,7 @@ import com.minhnbnt.fashionstore.model.ReturnRequest;
 import com.minhnbnt.fashionstore.model.Review;
 import com.minhnbnt.fashionstore.test.ProductTestFixtures;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,6 +36,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
 class OrderTrackingRepositoryTest {
+
+    @Autowired
+
+    private UploadRepository uploads;
+
 
     @Autowired
     private OrderRepository orders;
@@ -65,7 +71,7 @@ class OrderTrackingRepositoryTest {
 
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("tr-" + id + "@t.local", "U", null));
+        users.upsert(id, new CreateUserRequest("tr-" + id + "@t.local", "U"));
         return id;
     }
 
@@ -75,7 +81,7 @@ class OrderTrackingRepositoryTest {
         var buyerId = mirroredUser();
         var adminId = mirroredUser();
         var suffix = UUID.randomUUID().toString().substring(0, 8);
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + suffix, "s-" + suffix));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop " + suffix, "s-" + suffix));
         shops.approve(adminId, shop.id());
 
         var product = catalog.createProduct(
@@ -123,7 +129,7 @@ class OrderTrackingRepositoryTest {
         var ready = orders.findDeliveredReadyForAutoComplete(now.minus(7, ChronoUnit.DAYS));
         assertThat(ready).extracting(Order::getId).contains(created.id());
 
-        returns.save(ReturnRequest.create(created.id(), shop.id(), buyerId, "DAMAGED", "Loi", new String[0]));
+        returns.save(ReturnRequest.create(created.id(), shop.id(), buyerId, "DAMAGED", "Loi"));
         var afterReturn = orders.findDeliveredReadyForAutoComplete(now.minus(7, ChronoUnit.DAYS));
         assertThat(afterReturn).noneMatch(o -> o.getId().equals(created.id()));
 
@@ -139,11 +145,9 @@ class OrderTrackingRepositoryTest {
             5,
             "San pham rat tot va dep",
             new String[0],
-            null,
-            new String[0],
             false
         );
-        r.update(4, "Sua lai nhan xet chi tiet", new String[0], null, new String[0], false);
+        r.update(4, "Sua lai nhan xet chi tiet", new String[0], false);
         reviews.save(r);
 
         var mine = reviews.findByBuyerIdOrderByUpdatedAtDescCreatedAtDesc(buyerId);

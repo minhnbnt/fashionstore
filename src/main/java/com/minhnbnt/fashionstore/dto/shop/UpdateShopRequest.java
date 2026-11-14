@@ -4,6 +4,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 
+import java.util.UUID;
+
 public record UpdateShopRequest(
     @Schema(description = "null = giữ nguyên", nullable = true)
     @Size(max = 200)
@@ -15,12 +17,12 @@ public record UpdateShopRequest(
     @Nullable
     String description,
 
-    @Schema(description = "null = giữ nguyên", nullable = true)
+    @Schema(description = "Id upload logo. Id cũ = giữ nguyên (echo từ ShopResponse.logoUploadId), id mới = đổi, null = xoá logo", nullable = true)
     @Nullable
-    String logoKey,
+    UUID logoUploadId,
 
-    @Schema(description = "null = giữ nguyên", nullable = true)
+    @Schema(description = "Id upload banner. Id cũ = giữ nguyên (echo từ ShopResponse.bannerUploadId), id mới = đổi, null = xoá banner", nullable = true)
     @Nullable
-    String bannerKey
+    UUID bannerUploadId
 ) {
 }

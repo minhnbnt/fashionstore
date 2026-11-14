@@ -27,6 +27,7 @@ import com.minhnbnt.fashionstore.model.ShopMember;
 import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.model.ShopRole;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -48,6 +49,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class SellerPermissionEnforcementTest {
+
+    @Autowired
+
+    private UploadRepository uploads;
+
 
     @Autowired
     private OrderService orders;
@@ -99,13 +105,13 @@ class SellerPermissionEnforcementTest {
 
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("perm-" + id + "@t.local", "Perm User", null));
+        users.upsert(id, new CreateUserRequest("perm-" + id + "@t.local", "Perm User"));
         return id;
     }
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = mirroredUser();
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }
@@ -141,7 +147,7 @@ class SellerPermissionEnforcementTest {
 
     private UUID pendingReturn(UUID shopId, UUID buyerId) {
         var orderId = pendingOrder(shopId, buyerId);
-        var request = ReturnRequest.create(orderId, shopId, buyerId, "DEFECT", null, new String[0]);
+        var request = ReturnRequest.create(orderId, shopId, buyerId, "DEFECT", null);
 
         return returnRepository.save(request).getId();
     }
@@ -163,8 +169,6 @@ class SellerPermissionEnforcementTest {
             null,
             5,
             "San pham dung mo ta va dep",
-            new String[0],
-            null,
             new String[0],
             false
         );

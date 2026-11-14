@@ -9,13 +9,21 @@ Base: `com.minhnbnt.fashionstore` — shop | catalog | order | identity (mỗi d
 - `OpenApiProblemCustomizer` tự gắn body `application/problem+json` cho 400/401/403/404/409 của mọi endpoint trong spec.
 - 401/403 từ security filter body rỗng — UI chỉ dựa status code.
 
+## Luồng upload tập trung (uploadId) — dùng chung mọi flow
+
+1. Client gọi `POST /api/uploads/presign` `{contentType, purpose?: "media"|"kyc"}` → nhận `{uploadId, uploadUrl, publicUrl, expiresAt}`; hệ thống tạo row `upload` ngay tại presign, **không trả S3 key**. `purpose: kyc` đặt key dưới prefix riêng tư `kyc/` (Deny ẩn danh), còn lại ở gốc bucket public.
+2. Client `PUT` file thẳng lên `uploadUrl`, rồi gửi `uploadId` vào request nghiệp vụ (avatar, logo/banner, sản phẩm, banner/popup, chat, review, đổi trả, KYC).
+3. Response nghiệp vụ trả **URL hoàn chỉnh** (`*Url` public path-style; KYC trả presigned GET TTL 15 phút) + `uploadId` để client echo khi sửa.
+4. Cập nhật field media là "always state intent": echo id cũ = giữ nguyên, id mới = thay, **null = xoá** (JSON không phân biệt absent/explicit null — absent cũng là xoá). Xoá garment khi try-on đang bật bị chặn 400.
+5. File mồ côi (presign không PUT, media bị xoá) được queue pgmq `upload_gc` (delay 24h) chờ consumer dọn — chi tiết `docs/data.md` mục "S3 / file".
+
 ## Flow 1 — Identity
 
 | Xong | # | Method | Path | Mô tả |
 |------|---|--------|------|-------|
 | [x] | 1 | POST | `/api/users` | Mirror GoTrue user vào `user_profile` (authenticated, id từ JWT sub) |
 | [x] | 2 | GET | `/api/users/me` | Profile của user đang login |
-| [x] | 2b | PUT | `/api/users/me/avatar` | Đổi ảnh đại diện (nhận S3 key ảnh từ `/api/uploads/presign`) |
+| [x] | 2b | PUT | `/api/users/me/avatar` | Đổi ảnh đại diện (nhận `avatarUploadId` từ `/api/uploads/presign`; null/null-ish = xoá) |
 | [x] | 2c | DELETE | `/api/users/me/avatar` | Xóa ảnh đại diện |
 
 ## Flow 2 — Shop (đăng ký + duyệt)
@@ -43,8 +51,8 @@ Admin được xác định từ GoTrue `app_metadata.role=admin`; `user_profile
 | [x] | 10 | GET | `/api/categories` | Public danh mục (DemoSeeder seed sẵn, chưa cần CRUD) |
 | [x] | 11 | POST | `/api/shops/{shopId}/products` | Tạo product kèm variants (OWNER/STAFF, shop đã `APPROVED`) |
 | [x] | 12 | PUT | `/api/shops/{shopId}/products/{id}` | Sửa product / variant / tồn kho |
-| [x] | 13 | POST | `/api/uploads/presign` | Xin URL upload ảnh (`S3Storage` có sẵn) |
-| [x] | 14 | POST | `/api/shops/{shopId}/products/{id}/images` | Gắn `s3_key` vào product |
+| [x] | 13 | POST | `/api/uploads/presign` | Xin `{uploadId, uploadUrl, publicUrl, expiresAt}` — tạo row `upload` ngay, không trả key; `purpose: media\|kyc` chọn prefix lưu trữ |
+| [x] | 14 | POST | `/api/shops/{shopId}/products/{id}/images` | Gắn ảnh (theo `uploadId`) vào product |
 | [x] | 15 | GET | `/api/products/{id}` | Public chi tiết sản phẩm |
 | [x] | 15b | GET | `/api/products/batch?ids=id1,id2,…` | Public summary tối đa 20 product theo id, đúng thứ tự; chỉ `ACTIVE` của shop `APPROVED`, id không hiển thị được bị bỏ qua (phục vụ agent AI show sản phẩm) |
 | [x] | 16 | GET | `/api/search/products?q=&category=&size=&color=&minPrice=&maxPrice=&sort=&page=` | Search BM25 + lọc danh mục/biến thể/giá + sắp xếp + phân trang (`idx_product_bm25`, bắt buộc `to_bm25query` + `status='ACTIVE'`) |

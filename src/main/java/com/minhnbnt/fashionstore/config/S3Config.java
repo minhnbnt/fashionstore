@@ -64,8 +64,11 @@ public class S3Config {
 
     /**
      * Prepares the upload bucket for anonymous browser reads: creates it when
-     * missing and attaches a public-read policy. Runs once at startup; S3
-     * problems are logged and skipped so the app still boots without storage.
+     * missing and attaches a policy that grants public read on the bucket while
+     * denying anonymous reads on the {@code kyc/} prefix (presigned requests
+     * signed with the root credentials are unaffected by the conditional deny).
+     * Runs once at startup; S3 problems are logged and skipped so the app still
+     * boots without storage.
      */
     static void ensurePublicBucket(S3Client s3, String bucket) {
         try {
@@ -106,18 +109,32 @@ public class S3Config {
 
     private static void putPublicReadPolicy(S3Client s3, String bucket) {
 
+        // Deny trần cho prefix kyc/: versitygw không hỗ trợ Condition (aws:PrincipalType bị
+        // từ chối 400 "invalid condition key") và root credentials đi qua policy nên presigned
+        // GET vẫn hoạt động — đã xác minh bằng S3KycPolicyIntegrationTest. Lưu ý: nếu sau này
+        // chuyển sang AWS S3 thật, Deny trần sẽ chặn cả presigned — khi đó thêm Condition
+        // {"StringEquals": {"aws:PrincipalType": "Anonymous"}} (AWS hỗ trợ key này).
         var policy = """
             {
                 "Version": "2012-10-17",
-                "Statement": [{
-                    "Sid": "PublicReadGetObject",
-                    "Effect": "Allow",
-                    "Principal": "*",
-                    "Action": "s3:GetObject",
-                    "Resource": "arn:aws:s3:::%s/*"
-                }]
+                "Statement": [
+                    {
+                        "Sid": "PublicReadGetObject",
+                        "Effect": "Allow",
+                        "Principal": "*",
+                        "Action": "s3:GetObject",
+                        "Resource": "arn:aws:s3:::%s/*"
+                    },
+                    {
+                        "Sid": "DenyAnonymousReadKyc",
+                        "Effect": "Deny",
+                        "Principal": "*",
+                        "Action": "s3:GetObject",
+                        "Resource": "arn:aws:s3:::%s/kyc/*"
+                    }
+                ]
             }
-        """.formatted(bucket).trim();
+            """.formatted(bucket, bucket).trim();
 
         var request = PutBucketPolicyRequest.builder()
             .bucket(bucket)

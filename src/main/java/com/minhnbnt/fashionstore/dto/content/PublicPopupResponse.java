@@ -16,7 +16,8 @@ public record PublicPopupResponse(
 
     @Nullable String body,
 
-    @Nullable String imageKey,
+    @Schema(description = "URL public ảnh popup, null = popup chỉ có chữ")
+    @Nullable String imageUrl,
 
     @Nullable String ctaLabel,
 
@@ -30,12 +31,12 @@ public record PublicPopupResponse(
     int delaySeconds
 ) {
 
-    public static PublicPopupResponse of(SitePopup popup) {
+    public static PublicPopupResponse of(SitePopup popup, @Nullable String imageUrl) {
         return new PublicPopupResponse(
             popup.getId(),
             popup.getTitle(),
             popup.getBody(),
-            popup.getImageKey(),
+            imageUrl,
             popup.getCtaLabel(),
             popup.getLinkUrl(),
             popup.getAudience(),

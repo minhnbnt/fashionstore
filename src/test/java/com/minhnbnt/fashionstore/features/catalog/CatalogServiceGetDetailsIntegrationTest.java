@@ -28,10 +28,14 @@ class CatalogServiceGetDetailsIntegrationTest {
     @Autowired
     private JdbcClient jdbc;
 
+    @Autowired
+    private com.minhnbnt.fashionstore.features.upload.S3UrlService s3Urls;
+
     private UUID shopId;
     private UUID categoryId;
     private UUID prod1Id; // đầy đủ dữ liệu: variant + image + 1 review 4 sao
     private UUID prod2Id; // có variant, không review
+    private String prod1ImageKey;
 
     @BeforeEach
     void setUp() {
@@ -44,7 +48,7 @@ class CatalogServiceGetDetailsIntegrationTest {
         insertCategory();
         insertProduct(prod1Id, "Áo Có Đầy Đủ Dữ Liệu", Instant.now().minusSeconds(1000));
         insertVariant(prod1Id, 250000, null);
-        insertImage(prod1Id, "shop/ao-day-du-1.jpg", 1);
+        prod1ImageKey = insertImage(prod1Id, 1);
         insertBuyerAndReview(prod1Id, 4);
         insertProduct(prod2Id, "Áo Không Review", Instant.now().minusSeconds(500));
         insertVariant(prod2Id, 150000, 300000L);
@@ -96,11 +100,11 @@ class CatalogServiceGetDetailsIntegrationTest {
         assertThat(summaries).hasSize(2);
         assertThat(summaries.get(0).id()).isEqualTo(prod2Id);
         assertThat(summaries.get(0).minPrice()).isEqualTo(150000L);
-        assertThat(summaries.get(0).defaultImageKey()).isNull();
+        assertThat(summaries.get(0).defaultImageUrl()).isNull();
         assertThat(summaries.get(0).rank()).isNull();
         assertThat(summaries.get(1).id()).isEqualTo(prod1Id);
         assertThat(summaries.get(1).minPrice()).isEqualTo(250000L);
-        assertThat(summaries.get(1).defaultImageKey()).isEqualTo("shop/ao-day-du-1.jpg");
+        assertThat(summaries.get(1).defaultImageUrl()).isEqualTo(s3Urls.publicUrl(prod1ImageKey));
     }
 
     @Test
@@ -160,16 +164,24 @@ class CatalogServiceGetDetailsIntegrationTest {
             .update();
     }
 
-    private void insertImage(UUID productId, String s3Key, int sortOrder) {
+    /** Tạo row upload (s3_key UNIQUE nên key phải unique theo prodId) + product_image tham chiếu. */
+    private String insertImage(UUID productId, int sortOrder) {
+        var s3Key = "shop/" + productId + "-" + sortOrder + "-"
+            + UUID.randomUUID().toString().substring(0, 8) + ".jpg";
+        jdbc.sql("INSERT INTO upload (id, s3_key, content_type) VALUES (:id, :s3Key, 'image/jpeg')")
+            .param("id", UUID.randomUUID())
+            .param("s3Key", s3Key)
+            .update();
         jdbc.sql("""
-            INSERT INTO product_image (id, product_id, s3_key, sort_order)
-            VALUES (:id, :prodId, :s3Key, :sortOrder)
+            INSERT INTO product_image (id, product_id, upload_id, sort_order)
+            VALUES (:id, :prodId, (SELECT id FROM upload WHERE s3_key = :s3Key), :sortOrder)
             """)
             .param("id", UUID.randomUUID())
             .param("prodId", productId)
             .param("s3Key", s3Key)
             .param("sortOrder", sortOrder)
             .update();
+        return s3Key;
     }
 
     private void insertBuyerAndReview(UUID productId, int stars) {

@@ -33,7 +33,7 @@ class IdentityDirectoryServiceTest {
     @Test
     void findByEmailUsesDatabaseWithoutCallingGoTrue() {
         var id = UUID.randomUUID();
-        var profile = UserProfile.create(id, "staff@store.com", "Staff", null);
+        var profile = UserProfile.create(id, "staff@store.com", "Staff");
 
         when(users.findByEmailIgnoreCase("staff@store.com")).thenReturn(Optional.of(profile));
 
@@ -59,7 +59,7 @@ class IdentityDirectoryServiceTest {
     @Test
     void findByEmailUpsertsAndRereadsOnGoTrueHit() {
         var id = UUID.randomUUID();
-        var profile = UserProfile.create(id, "staff@store.com", "staff@store.com", null);
+        var profile = UserProfile.create(id, "staff@store.com", "staff@store.com");
 
         when(users.findByEmailIgnoreCase("staff@store.com")).thenReturn(Optional.empty());
         when(gotrue.isConfigured()).thenReturn(true);

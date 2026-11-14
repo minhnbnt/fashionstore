@@ -96,54 +96,38 @@ class UserControllerTest {
     void changeAvatarWithoutAuthIsUnauthorized() throws Exception {
         mockMvc.perform(put("/api/users/me/avatar")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"avatarKey\":\"key.png\"}"))
+                .content("{\"avatarUploadId\":\"" + UUID.randomUUID() + "\"}"))
             .andExpect(status().isUnauthorized());
     }
 
     @Test
     void changeAvatarReturnsProfile() throws Exception {
         var id = UUID.randomUUID();
-        var key = UUID.randomUUID() + ".png";
-        var response = new UserResponse(id, "a@t.local", "An", key, "CUSTOMER", "ACTIVE", null, Instant.now());
-        when(userService.changeAvatar(id, key)).thenReturn(response);
+        var uploadId = UUID.randomUUID();
+        var response = new UserResponse(
+            id, "a@t.local", "An", "http://localhost:9000/fashionstore/" + uploadId + ".png",
+            "CUSTOMER", "ACTIVE", null, Instant.now());
+        when(userService.changeAvatar(id, uploadId)).thenReturn(response);
 
         mockMvc.perform(put("/api/users/me/avatar")
                 .with(jwt().jwt(builder -> builder.subject(id.toString())))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"avatarKey\":\"" + key + "\"}"))
+                .content("{\"avatarUploadId\":\"" + uploadId + "\"}"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.avatarKey").value(key));
+            .andExpect(jsonPath("$.avatarUrl").value("http://localhost:9000/fashionstore/" + uploadId + ".png"));
     }
 
     @Test
-    void changeAvatarRejectsNonImageKey() throws Exception {
+    void changeAvatarRejectsMalformedUploadId() throws Exception {
         mockMvc.perform(put("/api/users/me/avatar")
                 .with(jwt())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"avatarKey\":\"https://evil.example/a.png\"}"))
+                .content("{\"avatarUploadId\":\"../avatar/a.png\"}"))
             .andExpect(status().isBadRequest());
     }
 
     @Test
-    void changeAvatarRejectsSvgKey() throws Exception {
-        mockMvc.perform(put("/api/users/me/avatar")
-                .with(jwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"avatarKey\":\"" + UUID.randomUUID() + ".svg\"}"))
-            .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void changeAvatarRejectsTraversalKey() throws Exception {
-        mockMvc.perform(put("/api/users/me/avatar")
-                .with(jwt())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"avatarKey\":\"../avatar/a.png\"}"))
-            .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void clearAvatarReturnsProfileWithoutKey() throws Exception {
+    void clearAvatarReturnsProfileWithoutUrl() throws Exception {
         var id = UUID.randomUUID();
         var response = new UserResponse(id, "a@t.local", "An", null, "CUSTOMER", "ACTIVE", null, Instant.now());
         when(userService.clearAvatar(id)).thenReturn(response);
@@ -151,6 +135,6 @@ class UserControllerTest {
         mockMvc.perform(delete("/api/users/me/avatar")
                 .with(jwt().jwt(builder -> builder.subject(id.toString()))))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.avatarKey").doesNotExist());
+            .andExpect(jsonPath("$.avatarUrl").doesNotExist());
     }
 }

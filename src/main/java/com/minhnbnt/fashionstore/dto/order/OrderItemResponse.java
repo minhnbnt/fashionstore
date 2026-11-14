@@ -35,9 +35,9 @@ public record OrderItemResponse(
     @Schema(description = "Thành tiền")
     long lineTotal,
 
-    @Schema(description = "Storage key ảnh đại diện sản phẩm/biến thể", nullable = true)
+    @Schema(description = "URL public ảnh đại diện sản phẩm/biến thể", nullable = true)
     @Nullable
-    String imageKey,
+    String imageUrl,
 
     @Schema(description = "Sản phẩm còn đang mở bán hay đã ẩn/ngừng bán")
     boolean productAvailable

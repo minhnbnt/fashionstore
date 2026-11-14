@@ -6,12 +6,16 @@ import com.minhnbnt.fashionstore.dto.order.RejectReturnRequest;
 import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
 import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
+import com.minhnbnt.fashionstore.features.order.repository.ReturnEvidenceRepository;
 import com.minhnbnt.fashionstore.features.order.repository.ReturnRequestRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.model.Order;
 import com.minhnbnt.fashionstore.model.ReturnRequest;
 import com.minhnbnt.fashionstore.model.ShopPermission;
+import com.minhnbnt.fashionstore.model.Upload;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,6 +59,15 @@ class ReturnRequestServiceUnitTest {
     @Mock
     private NotificationService notifications;
 
+    @Mock
+    private ReturnEvidenceRepository evidence;
+
+    @Mock
+    private UploadRepository uploads;
+
+    @Mock
+    private S3UrlService s3Urls;
+
     @InjectMocks
     private ReturnRequestService returnService;
 
@@ -78,7 +91,7 @@ class ReturnRequestServiceUnitTest {
 
         when(orders.findById(orderId)).thenReturn(Optional.of(order));
 
-        var req = new CreateReturnRequest("DAMAGED", "Item broken", List.of("img1.jpg"));
+        var req = new CreateReturnRequest("DAMAGED", "Item broken", null);
 
         assertThatThrownBy(() -> returnService.create(userId, orderId, req))
             .isInstanceOf(ResponseStatusException.class);
@@ -111,17 +124,22 @@ class ReturnRequestServiceUnitTest {
             shopId,
             userId,
             "DAMAGED",
-            "Item broken",
-            new String[]{"img1.jpg"}
+            "Item broken"
         );
         when(returns.save(any(ReturnRequest.class))).thenReturn(ret);
 
-        var req = new CreateReturnRequest("DAMAGED", "Item broken", List.of("img1.jpg"));
+        var evidenceId = UUID.randomUUID();
+        when(uploads.findById(evidenceId)).thenReturn(
+            Optional.of(Upload.create("returns/" + evidenceId + ".webp", "image/webp")));
+
+        var req = new CreateReturnRequest("DAMAGED", "Item broken", List.of(evidenceId));
         var resp = returnService.create(userId, orderId, req);
 
         assertThat(resp.orderId()).isEqualTo(orderId);
         assertThat(resp.status()).isEqualTo("REQUESTED");
+        assertThat(resp.evidence()).isEmpty();
         verify(returns).save(any(ReturnRequest.class));
+        verify(evidence).saveAll(any());
     }
 
     @Test
@@ -135,8 +153,7 @@ class ReturnRequestServiceUnitTest {
             shopId,
             userId,
             "DAMAGED",
-            "Broken",
-            new String[]{"img.jpg"}
+            "Broken"
         );
 
         when(returns.findById(returnId)).thenReturn(Optional.of(ret));
@@ -162,8 +179,7 @@ class ReturnRequestServiceUnitTest {
             shopId,
             userId,
             "DAMAGED",
-            "Broken",
-            new String[]{"img.jpg"}
+            "Broken"
         );
 
         when(returns.findById(returnId)).thenReturn(Optional.of(ret));
@@ -210,10 +226,17 @@ class ReturnRequestServiceUnitTest {
         when(orders.findAllById(any())).thenReturn(List.of(order));
         when(shops.findActiveUserIdsByShop(shopId)).thenReturn(List.of(sellerId));
 
+        var imageId = UUID.randomUUID();
+        var videoId = UUID.randomUUID();
+        when(uploads.findById(imageId)).thenReturn(
+            Optional.of(Upload.create("returns/" + imageId + ".webp", "image/webp")));
+        when(uploads.findById(videoId)).thenReturn(
+            Optional.of(Upload.create("returns/" + videoId + ".mp4", "video/mp4")));
+
         var created = returnService.create(
             buyerId,
             order.getId(),
-            new CreateReturnRequest("DAMAGED", "Rach tay ao", List.of("a.jpg", "b.mp4"))
+            new CreateReturnRequest("DAMAGED", "Rach tay ao", List.of(imageId, videoId))
         );
         assertThat(created.orderCode()).isEqualTo("ORD-RET1");
         assertThat(created.orderStatus()).isEqualTo("DELIVERED");
@@ -232,8 +255,7 @@ class ReturnRequestServiceUnitTest {
             shopId,
             buyerId,
             "DAMAGED",
-            "Rach tay ao",
-            new String[]{"a.jpg"}
+            "Rach tay ao"
         );
         when(returns.findById(entity.getId())).thenReturn(Optional.of(entity));
         var approved = returnService.approve(
@@ -269,8 +291,7 @@ class ReturnRequestServiceUnitTest {
             shopId,
             buyerId,
             "WRONG_ITEM",
-            "Sai size",
-            new String[]{}
+            "Sai size"
         );
         when(returns.findById(rejectedEntity.getId())).thenReturn(Optional.of(rejectedEntity));
         var rejected = returnService.reject(

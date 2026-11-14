@@ -43,6 +43,8 @@ import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.review.ReviewService;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.infrastructure.media.VideoMetadataService;
 import com.minhnbnt.fashionstore.model.Product;
 import com.minhnbnt.fashionstore.model.ProductAuditLog;
@@ -54,6 +56,7 @@ import com.minhnbnt.fashionstore.model.ProductViolationType;
 import com.minhnbnt.fashionstore.model.ReportStatus;
 import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.model.StockMovement;
+import com.minhnbnt.fashionstore.model.Upload;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -68,6 +71,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.HashMap;
@@ -125,6 +129,10 @@ public class CatalogService {
 
     private final ObjectMapper objectMapper;
 
+    private final UploadRepository uploads;
+
+    private final S3UrlService s3Urls;
+
     @Transactional
     public ProductResponse createProduct(
         @NonNull UUID userId,
@@ -142,7 +150,7 @@ public class CatalogService {
         requireCategoryExists(request.categoryId());
 
         if (Boolean.TRUE.equals(request.tryOnEnabled())) {
-            if (request.garmentKey() == null || request.garmentKey().isBlank()) {
+            if (request.garmentUploadId() == null) {
                 throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Garment image is required when virtual try-on is enabled"
@@ -165,7 +173,9 @@ public class CatalogService {
             );
         }
 
-        videoMetadataService.validateVideoDuration(request.videoKey());
+        if (request.videoUploadId() != null) {
+            videoMetadataService.validateVideoDuration(requireVideoUpload(request.videoUploadId()).getS3Key());
+        }
 
         var shop = shops.requireShop(shopId);
 
@@ -207,8 +217,8 @@ public class CatalogService {
             finalSlug,
             Objects.requireNonNullElse(request.description(), ""),
             initialStatus,
-            request.videoKey(),
-            request.garmentKey(),
+            request.videoUploadId(),
+            request.garmentUploadId(),
             Boolean.TRUE.equals(request.tryOnEnabled()),
             request.material(),
             request.origin(),
@@ -247,11 +257,14 @@ public class CatalogService {
         }
 
         if (request.images() != null && !request.images().isEmpty()) {
+            for (var img : request.images()) {
+                requireImageUpload(img.uploadId());
+            }
             var imageEntities = request.images().stream()
                 .map(img -> ProductImage.create(
                     product.getId(),
                     img.variantId(),
-                    img.s3Key(),
+                    img.uploadId(),
                     img.sortOrder()
                 ))
                 .toList();
@@ -262,11 +275,12 @@ public class CatalogService {
         for (int i = 0; i < request.variants().size(); i++) {
             var reqVar = request.variants().get(i);
             var createdVar = createdVariants.get(i);
-            if (reqVar.imageKey() != null && !reqVar.imageKey().isBlank()) {
+            if (reqVar.imageUploadId() != null) {
+                requireImageUpload(reqVar.imageUploadId());
                 variantImages.add(ProductImage.create(
                     product.getId(),
                     createdVar.getId(),
-                    reqVar.imageKey(),
+                    reqVar.imageUploadId(),
                     0
                 ));
             }
@@ -328,9 +342,21 @@ public class CatalogService {
             requireCategoryExists(request.categoryId());
         }
 
-        if (request.videoKey() != null && !request.videoKey().isBlank()
-            && !request.videoKey().equals(product.getVideoKey())) {
-            videoMetadataService.validateVideoDuration(request.videoKey());
+        // Media: null = xoá, id = đặt/đổi (echo id cũ = không đổi)
+        if (request.videoUploadId() != null
+            && !request.videoUploadId().equals(product.getVideoUploadId())) {
+            videoMetadataService.validateVideoDuration(requireVideoUpload(request.videoUploadId()).getS3Key());
+        }
+
+        var effectiveTryOn = product.isTryOnEnabled();
+        if (request.tryOnEnabled() != null) {
+            effectiveTryOn = request.tryOnEnabled();
+        }
+        if (effectiveTryOn && request.garmentUploadId() == null) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Garment image is required when virtual try-on is enabled"
+            );
         }
 
         var changes = new ArrayList<String>();
@@ -364,15 +390,23 @@ public class CatalogService {
             oldValues.put("description", product.getDescription());
             newValues.put("description", request.description());
         }
-        if (request.videoKey() != null && !request.videoKey().equals(product.getVideoKey())) {
-            changes.add("Cập nhật video sản phẩm");
-            oldValues.put("videoKey", product.getVideoKey());
-            newValues.put("videoKey", request.videoKey());
+        if (!Objects.equals(request.videoUploadId(), product.getVideoUploadId())) {
+            if (request.videoUploadId() == null) {
+                changes.add("Xoá video sản phẩm");
+            } else {
+                changes.add("Cập nhật video sản phẩm");
+            }
+            oldValues.put("videoUploadId", product.getVideoUploadId());
+            newValues.put("videoUploadId", request.videoUploadId());
         }
-        if (request.garmentKey() != null && !request.garmentKey().equals(product.getGarmentKey())) {
-            changes.add("Cập nhật ảnh garment thử đồ ảo");
-            oldValues.put("garmentKey", product.getGarmentKey());
-            newValues.put("garmentKey", request.garmentKey());
+        if (!Objects.equals(request.garmentUploadId(), product.getGarmentUploadId())) {
+            if (request.garmentUploadId() == null) {
+                changes.add("Xoá ảnh garment thử đồ ảo");
+            } else {
+                changes.add("Cập nhật ảnh garment thử đồ ảo");
+            }
+            oldValues.put("garmentUploadId", product.getGarmentUploadId());
+            newValues.put("garmentUploadId", request.garmentUploadId());
         }
         if (request.tryOnEnabled() != null && request.tryOnEnabled() != product.isTryOnEnabled()) {
             if (request.tryOnEnabled()) {
@@ -449,8 +483,8 @@ public class CatalogService {
             request.name(),
             request.description(),
             request.categoryId(),
-            request.videoKey(),
-            request.garmentKey(),
+            request.videoUploadId(),
+            request.garmentUploadId(),
             request.tryOnEnabled(),
             request.material(),
             request.origin(),
@@ -470,12 +504,15 @@ public class CatalogService {
             var oldCount = images.findByProductIdOrderBySortOrderAsc(product.getId()).size();
             images.deleteByProductId(product.getId());
             var newImages = request.images().stream()
-                .map(img -> ProductImage.create(
-                    product.getId(),
-                    img.variantId(),
-                    img.s3Key(),
-                    img.sortOrder()
-                ))
+                .map(img -> {
+                    requireImageUpload(img.uploadId());
+                    return ProductImage.create(
+                        product.getId(),
+                        img.variantId(),
+                        img.uploadId(),
+                        img.sortOrder()
+                    );
+                })
                 .toList();
             images.saveAll(newImages);
             changes.add("Cập nhật bộ ảnh: " + oldCount + " ảnh cũ -> " + newImages.size() + " ảnh mới");
@@ -528,22 +565,30 @@ public class CatalogService {
             if (item.variantId() != null) {
                 requireVariantInProduct(product.getId(), item.variantId());
             }
+            requireImageUpload(item.uploadId());
         }
 
         var created = request.images().stream()
             .map(item -> ProductImage.create(
                 product.getId(),
                 item.variantId(),
-                item.s3Key(),
+                item.uploadId(),
                 item.sortOrder()
             ))
             .toList();
 
-        var savedImages = images.saveAll(created).spliterator();
+        var savedImages = new ArrayList<ProductImage>();
+        images.saveAll(created).forEach(savedImages::add);
 
-        return StreamSupport.stream(savedImages, false)
-            .map(CatalogMapper::toImageResponse)
-            .toList();
+        var urls = publicUrlsByUploadId(
+            savedImages.stream().map(ProductImage::getUploadId).toList()
+        );
+
+        var responses = new ArrayList<ImageResponse>(savedImages.size());
+        for (var img : savedImages) {
+            responses.add(CatalogMapper.toImageResponse(img, urls.get(img.getUploadId())));
+        }
+        return responses;
     }
 
     @Transactional(readOnly = true)
@@ -632,20 +677,39 @@ public class CatalogService {
 
         var ratings = reviews.ratingSummaries(visibleProducts.keySet());
 
+        var imageIds = new HashSet<UUID>();
+        for (var product : visibleProducts.values()) {
+            if (product.getVideoUploadId() != null) {
+                imageIds.add(product.getVideoUploadId());
+            }
+            if (product.getGarmentUploadId() != null) {
+                imageIds.add(product.getGarmentUploadId());
+            }
+        }
+        for (var image : imagesByProduct.values()) {
+            for (var img : image) {
+                imageIds.add(img.getUploadId());
+            }
+        }
+        var urls = publicUrlsByUploadId(imageIds);
+
         var responses = new ArrayList<ProductResponse>();
         for (var entry : visibleProducts.entrySet()) {
             var id = entry.getKey();
             var summary = ratings.getOrDefault(id, new RatingSummary(0, null));
+            var product = entry.getValue();
             responses.add(CatalogMapper.toResponse(
-                entry.getValue(),
+                product,
                 variantsByProduct.getOrDefault(id, List.of()).stream()
                     .map(CatalogMapper::toVariantResponse)
                     .toList(),
                 imagesByProduct.getOrDefault(id, List.of()).stream()
-                    .map(CatalogMapper::toImageResponse)
+                    .map(img -> CatalogMapper.toImageResponse(img, urls.get(img.getUploadId())))
                     .toList(),
                 summary.averageRating(),
-                summary.reviewCount()
+                summary.reviewCount(),
+                urls.get(product.getVideoUploadId()),
+                urls.get(product.getGarmentUploadId())
             ));
         }
         return responses;
@@ -724,8 +788,10 @@ public class CatalogService {
         var variantResponses = variants.findByProductIdOrderByCreatedAtAsc(productId).stream()
             .map(CatalogMapper::toVariantResponse)
             .toList();
-        var imageResponses = images.findByProductIdOrderBySortOrderAsc(productId).stream()
-            .map(CatalogMapper::toImageResponse)
+        var imageList = images.findByProductIdOrderBySortOrderAsc(productId);
+        var imageUrls = publicUrlsByUploadId(imageList.stream().map(ProductImage::getUploadId).toList());
+        var imageResponses = imageList.stream()
+            .map(img -> CatalogMapper.toImageResponse(img, imageUrls.get(img.getUploadId())))
             .toList();
 
         return new AdminProductDetailResponse(
@@ -735,8 +801,8 @@ public class CatalogService {
             imageResponses,
             adminQueries.history(productId),
             adminQueries.reports(productId),
-            product.getVideoKey(),
-            product.getGarmentKey(),
+            mediaUrlOf(product.getVideoUploadId()),
+            mediaUrlOf(product.getGarmentUploadId()),
             product.isTryOnEnabled(),
             product.getMaterial(),
             product.getOrigin(),
@@ -1194,8 +1260,10 @@ public class CatalogService {
             .map(CatalogMapper::toVariantResponse)
             .toList();
 
-        var imageResponses = images.findByProductIdOrderBySortOrderAsc(product.getId()).stream()
-            .map(CatalogMapper::toImageResponse)
+        var imageList = images.findByProductIdOrderBySortOrderAsc(product.getId());
+        var urls = publicUrlsByUploadId(imageList.stream().map(ProductImage::getUploadId).toList());
+        var imageResponses = imageList.stream()
+            .map(img -> CatalogMapper.toImageResponse(img, urls.get(img.getUploadId())))
             .toList();
 
         var summary = reviews.ratingSummary(product.getId());
@@ -1205,8 +1273,67 @@ public class CatalogService {
             variantResponses,
             imageResponses,
             summary.averageRating(),
-            summary.reviewCount()
+            summary.reviewCount(),
+            mediaUrlOf(product.getVideoUploadId()),
+            mediaUrlOf(product.getGarmentUploadId())
         );
+    }
+
+    /**
+     * Chỉ nhận ảnh trình duyệt render được. Bỏ {@code image/svg+xml}: bucket public read,
+     * mở thẳng URL thì script trong file chạy được (cùng lý do với avatar, logo shop).
+     */
+    private static boolean isSupportedImage(String contentType) {
+
+        return contentType.startsWith("image/") && !contentType.equals("image/svg+xml");
+    }
+
+    private Upload requireImageUpload(UUID uploadId) {
+
+        return requireUpload(uploadId, "Product image");
+    }
+
+    private Upload requireVideoUpload(UUID uploadId) {
+
+        var upload = requireUpload(uploadId, "Product video");
+        if (!upload.getContentType().startsWith("video/")) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, "Product video upload must be a video");
+        }
+        return upload;
+    }
+
+    private Upload requireUpload(UUID uploadId, String purpose) {
+
+        var upload = uploads.findById(uploadId).orElse(null);
+        if (upload == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, purpose + " upload not found");
+        }
+        if (purpose.equals("Product image") && !isSupportedImage(upload.getContentType())) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, purpose + " upload must be a supported image");
+        }
+        return upload;
+    }
+
+    private @Nullable String mediaUrlOf(@Nullable UUID uploadId) {
+
+        if (uploadId == null) {
+            return null;
+        }
+
+        // FK bảo đảm upload tồn tại; thiếu là lỗi dữ liệu, fail loud.
+        return s3Urls.publicUrl(uploads.findById(uploadId).orElseThrow().getS3Key());
+    }
+
+    /** Batch uploadId -> URL public cho danh sách ảnh sản phẩm. */
+    private Map<UUID, String> publicUrlsByUploadId(@NonNull Collection<UUID> uploadIds) {
+
+        var urls = new HashMap<UUID, String>();
+        for (var upload : uploads.findAllById(uploadIds)) {
+            urls.put(upload.getId(), s3Urls.publicUrl(upload.getS3Key()));
+        }
+        return urls;
     }
 
     @Transactional
@@ -1926,7 +2053,7 @@ public class CatalogService {
         var imgList = images.findByProductIdOrderBySortOrderAsc(product.getId());
         String defaultImg = null;
         if (!imgList.isEmpty()) {
-            defaultImg = imgList.getFirst().getS3Key();
+            defaultImg = mediaUrlOf(imgList.getFirst().getUploadId());
         }
         var variantResponses = varList.stream().map(CatalogMapper::toVariantResponse).toList();
         var soldCount = orderService.getSoldQuantityForProduct(product.getId());
@@ -2073,10 +2200,10 @@ public class CatalogService {
             }
         }
 
-        String defaultImageKey = null;
+        String defaultImageUrl = null;
         var productImages = images.findByProductIdOrderBySortOrderAsc(productId);
         if (!productImages.isEmpty()) {
-            defaultImageKey = productImages.get(0).getS3Key();
+            defaultImageUrl = mediaUrlOf(productImages.get(0).getUploadId());
         }
 
         return new WishlistProductCard(
@@ -2084,7 +2211,7 @@ public class CatalogService {
             product.getName(),
             product.getSlug(),
             minPrice,
-            defaultImageKey,
+            defaultImageUrl,
             true,
             null
         );

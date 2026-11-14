@@ -15,6 +15,7 @@ import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.infrastructure.GoTrueAdminClient;
 import com.minhnbnt.fashionstore.model.UserRole;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,6 +37,11 @@ import static org.mockito.Mockito.verify;
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class AdminServicesTest {
+
+    @Autowired
+
+    private UploadRepository uploads;
+
 
     @Autowired
     private AdminShopService adminShops;
@@ -63,12 +69,12 @@ class AdminServicesTest {
 
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U", null));
+        users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U"));
         return id;
     }
 
     private UUID registerShop(UUID ownerId, String slug) {
-        return shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug)).id();
+        return shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop " + slug, slug)).id();
     }
 
     @Test
@@ -124,6 +130,33 @@ class AdminServicesTest {
         assertThat(detail.history()).hasSize(2);
         assertThat(detail.productCount()).isZero();
         assertThat(detail.orderCount()).isZero();
+    }
+
+    @Test
+    void shopDetailKycDocsArePresignedAndMediaIsPublic() throws InterruptedException {
+        var ownerId = mirroredUser();
+        var shopId = registerShop(ownerId, "admin-kyc-urls");
+
+        var first = adminShops.getDetail(shopId).shop();
+
+        // Giấy tờ KYC: presigned GET SigV4 — có chữ ký, TTL 900s (~15 phút).
+        assertThat(first.idFrontUrl()).contains("X-Amz-Signature");
+        assertThat(first.idFrontUrl()).contains("X-Amz-Expires=900");
+        assertThat(first.idBackUrl()).contains("X-Amz-Signature");
+        assertThat(first.idSelfieUrl()).contains("X-Amz-Signature");
+
+        // Chữ ký có độ phân giải giây: chờ qua 1 giây để lần ký sau chắc chắn khác.
+        Thread.sleep(1100);
+        var second = adminShops.getDetail(shopId).shop();
+        assertThat(first.idFrontUrl()).isNotEqualTo(second.idFrontUrl());
+
+        // Media: URL public path-style — không chữ ký, bất biến giữa các lần gọi.
+        assertThat(first.logoUrl()).isNotNull().doesNotContain("X-Amz-Signature");
+        assertThat(first.bannerUrl()).isNotNull().doesNotContain("X-Amz-Signature");
+        assertThat(first.logoUrl()).isEqualTo(second.logoUrl());
+
+        // Fixture không nộp giấy chứng nhận ĐKKD.
+        assertThat(first.businessCertUrl()).isNull();
     }
 
     @Test

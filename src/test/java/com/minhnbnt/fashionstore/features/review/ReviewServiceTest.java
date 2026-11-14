@@ -18,6 +18,8 @@ import com.minhnbnt.fashionstore.model.ReviewSort;
 import com.minhnbnt.fashionstore.model.ReviewTag;
 import com.minhnbnt.fashionstore.test.ProductTestFixtures;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
+import com.minhnbnt.fashionstore.model.Upload;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,6 +37,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class ReviewServiceTest {
+
+    @Autowired
+
+    private UploadRepository uploads;
+
 
     @Autowired
     private ReviewService reviews;
@@ -63,13 +70,13 @@ class ReviewServiceTest {
 
     private UUID mirroredUser(String displayName) {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", displayName, null));
+        users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", displayName));
         return id;
     }
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = mirroredUser();
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }
@@ -132,6 +139,14 @@ class ReviewServiceTest {
         return new UpdateReviewRequest(stars, comment, null, null, null, false);
     }
 
+    /**
+     * Tạo row upload ảnh thật (key unique mỗi lần — s3_key UNIQUE, test Spring không
+     * rollback giữa các test). Trả row để assert URL theo key đã tạo.
+     */
+    private Upload newImageUpload() {
+        return uploads.save(Upload.create("reviews/" + UUID.randomUUID() + ".webp", "image/webp"));
+    }
+
     private static void assertStatus(ResponseStatusException e, HttpStatus status) {
         assertThat(e.getStatusCode()).isEqualTo(status);
     }
@@ -143,6 +158,9 @@ class ReviewServiceTest {
         var shopId = approvedShop(ownerId, "shop-rev-a");
         var purchased = deliveredProduct(ownerId, buyerId, shopId, "ao-rev-a", "SKU-REV-A");
 
+        var image1 = newImageUpload();
+        var image2 = newImageUpload();
+
         var response = reviews.createReview(
             buyerId,
             purchased.productId(),
@@ -150,7 +168,7 @@ class ReviewServiceTest {
                 purchased.orderId(),
                 5,
                 "Vải dày dặn, đường may rất chắc chắn.",
-                List.of("reviews/img-1.jpg", "reviews/img-2.jpg"),
+                List.of(image1.getId(), image2.getId()),
                 null,
                 List.of(ReviewTag.QUALITY_GOOD, ReviewTag.TRUE_TO_SIZE, ReviewTag.QUALITY_GOOD),
                 false
@@ -162,7 +180,11 @@ class ReviewServiceTest {
         assertThat(response.comment()).isEqualTo("Vải dày dặn, đường may rất chắc chắn.");
         assertThat(response.buyerDisplayName()).isEqualTo("Minh Nguyễn");
         assertThat(response.variantLabel()).contains("M").contains("Đen");
-        assertThat(response.imageKeys()).containsExactly("reviews/img-1.jpg", "reviews/img-2.jpg");
+        // Media trả URL public theo thứ tự uploadId, không trả key.
+        assertThat(response.media()).hasSize(2);
+        assertThat(response.media().get(0).kind()).isEqualTo("IMAGE");
+        assertThat(response.media().get(0).url()).endsWith(image1.getS3Key());
+        assertThat(response.media().get(1).url()).endsWith(image2.getS3Key());
         assertThat(response.tags()).containsExactly(ReviewTag.QUALITY_GOOD, ReviewTag.TRUE_TO_SIZE);
         assertThat(response.mine()).isTrue();
     }
@@ -307,7 +329,8 @@ class ReviewServiceTest {
                 purchased.orderId(),
                 5,
                 "Nhận xét đủ 10 ký tự hợp lệ rồi.",
-                List.of("1.jpg", "2.jpg", "3.jpg", "4.jpg", "5.jpg", "6.jpg"),
+                List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                    UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()),
                 null,
                 null,
                 false
@@ -330,10 +353,11 @@ class ReviewServiceTest {
         );
         assertThat(created.edited()).isFalse();
 
+        var imageUploadId = newImageUpload().getId();
         var updated = reviews.updateReviewById(
             buyerId,
             created.id(),
-            new UpdateReviewRequest(5, "Sau khi giặt vẫn giữ form xuất sắc.", List.of("a.jpg"), null, List.of(ReviewTag.QUALITY_GOOD), true)
+            new UpdateReviewRequest(5, "Sau khi giặt vẫn giữ form xuất sắc.", List.of(imageUploadId), null, List.of(ReviewTag.QUALITY_GOOD), true)
         );
 
         assertThat(updated.stars()).isEqualTo(5);
@@ -391,7 +415,7 @@ class ReviewServiceTest {
         var reviewA = reviews.createReview(
             buyerA,
             pA.productId(),
-            new CreateReviewRequest(pA.orderId(), 3, "Bài viết đầu tiên có kèm ảnh thực tế.", List.of("rev-a.jpg"), null, null, false)
+            new CreateReviewRequest(pA.orderId(), 3, "Bài viết đầu tiên có kèm ảnh thực tế.", List.of(newImageUpload().getId()), null, null, false)
         );
         var reviewB = reviews.createReview(
             buyerB,

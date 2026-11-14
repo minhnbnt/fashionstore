@@ -9,6 +9,7 @@ import com.minhnbnt.fashionstore.model.ShopMember;
 import com.minhnbnt.fashionstore.model.ShopMemberAudit;
 import com.minhnbnt.fashionstore.model.ShopRole;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,6 +30,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class StaffInvitationIntegrationTest {
+
+    @Autowired
+
+    private UploadRepository uploads;
+
 
     @Autowired
     private ShopStaffService staff;
@@ -229,7 +235,7 @@ class StaffInvitationIntegrationTest {
 
     private UUID user(String prefix) {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest(prefix + "-" + id + "@t.local", prefix, null));
+        users.upsert(id, new CreateUserRequest(prefix + "-" + id + "@t.local", prefix));
         return id;
     }
 
@@ -238,7 +244,7 @@ class StaffInvitationIntegrationTest {
     }
 
     private UUID shop(UUID ownerId) {
-        return shops.register(ownerId, ShopTestFixtures.createRequest(
+        return shops.register(ownerId, ShopTestFixtures.createRequest(uploads, 
             "Invitation Shop",
             "invitation-shop-" + UUID.randomUUID()
         )).id();

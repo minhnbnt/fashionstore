@@ -1166,7 +1166,7 @@ public class OrderService {
     ) {
         var responses = new ArrayList<OrderItemResponse>(orderItems.size());
         for (var item : orderItems) {
-            String imageKey = null;
+            String imageUrl = null;
             boolean productAvailable = false;
             var productId = item.getProductId();
             if (productId != null) {
@@ -1174,10 +1174,10 @@ public class OrderService {
                 if (info != null) {
                     productAvailable = info.available();
                     if (item.getVariantId() != null) {
-                        imageKey = info.variantImageKeys().get(item.getVariantId());
+                        imageUrl = info.variantImageUrls().get(item.getVariantId());
                     }
-                    if (imageKey == null) {
-                        imageKey = info.defaultImageKey();
+                    if (imageUrl == null) {
+                        imageUrl = info.defaultImageUrl();
                     }
                 }
             }
@@ -1191,7 +1191,7 @@ public class OrderService {
                 item.getUnitPrice(),
                 item.getQuantity(),
                 item.getLineTotal(),
-                imageKey,
+                imageUrl,
                 productAvailable
             ));
         }

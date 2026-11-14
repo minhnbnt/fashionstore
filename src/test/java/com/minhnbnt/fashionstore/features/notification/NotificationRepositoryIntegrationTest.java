@@ -153,7 +153,7 @@ class NotificationRepositoryIntegrationTest {
 
     private UUID user() {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("notification-" + id + "@t.local", "Notification User", null));
+        users.upsert(id, new CreateUserRequest("notification-" + id + "@t.local", "Notification User"));
         return id;
     }
 }

@@ -32,8 +32,6 @@ public class ReturnRequest implements Persistable<UUID> {
 
     private @Nullable String description;
 
-    private String[] evidenceKeys;
-
     private ReturnStatus status;
 
     private @Nullable String resolution;
@@ -50,7 +48,7 @@ public class ReturnRequest implements Persistable<UUID> {
     private boolean newRecord;
 
     public static ReturnRequest create(
-        UUID orderId, UUID shopId, UUID buyerId, String reason, @Nullable String description, String[] evidenceKeys) {
+        UUID orderId, UUID shopId, UUID buyerId, String reason, @Nullable String description) {
         var now = Instant.now();
         return new ReturnRequest(
             UUID.randomUUID(),
@@ -59,7 +57,6 @@ public class ReturnRequest implements Persistable<UUID> {
             buyerId,
             reason,
             description,
-            evidenceKeys,
             ReturnStatus.REQUESTED,
             null,
             null,
