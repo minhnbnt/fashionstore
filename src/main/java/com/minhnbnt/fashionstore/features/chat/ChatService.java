@@ -12,6 +12,8 @@ import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
 import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.infrastructure.realtime.ChatRealtimePublisher;
 import com.minhnbnt.fashionstore.model.ChatConversation;
 import com.minhnbnt.fashionstore.model.ChatMessage;
@@ -56,6 +58,10 @@ public class ChatService {
     private final NotificationService notifications;
 
     private final ChatRealtimePublisher realtime;
+
+    private final UploadRepository uploads;
+
+    private final S3UrlService s3Urls;
 
     @Transactional
     public ChatConversationResponse startConversation(@NonNull UUID buyerId, @NonNull UUID shopId) {
@@ -107,7 +113,7 @@ public class ChatService {
         verifyParticipant(userId, conv);
 
         return messages.findByConversationIdOrderBySentAtAsc(conversationId).stream()
-            .map(ChatService::toMessageResponse)
+            .map(this::toMessageResponse)
             .toList();
     }
 
@@ -141,14 +147,15 @@ public class ChatService {
             textContent = request.content().trim();
         }
         validateProductLinks(conv.getShopId(), textContent);
-        var previewText = buildPreviewText(textContent, request.imageKey());
+        validateImageUpload(request.imageUploadId());
+        var previewText = buildPreviewText(textContent, request.imageUploadId());
 
         var msg = ChatMessage.of(
             conversationId,
             userId,
             senderType,
             textContent,
-            request.imageKey()
+            request.imageUploadId()
         );
         messages.save(msg);
 
@@ -351,9 +358,9 @@ public class ChatService {
         }
     }
 
-    private static String buildPreviewText(String textContent, @Nullable String imageKey) {
+    private static String buildPreviewText(String textContent, @Nullable UUID imageUploadId) {
         if (textContent.isBlank()) {
-            if (imageKey != null) {
+            if (imageUploadId != null) {
                 return "[Hình ảnh]";
             }
             return "";
@@ -368,16 +375,49 @@ public class ChatService {
         return textContent;
     }
 
-    private static ChatMessageResponse toMessageResponse(ChatMessage m) {
+    private ChatMessageResponse toMessageResponse(ChatMessage m) {
         return new ChatMessageResponse(
             m.getId(),
             m.getConversationId(),
             m.getSenderId(),
             m.getSenderType(),
             m.getContent(),
-            m.getImageKey(),
+            resolveImageUrl(m.getImageUploadId()),
             m.getSentAt(),
             m.isRead()
         );
+    }
+
+    private @Nullable String resolveImageUrl(@Nullable UUID uploadId) {
+
+        if (uploadId == null) {
+            return null;
+        }
+        // FK + validate phía request bảo đảm upload tồn tại; thiếu là lỗi dữ liệu, fail loud.
+        return s3Urls.publicUrl(uploads.findById(uploadId).orElseThrow().getS3Key());
+    }
+
+    /**
+     * Chỉ nhận ảnh trình duyệt render được. Bỏ {@code image/svg+xml}: bucket public read,
+     * mở thẳng URL thì script trong file chạy được (cùng lý do với avatar, ảnh sản phẩm).
+     */
+    private static boolean isSupportedImage(String contentType) {
+
+        return contentType.startsWith("image/") && !contentType.equals("image/svg+xml");
+    }
+
+    private void validateImageUpload(@Nullable UUID uploadId) {
+
+        if (uploadId == null) {
+            return;
+        }
+        var upload = uploads.findById(uploadId).orElse(null);
+        if (upload == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chat image upload not found");
+        }
+        if (!isSupportedImage(upload.getContentType())) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, "Chat image upload must be a supported image");
+        }
     }
 }
