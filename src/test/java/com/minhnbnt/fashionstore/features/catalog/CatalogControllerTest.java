@@ -2,7 +2,6 @@ package com.minhnbnt.fashionstore.features.catalog;
 
 import com.minhnbnt.fashionstore.config.SecurityConfig;
 import com.minhnbnt.fashionstore.dto.catalog.CategoryResponse;
-import com.minhnbnt.fashionstore.dto.catalog.PresignResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSearchRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSearchResponse;
@@ -13,8 +12,6 @@ import com.minhnbnt.fashionstore.features.catalog.controller.CategoryController;
 import com.minhnbnt.fashionstore.features.catalog.controller.PublicProductController;
 import com.minhnbnt.fashionstore.features.catalog.controller.SearchController;
 import com.minhnbnt.fashionstore.features.catalog.controller.ShopProductController;
-import com.minhnbnt.fashionstore.features.catalog.controller.UploadController;
-import com.minhnbnt.fashionstore.infrastructure.S3Storage;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,8 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     CategoryController.class,
     ShopProductController.class,
     PublicProductController.class,
-    SearchController.class,
-    UploadController.class
+    SearchController.class
 })
 @Import(SecurityConfig.class)
 class CatalogControllerTest {
@@ -59,9 +55,6 @@ class CatalogControllerTest {
 
     @MockitoBean
     private CatalogService catalog;
-
-    @MockitoBean
-    private S3Storage storage;
 
     private static ProductResponse product(UUID id, UUID shopId) {
         return new ProductResponse(
@@ -381,39 +374,5 @@ class CatalogControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.sizes[1]").value("M"))
             .andExpect(jsonPath("$.maxPrice").value(300000));
-    }
-
-    @Test
-    void presignNeedsAuth() throws Exception {
-        mockMvc.perform(post("/api/uploads/presign")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"contentType\":\"image/jpeg\"}"))
-            .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void presignRejectsNonImage() throws Exception {
-        var userId = UUID.randomUUID();
-
-        mockMvc.perform(post("/api/uploads/presign")
-                .with(jwt().jwt(builder -> builder.subject(userId.toString())))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"contentType\":\"text/plain\"}"))
-            .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void presignReturnsKeyAndUrl() throws Exception {
-        var userId = UUID.randomUUID();
-        var now = Instant.now();
-        when(storage.presign("image/jpeg"))
-            .thenReturn(new S3Storage.PresignedUpload("abc.jpg", "http://x/abc.jpg", now));
-
-        mockMvc.perform(post("/api/uploads/presign")
-                .with(jwt().jwt(builder -> builder.subject(userId.toString())))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"contentType\":\"image/jpeg\"}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.key").value("abc.jpg"));
     }
 }
