@@ -36,7 +36,12 @@ public class TestcontainersConfiguration {
 
     private static @Nullable GenericContainer<?> sharedS3;
 
-    @Bean
+    /**
+     * Container dùng chung cho cả JVM. {@code destroyMethod = ""} chặn Spring gọi {@code close()} khi một
+     * context bị destroy — nếu không, một context fail giữa chừng sẽ kill container dùng chung và làm nổ
+     * dây chuyền {@code ConnectException} cho mọi context còn lại (JUnit chạy class song song).
+     */
+    @Bean(destroyMethod = "")
     PostgreSQLContainer postgresContainer() {
 
         synchronized (TestcontainersConfiguration.class) {
@@ -49,7 +54,8 @@ public class TestcontainersConfiguration {
         }
     }
 
-    @Bean
+    /** Tương tự {@link #postgresContainer()}: container sống theo JVM, không theo vòng đời context. */
+    @Bean(destroyMethod = "")
     GenericContainer<?> s3Container() {
         return s3();
     }
@@ -68,12 +74,16 @@ public class TestcontainersConfiguration {
     @Bean
     DynamicPropertyRegistrar s3Properties(@Qualifier("s3Container") GenericContainer<?> container) {
 
+        // Bucket riêng cho từng context: S3Config.ensureBucketExists sẽ tự tạo lúc boot,
+        // tránh data chéo giữa các context chạy song song.
+        var bucket = "fashionstore-test-" + UUID.randomUUID().toString().replace("-", "");
+
         return registry -> {
             registry.add("s3.endpoint", () -> endpointOf(container));
             registry.add("s3.public-base-url", () -> endpointOf(container));
             registry.add("s3.access-key", () -> S3_ACCESS_KEY);
             registry.add("s3.secret-key", () -> S3_SECRET_KEY);
-            registry.add("s3.bucket", () -> "fashionstore-test");
+            registry.add("s3.bucket", () -> bucket);
         };
     }
 
