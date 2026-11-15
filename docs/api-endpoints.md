@@ -57,6 +57,7 @@ Admin được xác định từ GoTrue `app_metadata.role=admin`; `user_profile
 | [x] | 15b | GET | `/api/products/batch?ids=id1,id2,…` | Public summary tối đa 20 product theo id, đúng thứ tự; chỉ `ACTIVE` của shop `APPROVED`, id không hiển thị được bị bỏ qua (phục vụ agent AI show sản phẩm) |
 | [x] | 16 | GET | `/api/search/products?q=&category=&size=&color=&minPrice=&maxPrice=&sort=&page=` | Search BM25 + lọc danh mục/biến thể/giá + sắp xếp + phân trang (`idx_product_bm25`, bắt buộc `to_bm25query` + `status='ACTIVE'`) |
 | [x] | 16b | GET | `/api/search/facets?q=&category=` | Size/màu/khoảng giá có sẵn để dựng bộ lọc |
+| [x] | 16c | POST | `/api/search/products/by-image` | Search bằng ảnh: gRPC sang embed-worker lấy vector Fashion-CLIP, ANN top-N trên diskann, dedupe theo product. Multipart `file` ≤ 8MB, `limit` 1–100 |
 
 Chi tiết luồng này xem `docs/catalog.md`.
 

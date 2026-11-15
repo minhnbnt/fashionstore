@@ -151,3 +151,13 @@ dto/catalog/                 # request/response records
 ```
 
 Behavior để trong entity (`product.hide()/activate()`, `variant.updatePricing()/unsetDefault()`), cạnh tranh đồng thời để dành flow order (trừ kho nguyên tử). Service catalog không gọi repository shop trực tiếp — cần gì về shop thì qua `ShopService` hoặc `ShopAccessChecker`.
+
+## #16c — Tìm bằng ảnh
+
+`POST /api/search/products/by-image` — public, multipart `file` (≤ 8MB, chỉ `image/*`), `limit` 1–100.
+
+Backend gửi bytes sang embed-worker qua gRPC (`EmbeddingService/EmbedImage`, deadline 5s), nhận vector
+512 chiều rồi truy vấn `product_embedding` bằng `<=>` (diskann), lấy dư 3× rồi dedupe theo product.
+Chỉ hàng `ACTIVE` của shop `APPROVED`. Worker chết → `503`; BM25 vẫn chạy bình thường.
+
+Spec: `superpowers/specs/2026-11-15-image-search-grpc-design.md`.

@@ -30,12 +30,10 @@ class ImageSearchRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        jdbc.sql("""
-            TRUNCATE product_embedding, product_image, product_variant, product, upload, shop CASCADE
-            """).update();
+        // Mỗi context có database riêng nên không truncate; seed demo chưa có vector nên không lẫn.
         shopId = UUID.randomUUID();
-        jdbc.sql("INSERT INTO shop (id, name, slug) VALUES (:id, 'S', 's-repo')")
-            .param("id", shopId).update();
+        jdbc.sql("INSERT INTO shop (id, name, slug) VALUES (:id, 'S', :slug)")
+            .param("id", shopId).param("slug", "s-" + shopId).update();
     }
 
     private UUID product(
@@ -77,27 +75,33 @@ class ImageSearchRepositoryTest {
         image(near, unit(1));
         var far = product("far", "ACTIVE", "APPROVED", unit(256));
 
-        var hits = repository.search(unit(0), 10);
+        var ids = repository.search(unit(0), 50).stream()
+            .map(ImageSearchRepository.Scored::productId)
+            .toList();
 
-        assertThat(hits.get(0).productId()).isEqualTo(near);
-        assertThat(hits.get(hits.size() - 1).productId()).isEqualTo(far);
+        assertThat(ids.get(0)).isEqualTo(near);
         // Repo trả cả 2 ảnh của "near"; service mới dedupe.
-        assertThat(hits).extracting(ImageSearchRepository.Scored::productId).containsOnly(near, far);
+        assertThat(ids).filteredOn(near::equals).hasSize(2);
+        assertThat(ids.indexOf(far)).isGreaterThan(ids.lastIndexOf(near));
     }
 
     @Test
     void hidesInactiveProductsAndUnapprovedShops() {
-        product("hidden", "HIDDEN", "APPROVED", unit(0));
-        product("banned", "BANNED", "APPROVED", unit(0));
-        product("pending-shop", "ACTIVE", "PENDING", unit(0));
+        var hidden = product("hidden", "HIDDEN", "APPROVED", unit(0));
+        var banned = product("banned", "BANNED", "APPROVED", unit(0));
+        var pendingShop = product("pending-shop", "ACTIVE", "PENDING", unit(0));
 
-        assertThat(repository.search(unit(0), 10)).isEmpty();
+        assertThat(repository.search(unit(0), 50))
+            .extracting(ImageSearchRepository.Scored::productId)
+            .doesNotContain(hidden, banned, pendingShop);
     }
 
     @Test
     void skipsRowsWithoutEmbedding() {
-        product("no-vector", "ACTIVE", "APPROVED", null);
-        assertThat(repository.search(unit(0), 10)).isEmpty();
+        var noVector = product("no-vector", "ACTIVE", "APPROVED", null);
+        assertThat(repository.search(unit(0), 50))
+            .extracting(ImageSearchRepository.Scored::productId)
+            .doesNotContain(noVector);
     }
 
     private static float[] unit(int shift) {

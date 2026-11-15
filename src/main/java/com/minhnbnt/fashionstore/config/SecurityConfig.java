@@ -27,6 +27,8 @@ public class SecurityConfig {
 
     private static final List<String> PUBLIC_PATHS = List.of(
         "/api/public/**",
+        // Search bằng ảnh là POST nên không nằm trong danh sách public GET bên dưới.
+        "/api/search/**",
         "/error",
         // Handshake WebSocket: xác thực JWT diễn ra ở STOMP CONNECT (WebSocketAuthInterceptor)
         "/ws/**",
