@@ -113,7 +113,7 @@ public class TestcontainersConfiguration {
 
     @Bean
     JdbcConnectionDetails jdbcConnectionDetails() {
-        return new PerContextConnectionDetails();
+        return new PerContextConnectionDetails(postgresContainer());
     }
 
     private static String endpointOf(GenericContainer<?> container) {
@@ -157,25 +157,30 @@ public class TestcontainersConfiguration {
 
     private static final class PerContextConnectionDetails implements JdbcConnectionDetails {
 
-        private final IsolatedDatabase database;
+        private final PostgreSQLContainer container;
 
-        private PerContextConnectionDetails() {
-            this.database = isolatedDatabase();
+        private final String database;
+
+        private PerContextConnectionDetails(PostgreSQLContainer container) {
+            this.container = container;
+            this.database = createEmptyDatabase(container);
         }
 
         @Override
         public @NonNull String getJdbcUrl() {
-            return database.jdbcUrl();
+            var base = container.getJdbcUrl();
+            var slash = base.lastIndexOf('/');
+            return base.substring(0, slash + 1) + database;
         }
 
         @Override
         public @Nullable String getUsername() {
-            return database.username();
+            return container.getUsername();
         }
 
         @Override
         public @Nullable String getPassword() {
-            return database.password();
+            return container.getPassword();
         }
     }
 
