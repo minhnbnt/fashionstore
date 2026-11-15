@@ -1,3 +1,4 @@
+import com.google.protobuf.gradle.id
 import net.ltgt.gradle.errorprone.errorprone
 
 plugins {
@@ -5,6 +6,7 @@ plugins {
     id("org.springframework.boot") version "4.1.1"
     id("io.spring.dependency-management") version "1.1.7"
     id("net.ltgt.errorprone") version "5.1.1"
+    id("com.google.protobuf") version "0.10.1"
 }
 
 group = "com.minhnbnt"
@@ -35,6 +37,8 @@ dependencies {
     developmentOnly("org.springframework.boot:spring-boot-devtools")
 
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1")
+    implementation("org.springframework.grpc:spring-grpc-client-spring-boot-starter:1.0.3")
+    implementation("com.pgvector:pgvector:0.1.6")
 
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
@@ -52,6 +56,23 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-postgresql")
 
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+protobuf {
+    protoc { artifact = "com.google.protobuf:protoc:4.36.2" }
+    plugins {
+        create("grpc") { artifact = "io.grpc:protoc-gen-grpc-java:1.77.1" }
+    }
+    generateProtoTasks {
+        // all() chạy 2 lần cho cùng một task ở plugin 0.10.x nên phải tự chặn trùng.
+        all().forEach { task ->
+            task.plugins {
+                if (findByName("grpc") == null) {
+                    id("grpc")
+                }
+            }
+        }
+    }
 }
 
 tasks.withType<Test> {
@@ -93,5 +114,8 @@ tasks.withType<JavaCompile>().configureEach {
         option("NullAway:AnnotatedPackages", "com.minhnbnt")
         option("NullAway:ExcludedClassAnnotations", "org.springframework.aot.generate.Generated")
         disable("StringConcatToTextBlock")
+        // Mã sinh từ proto: NullAway/style của project không áp lên.
+        excludedPaths.set(".*/build/generated/.*")
+        disableWarningsInGeneratedCode.set(true)
     }
 }

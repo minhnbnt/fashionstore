@@ -827,7 +827,7 @@ Expected: FAIL — chưa khai báo plugin protobuf, `Files.readAllBytes` vẫn �
 
 - [ ] **Step 4: Sửa `build.gradle.kts`**
 
-Thêm plugin:
+Thêm plugin (kèm `import com.google.protobuf.gradle.id` ở đầu file):
 
 ```kotlin
     id("com.google.protobuf") version "0.10.1"
@@ -849,7 +849,14 @@ protobuf {
         create("grpc") { artifact = "io.grpc:protoc-gen-grpc-java:1.77.1" }
     }
     generateProtoTasks {
-        all().forEach { it.plugins { create("grpc") } }
+        // all() chạy 2 lần cho cùng task ở plugin 0.10.x nên phải tự chặn trùng.
+        all().forEach { task ->
+            task.plugins {
+                if (findByName("grpc") == null) {
+                    id("grpc")
+                }
+            }
+        }
     }
 }
 ```
@@ -857,7 +864,7 @@ protobuf {
 Trong `tasks.withType<JavaCompile>().configureEach`, thêm:
 
 ```kotlin
-        options.errorprone.excludedPaths.set(".*/grpc/gen/.*")
+        options.errorprone.excludedPaths.set(".*/build/generated/.*")
         options.errorprone.disableWarningsInGeneratedCode.set(true)
 ```
 

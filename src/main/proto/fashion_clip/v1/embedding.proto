@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package fashion_clip.v1;
+
+option java_package = "com.minhnbnt.fashionstore.grpc";
+option java_multiple_files = true;
+
+message EmbedImageRequest {
+  bytes image = 1;
+}
+
+message EmbedImageReply {
+  repeated float vector = 1;  // 512 chiều, đã L2-normalize
+  string model = 2;           // "fashion-clip-vit-b32"
+}
+
+service EmbeddingService {
+  rpc EmbedImage(EmbedImageRequest) returns (EmbedImageReply);
+}
