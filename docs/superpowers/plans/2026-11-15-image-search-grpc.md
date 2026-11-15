@@ -6,7 +6,7 @@
 
 **Architecture:** gRPC server mới trong worker (thuần inference, stateless, bind loopback, pool 4). Backend dùng `spring-grpc` client stub, bind vector bằng `com.pgvector:pgvector`, query top-N rồi dedupe theo product. Đường ghi vector vẫn là pgmq, không đổi.
 
-**Tech Stack:** Python 3.14 + `grpcio` + `grpcio-tools` + Pillow; Spring Boot 4.1.1 + `spring-grpc-client-spring-boot-starter:1.0.3` + `com.pgvector:pgvector:0.1.6`.
+**Tech Stack:** Python 3.14 + `grpcio` + `grpcio-tools` + Pillow; Spring Boot 4.1.1 + `spring-boot-starter-grpc-client` (do BOM quản) + `com.pgvector:pgvector:0.1.6`.
 
 **Spec:** `docs/superpowers/specs/2026-11-15-image-search-grpc-design.md`
 
@@ -47,8 +47,8 @@ Backend (`/home/minhnbnt/fashionstore/backend`):
 - `src/main/proto/fashion_clip/v1/embedding.proto` — bản copy.
 - `build.gradle.kts` — plugin protobuf, deps, exclude errorprone.
 - `src/main/resources/application.yml` — multipart limit, channel `embedder`.
-- `src/main/java/com/minhnbnt/fashionstore/features/catalog/search/EmbeddingGrpcConfig.java`
-- `.../search/EmbeddingClient.java`
+- `src/main/java/com/minhnbnt/fashionstore/infrastructure/EmbeddingGrpcConfig.java`
+- `src/main/java/com/minhnbnt/fashionstore/infrastructure/EmbeddingClient.java`
 - `.../search/ImageSearchService.java`
 - `.../search/ImageSearchRepository.java`
 - `.../controller/ImageSearchController.java`
@@ -836,17 +836,21 @@ Thêm plugin (kèm `import com.google.protobuf.gradle.id` ở đầu file):
 Thêm deps:
 
 ```kotlin
-    implementation("org.springframework.grpc:spring-grpc-client-spring-boot-starter:1.0.3")
+    implementation("org.springframework.boot:spring-boot-starter-grpc-client")
     implementation("com.pgvector:pgvector:0.1.6")
+
+    // InProcessServerBuilder/ChannelBuilder nằm ở artifact riêng từ grpc-java 1.8x.
+    testImplementation("io.grpc:grpc-inprocess")
 ```
 
 Thêm block (sau `dependencies { }`):
 
 ```kotlin
 protobuf {
-    protoc { artifact = "com.google.protobuf:protoc:4.36.2" }
+    // Khớp protobuf-java do BOM của Boot quản (4.35.1), lệch là ProtobufRuntimeVersionException.
+    protoc { artifact = "com.google.protobuf:protoc:4.35.1" }
     plugins {
-        create("grpc") { artifact = "io.grpc:protoc-gen-grpc-java:1.77.1" }
+        create("grpc") { artifact = "io.grpc:protoc-gen-grpc-java:1.83.1" }
     }
     generateProtoTasks {
         // all() chạy 2 lần cho cùng task ở plugin 0.10.x nên phải tự chặn trùng.
@@ -890,8 +894,8 @@ git commit -m "build: protobuf codegen + client gRPC + pgvector"
 ### Task 7: Cấu hình channel + `EmbeddingClient`
 
 **Files:**
-- Create: `backend/src/main/java/com/minhnbnt/fashionstore/features/catalog/search/EmbeddingGrpcConfig.java`
-- Create: `backend/src/main/java/com/minhnbnt/fashionstore/features/catalog/search/EmbeddingClient.java`
+- Create: `backend/src/main/java/com/minhnbnt/fashionstore/infrastructure/EmbeddingGrpcConfig.java`
+- Create: `backend/src/main/java/com/minhnbnt/fashionstore/infrastructure/EmbeddingClient.java`
 - Modify: `backend/src/main/resources/application.yml`
 - Test: `backend/src/test/java/com/minhnbnt/fashionstore/features/catalog/EmbeddingClientTest.java`
 
@@ -906,7 +910,7 @@ git commit -m "build: protobuf codegen + client gRPC + pgvector"
 package com.minhnbnt.fashionstore.features.catalog;
 
 import com.google.protobuf.ByteString;
-import com.minhnbnt.fashionstore.features.catalog.search.EmbeddingClient;
+import com.minhnbnt.fashionstore.infrastructure.EmbeddingClient;
 import com.minhnbnt.fashionstore.grpc.EmbedImageReply;
 import com.minhnbnt.fashionstore.grpc.EmbedImageRequest;
 import com.minhnbnt.fashionstore.grpc.EmbeddingServiceGrpc;
@@ -1034,7 +1038,7 @@ Expected: FAIL — chưa có `EmbeddingClient`.
 `EmbeddingGrpcConfig.java`:
 
 ```java
-package com.minhnbnt.fashionstore.features.catalog.search;
+package com.minhnbnt.fashionstore.infrastructure;
 
 import com.minhnbnt.fashionstore.grpc.EmbeddingServiceGrpc;
 import org.springframework.context.annotation.Bean;
@@ -1054,7 +1058,7 @@ public class EmbeddingGrpcConfig {
 `EmbeddingClient.java`:
 
 ```java
-package com.minhnbnt.fashionstore.features.catalog.search;
+package com.minhnbnt.fashionstore.infrastructure;
 
 import com.minhnbnt.fashionstore.grpc.EmbedImageRequest;
 import com.minhnbnt.fashionstore.grpc.EmbeddingServiceGrpc;
@@ -1123,12 +1127,18 @@ spring:
       max-request-size: 9MB
   grpc:
     client:
-      channels:
+      channel:
         embedder:
-          address: ${EMBED_GRPC_ADDRESS:127.0.0.1:9091}
-          default-deadline: 5s
-  grpc.client.max-inbound-message-size: 8MB
+          target: static://${EMBED_GRPC_ADDRESS:127.0.0.1:9091}
+          default:
+            deadline: 5s
+          inbound:
+            message:
+              max-size: 8MB
 ```
+
+Khoá `spring.grpc.client.channel`/`target`/`default.deadline` là của spring-grpc 1.1.x (đã vào Boot 4.1);
+1.0.x dùng `channels`/`address`/`default-deadline`.
 
 - [ ] **Step 5: Chạy test**
 
@@ -1138,7 +1148,7 @@ Expected: PASS (6 test).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/main/java/com/minhnbnt/fashionstore/features/catalog/search src/main/resources/application.yml src/test/java/com/minhnbnt/fashionstore/features/catalog/EmbeddingClientTest.java
+git add src/main/java/com/minhnbnt/fashionstore/infrastructure/EmbeddingClient.java src/main/java/com/minhnbnt/fashionstore/infrastructure/EmbeddingGrpcConfig.java src/main/resources/application.yml src/test/java/com/minhnbnt/fashionstore/features/catalog/EmbeddingClientTest.java
 git commit -m "feat(search): client gRPC embed ảnh + map mã lỗi"
 ```
 
@@ -1263,7 +1273,7 @@ Expected: FAIL — chưa có `ImageSearchRepository`.
 `ImageSearchRepository.java`:
 
 ```java
-package com.minhnbnt.fashionstore.features.catalog.search;
+package com.minhnbnt.fashionstore.infrastructure;
 
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -1522,7 +1532,7 @@ public record ImageSearchResponse(@Schema List<ImageSearchHit> items) {
 `ImageSearchService.java`:
 
 ```java
-package com.minhnbnt.fashionstore.features.catalog.search;
+package com.minhnbnt.fashionstore.infrastructure;
 
 import com.minhnbnt.fashionstore.dto.catalog.ImageSearchHit;
 import com.minhnbnt.fashionstore.dto.catalog.ImageSearchResponse;

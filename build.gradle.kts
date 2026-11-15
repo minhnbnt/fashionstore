@@ -37,7 +37,7 @@ dependencies {
     developmentOnly("org.springframework.boot:spring-boot-devtools")
 
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1")
-    implementation("org.springframework.grpc:spring-grpc-client-spring-boot-starter:1.0.3")
+    implementation("org.springframework.boot:spring-boot-starter-grpc-client")
     implementation("com.pgvector:pgvector:0.1.6")
 
     compileOnly("org.projectlombok:lombok")
@@ -55,13 +55,17 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
     testImplementation("org.testcontainers:testcontainers-postgresql")
 
+    // InProcessServerBuilder/ChannelBuilder nằm ở artifact riêng từ grpc-java 1.8x.
+    testImplementation("io.grpc:grpc-inprocess")
+
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 protobuf {
-    protoc { artifact = "com.google.protobuf:protoc:4.36.2" }
+    // Khớp protobuf-java do BOM của Boot quản (4.35.1), lệch là ProtobufRuntimeVersionException.
+    protoc { artifact = "com.google.protobuf:protoc:4.35.1" }
     plugins {
-        create("grpc") { artifact = "io.grpc:protoc-gen-grpc-java:1.77.1" }
+        create("grpc") { artifact = "io.grpc:protoc-gen-grpc-java:1.83.1" }
     }
     generateProtoTasks {
         // all() chạy 2 lần cho cùng một task ở plugin 0.10.x nên phải tự chặn trùng.

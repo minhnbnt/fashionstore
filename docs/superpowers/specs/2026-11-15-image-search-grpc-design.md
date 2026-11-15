@@ -15,8 +15,8 @@ Text search vẫn là BM25 (`pg_textsearch`), **không** dùng CLIP text tower.
 
 ## Bối cảnh và ràng buộc
 
-- Backend Spring Boot 4.1.1 / Java 21. Dùng `spring-grpc` **1.0.3** (bản dựng trên Boot 4.0.2 —
-  lệch minor với 4.1.1, chấp nhận; nếu vỡ thì fallback grpc-java thuần + bean `Channel` tay).
+- Backend Spring Boot 4.1.1 / Java 21. Dùng `spring-boot-starter-grpc-client` (spring-grpc đã vào Boot,
+  version do BOM quản).
 - Ghi vector dùng thư viện `com.pgvector:pgvector:0.1.6` (`PGvector` để bind tham số), **không**
   dùng Spring AI.
 - Worker chạy cùng host với backend, nên channel là plaintext h2c tới `127.0.0.1`, **không auth**.
@@ -83,16 +83,17 @@ Config (`application.yml`):
 ```yaml
 spring:
   servlet.multipart: { max-file-size: 8MB, max-request-size: 9MB }
-  grpc.client.channels.embedder:
-    address: ${EMBED_GRPC_ADDRESS:127.0.0.1:9091}
-    default-deadline: 5s
+  grpc.client.channel.embedder:
+    target: static://${EMBED_GRPC_ADDRESS:127.0.0.1:9091}
+    default.deadline: 5s
 ```
 
-Code (đặt trong `features/catalog/search/`):
+Code client đặt trong `infrastructure/` (cạnh `CalendarificClient`, `GoTrueAdminClient`); phần search
+còn lại trong `features/catalog/search/`:
 
-- `EmbeddingGrpcConfig` — bean `EmbeddingServiceBlockingStub` từ
+- `infrastructure/EmbeddingGrpcConfig` — bean `EmbeddingServiceBlockingStub` từ
   `GrpcChannelFactory.createChannel("embedder")`.
-- `EmbeddingClient` — gọi stub, đổi `StatusRuntimeException` thành `ResponseStatusException`:
+- `infrastructure/EmbeddingClient` — gọi stub, đổi `StatusRuntimeException` thành `ResponseStatusException`:
   `UNAVAILABLE`/`DEADLINE_EXCEEDED` → 503, `INVALID_ARGUMENT` → 400, `RESOURCE_EXHAUSTED` → 413.
   Vector sai chiều (≠512) → 502.
 - `ImageSearchController` — `POST /api/search/products/by-image`, multipart `file`, `limit` 1–100

@@ -2,6 +2,23 @@ spring:
   application:
     name: fashionstore
 
+  servlet:
+    multipart:
+      max-file-size: 8MB
+      max-request-size: 9MB
+
+  # Worker embedding chạy cùng host, plaintext loopback, deadline cứng 5s.
+  grpc:
+    client:
+      channel:
+        embedder:
+          target: static://${EMBED_GRPC_ADDRESS:127.0.0.1:9091}
+          default:
+            deadline: 5s
+          inbound:
+            message:
+              max-size: 8MB
+
   flyway:
     out-of-order: true
 
