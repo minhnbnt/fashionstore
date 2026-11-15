@@ -2,6 +2,7 @@ package com.minhnbnt.fashionstore.features.chat.controller;
 
 import com.minhnbnt.fashionstore.dto.chat.ChatConversationResponse;
 import com.minhnbnt.fashionstore.dto.chat.ChatMessageResponse;
+import com.minhnbnt.fashionstore.dto.chat.OpenConversationWithBuyerRequest;
 import com.minhnbnt.fashionstore.dto.chat.SendMessageRequest;
 import com.minhnbnt.fashionstore.dto.chat.StartConversationRequest;
 import com.minhnbnt.fashionstore.features.chat.ChatService;
@@ -62,6 +63,24 @@ public class ChatController {
         var buyerId = UUID.fromString(subject);
 
         return chat.listBuyerConversations(buyerId);
+    }
+
+    @PostMapping("/api/seller/conversations/open-with-buyer")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(
+        summary = "Seller mở hội thoại với buyer từ đánh giá",
+        description = "Seller tạo hoặc lấy hội thoại hiện có với một buyer cụ thể để hỗ trợ sau khi đọc review."
+    )
+    @ApiResponse(responseCode = "200", description = "Thông tin hội thoại")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải thành viên shop hoặc thiếu quyền CHAT_ACCESS")
+    @SecurityRequirement(name = "bearerAuth")
+    public ChatConversationResponse openConversationWithBuyer(
+        @AuthenticationPrincipal Jwt jwt,
+        @Valid @RequestBody OpenConversationWithBuyerRequest request
+    ) {
+        var sellerId = UUID.fromString(Objects.requireNonNull(jwt.getSubject()));
+        return chat.openConversationForSeller(sellerId, request.shopId(), request.buyerId());
     }
 
     @GetMapping("/api/seller/conversations")

@@ -6,6 +6,7 @@ import com.minhnbnt.fashionstore.dto.chat.SendMessageRequest;
 import com.minhnbnt.fashionstore.dto.review.CreateReviewRequest;
 import com.minhnbnt.fashionstore.dto.review.ReplyReviewRequest;
 import com.minhnbnt.fashionstore.dto.review.ReportReviewRequest;
+import com.minhnbnt.fashionstore.dto.review.SaveReviewReplyTemplateRequest;
 import com.minhnbnt.fashionstore.features.chat.ChatService;
 import com.minhnbnt.fashionstore.features.order.ReturnRequestService;
 import com.minhnbnt.fashionstore.features.review.ReviewService;
@@ -44,6 +45,7 @@ class DemoEngagementSeeder {
         DemoOrderSeeder.DemoOrders orders
     ) {
         seedReviews(ownerId, productIdBySlug, buyers, orders);
+        seedTemplates(ownerId, shopId);
         seedReturns(ownerId, buyers, orders);
         seedChat(ownerId, shopId, buyers);
     }
@@ -129,6 +131,24 @@ class DemoEngagementSeeder {
         ));
         reviews.report(ownerId, oneStar.id(), new ReportReviewRequest(
             "Đánh giá có nội dung sai sự thật về màu sắc và chất liệu sản phẩm."
+        ));
+    }
+
+    private void seedTemplates(UUID ownerId, UUID shopId) {
+        if (!reviews.listReplyTemplates(ownerId, shopId).isEmpty()) {
+            return;
+        }
+        reviews.createReplyTemplate(ownerId, shopId, new SaveReviewReplyTemplateRequest(
+            "Cảm ơn đánh giá 5 sao",
+            "Cảm ơn bạn rất nhiều đã tin tưởng và ủng hộ shop! Rất mong tiếp tục được phục vụ bạn ở những đơn hàng tiếp theo."
+        ));
+        reviews.createReplyTemplate(ownerId, shopId, new SaveReviewReplyTemplateRequest(
+            "Hỗ trợ đổi size / sản phẩm",
+            "Cảm ơn bạn đã góp ý cho shop. Nếu cần hỗ trợ đổi size hoặc kiểm tra lại sản phẩm, bạn nhắn tin cho shop qua mục Chat để được xử lý nhanh nhé."
+        ));
+        reviews.createReplyTemplate(ownerId, shopId, new SaveReviewReplyTemplateRequest(
+            "Ghi nhận góp ý chất lượng",
+            "Shop xin lỗi vì trải nghiệm chưa trọn vẹn và cảm ơn bạn đã phản hồi thẳng thắn. Shop đã ghi nhận để kiểm tra kỹ hơn khâu đóng gói và kiểm hàng."
         ));
     }
 
