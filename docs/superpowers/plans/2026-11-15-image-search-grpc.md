@@ -379,7 +379,7 @@ def png() -> bytes:
 
 
 def test_returns_512_values_and_model_name() -> None:
-    reply = servicer().embed_image(embedding_pb2.EmbedImageRequest(image=png()), Context())
+    reply = servicer().EmbedImage(embedding_pb2.EmbedImageRequest(image=png()), Context())
     assert len(reply.vector) == 512
     assert reply.model == "fashion-clip-vit-b32"
 
@@ -387,14 +387,14 @@ def test_returns_512_values_and_model_name() -> None:
 def test_empty_image_is_invalid_argument() -> None:
     context = Context()
     with pytest.raises(grpc.RpcError):
-        servicer().embed_image(embedding_pb2.EmbedImageRequest(image=b""), context)
+        servicer().EmbedImage(embedding_pb2.EmbedImageRequest(image=b""), context)
     assert context.code is grpc.StatusCode.INVALID_ARGUMENT
 
 
 def test_broken_image_is_invalid_argument() -> None:
     context = Context()
     with pytest.raises(grpc.RpcError):
-        servicer().embed_image(embedding_pb2.EmbedImageRequest(image=b"xx"), context)
+        servicer().EmbedImage(embedding_pb2.EmbedImageRequest(image=b"xx"), context)
     assert context.code is grpc.StatusCode.INVALID_ARGUMENT
 
 
@@ -402,7 +402,7 @@ def test_oversize_is_resource_exhausted() -> None:
     embedder = SearchEmbedder(StubModel(), max_image_bytes=10)
     context = Context()
     with pytest.raises(grpc.RpcError):
-        EmbeddingServicer(embedder).embed_image(
+        EmbeddingServicer(embedder).EmbedImage(
             embedding_pb2.EmbedImageRequest(image=png()), context
         )
     assert context.code is grpc.StatusCode.RESOURCE_EXHAUSTED
@@ -435,7 +435,7 @@ class EmbeddingServicer(embedding_pb2_grpc.EmbeddingServiceServicer):
     def __init__(self, embedder: SearchEmbedder) -> None:
         self._embedder = embedder
 
-    def embed_image(self, request, context):
+    def EmbedImage(self, request, context):
         try:
             vector = self._embedder.embed(request.image)
         except ImageTooLarge as exc:
@@ -468,7 +468,7 @@ def test_wrong_model_dimension_is_internal() -> None:
     embedder = SearchEmbedder(WrongDimModel())
     context = Context()
     with pytest.raises(grpc.RpcError):
-        EmbeddingServicer(embedder).embed_image(
+        EmbeddingServicer(embedder).EmbedImage(
             embedding_pb2.EmbedImageRequest(image=png()), context
         )
     assert context.code is grpc.StatusCode.INTERNAL
@@ -539,7 +539,7 @@ def running():
 def test_round_trip_over_real_socket(running) -> None:
     port = running.add_insecure_port("127.0.0.1:0")
     channel = grpc.insecure_channel(f"127.0.0.1:{port}")
-    reply = embedding_pb2_grpc.EmbeddingServiceStub(channel).embed_image(
+    reply = embedding_pb2_grpc.EmbeddingServiceStub(channel).EmbedImage(
         embedding_pb2.EmbedImageRequest(image=png())
     )
     assert len(reply.vector) == 512
