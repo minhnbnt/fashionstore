@@ -111,6 +111,18 @@ public class TestcontainersConfiguration {
         };
     }
 
+    /**
+     * Pool connection nhỏ cho từng context test: Hikari mặc định mở tới 10 connection/context,
+     * trong khi cache của Spring giữ tối đa 32 context cùng bám vào MỘT container postgres dùng
+     * chung (mỗi context một database) — đỉnh điểm hơn 300 connection, vượt max_connections=100
+     * của postgres. Test trong một context chạy tuần tự (same_thread), 2 connection là đủ cho
+     * test method và job định kỳ chạy chen vào.
+     */
+    @Bean
+    DynamicPropertyRegistrar datasourceProperties() {
+        return registry -> registry.add("spring.datasource.hikari.maximum-pool-size", () -> "2");
+    }
+
     @Bean
     JdbcConnectionDetails jdbcConnectionDetails() {
         return new PerContextConnectionDetails(postgresContainer());
