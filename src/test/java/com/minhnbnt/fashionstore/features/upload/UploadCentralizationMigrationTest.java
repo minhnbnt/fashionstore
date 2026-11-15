@@ -6,18 +6,14 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.Duration;
 import java.util.UUID;
 
+import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.configuration.FluentConfiguration;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -27,17 +23,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * backfill dedupe vào {@code upload}, content-type suy từ extension và producer pgmq
  * enqueue message cho từng row (design D1 + D5).
  */
-@Testcontainers
 class UploadCentralizationMigrationTest {
 
     /** Dùng chung cho avatar và product_image để khẳng định dedupe theo key. */
     private static final String SHARED_KEY = "11111111-1111-1111-1111-111111111111.png";
 
-    @Container
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
-        DockerImageName.parse("ghcr.io/minhnbnt/postgresql:latest")
-            .asCompatibleSubstituteFor("postgres"))
-        .withStartupTimeout(Duration.ofMinutes(3));
+    private static final TestcontainersConfiguration.IsolatedDatabase DB = TestcontainersConfiguration.isolatedDatabase();
 
     @BeforeAll
     static void migrateSeedAndMigrateAgain() throws SQLException {
@@ -60,7 +51,7 @@ class UploadCentralizationMigrationTest {
     private static FluentConfiguration baseFlyway() {
 
         return Flyway.configure()
-            .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+            .dataSource(DB.jdbcUrl(), DB.username(), DB.password())
             .locations("classpath:db/migration")
             .outOfOrder(true);
     }
@@ -166,7 +157,7 @@ class UploadCentralizationMigrationTest {
     private static Connection connection() throws SQLException {
 
         return DriverManager.getConnection(
-            POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+            DB.jdbcUrl(), DB.username(), DB.password());
     }
 
     private static long scalar(String sql) throws SQLException {

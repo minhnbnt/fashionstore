@@ -5,18 +5,14 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.Duration;
 import java.util.UUID;
 
+import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.configuration.FluentConfiguration;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,7 +23,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * rồi V38 (đổi {@code avatar_upload_id}), khẳng định data cũ map đúng sang FK, cột key
  * bị drop và FK chặn xoá upload đang được tham chiếu (design D5 + D6).
  */
-@Testcontainers
 class UserProfileAvatarMigrationTest {
 
     private static final String AVATAR_KEY = "a1111111-1111-1111-1111-111111111111.png";
@@ -38,11 +33,7 @@ class UserProfileAvatarMigrationTest {
     private static final UUID USER_WITHOUT_AVATAR =
         UUID.fromString("00000000-0000-0000-0000-0000000000a2");
 
-    @Container
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
-        DockerImageName.parse("ghcr.io/minhnbnt/postgresql:latest")
-            .asCompatibleSubstituteFor("postgres"))
-        .withStartupTimeout(Duration.ofMinutes(3));
+    private static final TestcontainersConfiguration.IsolatedDatabase DB = TestcontainersConfiguration.isolatedDatabase();
 
     @BeforeAll
     static void migrateSeedAndMigrateAgain() throws SQLException {
@@ -65,7 +56,7 @@ class UserProfileAvatarMigrationTest {
     private static FluentConfiguration baseFlyway() {
 
         return Flyway.configure()
-            .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+            .dataSource(DB.jdbcUrl(), DB.username(), DB.password())
             .locations("classpath:db/migration")
             .outOfOrder(true);
     }
@@ -85,7 +76,7 @@ class UserProfileAvatarMigrationTest {
     private static Connection connection() throws SQLException {
 
         return DriverManager.getConnection(
-            POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+            DB.jdbcUrl(), DB.username(), DB.password());
     }
 
     @Test

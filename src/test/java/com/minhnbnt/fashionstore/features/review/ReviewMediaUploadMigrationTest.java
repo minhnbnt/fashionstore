@@ -4,18 +4,14 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.Duration;
 import java.util.UUID;
 
+import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.configuration.FluentConfiguration;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,7 +23,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * IMAGE với sort_order theo vị trí trong mảng, video thành row VIDEO xếp sau, review
  * không media không có row, cột key bị drop và FK chặn xoá upload đang được tham chiếu.
  */
-@Testcontainers
 class ReviewMediaUploadMigrationTest {
 
     private static final String IMAGE_KEY_1 = "e2111111-1111-1111-1111-111111111111.webp";
@@ -46,11 +41,7 @@ class ReviewMediaUploadMigrationTest {
 
     private static final UUID REVIEW_TEXT_ONLY_ID = UUID.fromString("00000000-0000-0000-0000-0000000000f5");
 
-    @Container
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
-        DockerImageName.parse("ghcr.io/minhnbnt/postgresql:latest")
-            .asCompatibleSubstituteFor("postgres"))
-        .withStartupTimeout(Duration.ofMinutes(3));
+    private static final TestcontainersConfiguration.IsolatedDatabase DB = TestcontainersConfiguration.isolatedDatabase();
 
     @BeforeAll
     static void migrateSeedAndMigrateAgain() throws SQLException {
@@ -73,7 +64,7 @@ class ReviewMediaUploadMigrationTest {
     private static FluentConfiguration baseFlyway() {
 
         return Flyway.configure()
-            .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+            .dataSource(DB.jdbcUrl(), DB.username(), DB.password())
             .locations("classpath:db/migration")
             .outOfOrder(true);
     }
@@ -114,7 +105,7 @@ class ReviewMediaUploadMigrationTest {
     private static Connection connection() throws SQLException {
 
         return DriverManager.getConnection(
-            POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+            DB.jdbcUrl(), DB.username(), DB.password());
     }
 
     @Test
