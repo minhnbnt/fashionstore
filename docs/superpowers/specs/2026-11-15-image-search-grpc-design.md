@@ -59,8 +59,6 @@ với file bên kia (thiếu checkout thì test skip) — lệch là đỏ, khô
 - `app/grpc/server.py` — `grpc.server(ThreadPoolExecutor(4), maximum_concurrent_rpcs=4,
   options=[max_receive_message_size=8MB, max_send_message_size=8MB])`, đăng ký servicer +
   `grpc.health.v1.Health`, bind `127.0.0.1:${GRPC_PORT:-9091}`, `torch.set_num_threads(4)`.
-- Cache LRU 512 entry, TTL 600s, key `sha256(bytes)`, chỉ cache thành công. Env
-  `GRPC_CACHE_ENTRIES`, `GRPC_CACHE_TTL_S`.
 - `main()`: start server → chạy consumer loop như cũ → SIGTERM/SIGINT dừng cả hai,
   `server.stop(grace=5)`, xong batch dở mới đóng pool/DB.
 - Consumer pgmq dùng **chung** pool 4 nên tổng song song có trần. `EMBED_BATCH_SIZE` giữ 16; nếu
@@ -123,12 +121,12 @@ ORDER BY pe.embedding <=> :vec LIMIT :overFetch   -- overFetch = limit * 3
 | Burst | `maximum_concurrent_rpcs=4` + pool 4, consumer dùng chung pool |
 
 Message size 8MB cả hai chiều. Health service để SOURCE = SERVING; backend **không** dựng readiness
-gate. Log 1 dòng debug mỗi RPC (size, cached, duration, dims), warn khi decode fail.
+gate. Log 1 dòng debug mỗi RPC (size, duration, dims), warn khi decode fail.
 
 ## Test
 
 - Python (không cần torch): servicer với fake embedder — thành công, bytes rỗng, không phải ảnh,
-  quá size, cache hit không gọi model, decode lỗi. Một test dựng server in-process port ngẫu nhiên
+  quá size, decode lỗi. Một test dựng server in-process port ngẫu nhiên
   và gọi bằng stub thật. Một test `main()` dừng được cả server lẫn consumer.
 - Java: `EmbeddingClient` với `InProcessServerBuilder` (thành công + từng loại lỗi → đúng status);
   repository với Testcontainers Postgres (thứ tự, dedupe, lọc ACTIVE/APPROVED, loại NULL);
@@ -144,7 +142,7 @@ gate. Log 1 dòng debug mỗi RPC (size, cached, duration, dims), warn khi decod
 - **CPU tranh chấp:** search và consumer dùng chung pool 4; một batch 16 ảnh làm p95 của search
   tăng.
 - Không auth/TLS. Tách host là phải thêm token + TLS trước.
-- Cache không chia sẻ giữa các process, mất khi restart.
+- Cache vector tạm hoãn: mỗi lần search đều chạy model.
 
 ## Ngoài phạm vi
 

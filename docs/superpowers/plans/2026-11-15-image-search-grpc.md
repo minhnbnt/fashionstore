@@ -4,7 +4,7 @@
 
 **Goal:** Khách gửi ảnh → backend gọi gRPC sang embed-worker lấy vector Fashion-CLIP → truy vấn diskann trả sản phẩm giống nhất.
 
-**Architecture:** gRPC server mới trong worker (thuần inference, stateless, bind loopback, pool 4, cache theo hash). Backend dùng `spring-grpc` client stub, bind vector bằng `com.pgvector:pgvector`, query top-N rồi dedupe theo product. Đường ghi vector vẫn là pgmq, không đổi.
+**Architecture:** gRPC server mới trong worker (thuần inference, stateless, bind loopback, pool 4). Backend dùng `spring-grpc` client stub, bind vector bằng `com.pgvector:pgvector`, query top-N rồi dedupe theo product. Đường ghi vector vẫn là pgmq, không đổi.
 
 **Tech Stack:** Python 3.14 + `grpcio` + `grpcio-tools` + Pillow; Spring Boot 4.1.1 + `spring-grpc-client-spring-boot-starter:1.0.3` + `com.pgvector:pgvector:0.1.6`.
 
@@ -38,8 +38,7 @@ Worker (`/home/minhnbnt/fashionstore/embed-worker`):
 - `proto/fashion_clip/v1/embedding.proto` — contract.
 - `scripts/gen_proto.sh` — sinh stub vào `app/grpc/gen/`.
 - `app/grpc/gen/` — mã sinh, commit.
-- `app/service/search_embedding.py` — validate + decode + cache + gọi model.
-- `app/service/vector_cache.py` — LRU + TTL.
+- `app/service/search_embedding.py` — validate + decode + gọi model.
 - `app/grpc/embedding_service.py` — servicer, map exception → status.
 - `app/grpc/server.py` — dựng server, options, health, bind, stop.
 - `app/worker/main.py` — start server trước consumer, shutdown cả hai.
@@ -173,7 +172,7 @@ git commit -m "feat(grpc): proto EmbeddingService + script sinh stub"
 
 **Interfaces:**
 - Consumes: `EmbeddingModel.embed_images(images) -> npt.NDArray[np.float32]` (đã có trong `app/types.py`).
-- Produces: `SearchEmbedder(model, cache, max_image_bytes=8_388_608)`, method `embed(data: bytes) -> list[float]`; exception `InvalidImage`, `ImageTooLarge`; hằng `EMBED_DIM = 512` dùng lại từ `app.types`.
+- Produces: `SearchEmbedder(model, *, max_image_bytes=8_388_608)`, method `embed(data: bytes) -> list[float]`; exception `InvalidImage`, `ImageTooLarge`; hằng `EMBED_DIM = 512` dùng lại từ `app.types`.
 
 - [ ] **Step 1: Viết test thất bại**
 
@@ -204,55 +203,35 @@ def png(color=(200, 10, 10), mode="RGB") -> bytes:
     return buffer.getvalue()
 
 
-class StubCache:
-    def __init__(self) -> None:
-        self.data: dict[str, list[float]] = {}
-
-    def get(self, key: str) -> list[float] | None:
-        return self.data.get(key)
-
-    def put(self, key: str, vector: list[float]) -> None:
-        self.data[key] = vector
-
-
-def test_embed_returns_normalized_512() -> None:
+def test_embed_returns_512_values() -> None:
     model = StubModel()
-    vector = SearchEmbedder(model, StubCache()).embed(png())
+    vector = SearchEmbedder(model).embed(png())
     assert len(vector) == 512
     assert model.calls == 1
 
 
 def test_embed_accepts_transparent_png() -> None:
     model = StubModel()
-    SearchEmbedder(model, StubCache()).embed(png((0, 0, 0, 0), mode="RGBA"))
+    SearchEmbedder(model).embed(png((0, 0, 0, 0), mode="RGBA"))
     assert model.calls == 1
 
 
 def test_empty_bytes_is_invalid() -> None:
     with pytest.raises(InvalidImage):
-        SearchEmbedder(StubModel(), StubCache()).embed(b"")
+        SearchEmbedder(StubModel()).embed(b"")
 
 
 def test_non_image_is_invalid() -> None:
     with pytest.raises(InvalidImage):
-        SearchEmbedder(StubModel(), StubCache()).embed(b"not an image at all")
+        SearchEmbedder(StubModel()).embed(b"not an image at all")
 
 
 def test_oversize_is_rejected_before_decode() -> None:
     model = StubModel()
-    embedder = SearchEmbedder(model, StubCache(), max_image_bytes=10)
+    embedder = SearchEmbedder(model, max_image_bytes=10)
     with pytest.raises(ImageTooLarge):
         embedder.embed(png())
     assert model.calls == 0
-
-
-def test_cache_hit_skips_model() -> None:
-    model = StubModel()
-    embedder = SearchEmbedder(model, StubCache())
-    first = embedder.embed(png())
-    second = embedder.embed(png())
-    assert first == second
-    assert model.calls == 1
 ```
 
 - [ ] **Step 2: Chạy test để thấy đỏ**
@@ -265,9 +244,8 @@ Expected: FAIL — `ModuleNotFoundError: app.service.search_embedding`.
 `app/service/search_embedding.py`:
 
 ```python
-"""Ảnh query -> vector. Stateless ngoài cache; không đụng DB."""
+"""Ảnh query -> vector. Stateless; không đụng DB."""
 
-import hashlib
 import logging
 from io import BytesIO
 
@@ -290,15 +268,8 @@ class ImageTooLarge(Exception):
 
 
 class SearchEmbedder:
-    def __init__(
-        self,
-        model: EmbeddingModel,
-        cache: "VectorCache",
-        *,
-        max_image_bytes: int = MAX_IMAGE_BYTES,
-    ) -> None:
+    def __init__(self, model: EmbeddingModel, *, max_image_bytes: int = MAX_IMAGE_BYTES) -> None:
         self._model = model
-        self._cache = cache
         self._max_image_bytes = max_image_bytes
 
     def embed(self, data: bytes) -> list[float]:
@@ -307,16 +278,6 @@ class SearchEmbedder:
         if len(data) > self._max_image_bytes:
             raise ImageTooLarge(f"ảnh {len(data)} byte vượt {self._max_image_bytes}")
 
-        key = hashlib.sha256(data).hexdigest()
-        cached = self._cache.get(key)
-        if cached is not None:
-            return cached
-
-        vector = self._embed_uncached(data)
-        self._cache.put(key, vector)
-        return vector
-
-    def _embed_uncached(self, data: bytes) -> list[float]:
         image = self._decode(data)
         vectors = self._model.embed_images([image])
         vector = [float(value) for value in vectors[0]]
@@ -334,12 +295,12 @@ class SearchEmbedder:
             raise InvalidImage(str(exc)) from exc
 ```
 
-`VectorCache` được viết ở Task 3; tạm thời để type là chuỗi `"VectorCache"` nên Task 2 chạy được với `StubCache` của test.
+Cache LRU/TTL **tạm hoãn** (Task 3 giữ lại làm ghi chú, chưa làm).
 
 - [ ] **Step 4: Chạy lại test**
 
 Run: `uv run pytest tests/test_search_embedding.py -q`
-Expected: PASS (6 test).
+Expected: PASS (5 test).
 
 - [ ] **Step 5: Commit**
 
@@ -350,146 +311,12 @@ git commit -m "feat(grpc): SearchEmbedder validate/decode/embed ảnh query"
 
 ---
 
-### Task 3: Cache vector LRU + TTL
+### Task 3: Cache vector LRU + TTL — **tạm hoãn**
 
-**Files:**
-- Create: `embed-worker/app/service/vector_cache.py`
-- Test: `embed-worker/tests/test_vector_cache.py`
-- Modify: `embed-worker/app/config.py` (thêm `grpc_cache_entries`, `grpc_cache_ttl_s`)
-
-**Interfaces:**
-- Produces: `VectorCache(max_entries=512, ttl_s=600.0, clock=time.monotonic)` với `get(key) -> list[float] | None`, `put(key, vector) -> None`. Có lock nội bộ để dùng từ nhiều thread.
-
-- [ ] **Step 1: Viết test thất bại**
-
-`tests/test_vector_cache.py`:
-
-```python
-from app.service.vector_cache import VectorCache
-
-
-class Clock:
-    def __init__(self) -> None:
-        self.now = 0.0
-
-    def __call__(self) -> float:
-        return self.now
-
-
-def test_put_then_get() -> None:
-    cache = VectorCache()
-    cache.put("k", [1.0])
-    assert cache.get("k") == [1.0]
-
-
-def test_missing_key_is_none() -> None:
-    assert VectorCache().get("nope") is None
-
-
-def test_entry_expires_after_ttl() -> None:
-    clock = Clock()
-    cache = VectorCache(ttl_s=10, clock=clock)
-    cache.put("k", [1.0])
-    clock.now = 10.5
-    assert cache.get("k") is None
-
-
-def test_oldest_entry_evicted_over_capacity() -> None:
-    cache = VectorCache(max_entries=2)
-    cache.put("a", [1.0])
-    cache.put("b", [2.0])
-    cache.put("c", [3.0])
-    assert cache.get("a") is None
-    assert cache.get("c") == [3.0]
-
-
-def test_touched_entry_survives_eviction() -> None:
-    cache = VectorCache(max_entries=2)
-    cache.put("a", [1.0])
-    cache.put("b", [2.0])
-    cache.get("a")
-    cache.put("c", [3.0])
-    assert cache.get("a") == [1.0]
-    assert cache.get("b") is None
-```
-
-- [ ] **Step 2: Chạy test để thấy đỏ**
-
-Run: `uv run pytest tests/test_vector_cache.py -q`
-Expected: FAIL — chưa có module.
-
-- [ ] **Step 3: Viết implementation**
-
-`app/service/vector_cache.py`:
-
-```python
-"""LRU + TTL cho vector ảnh query. Có lock vì servicer chạy đa thread."""
-
-import threading
-import time
-from collections import OrderedDict
-from collections.abc import Callable
-
-Vector = list[float]
-
-
-class VectorCache:
-    def __init__(
-        self,
-        *,
-        max_entries: int = 512,
-        ttl_s: float = 600.0,
-        clock: Callable[[], float] = time.monotonic,
-    ) -> None:
-        self._max_entries = max_entries
-        self._ttl_s = ttl_s
-        self._clock = clock
-        self._lock = threading.Lock()
-        self._entries: OrderedDict[str, tuple[float, Vector]] = OrderedDict()
-
-    def get(self, key: str) -> Vector | None:
-        with self._lock:
-            entry = self._entries.get(key)
-            if entry is None:
-                return None
-            stored_at, vector = entry
-            if self._clock() - stored_at > self._ttl_s:
-                del self._entries[key]
-                return None
-            self._entries.move_to_end(key)
-            return vector
-
-    def put(self, key: str, vector: Vector) -> None:
-        with self._lock:
-            self._entries[key] = (self._clock(), vector)
-            self._entries.move_to_end(key)
-            while len(self._entries) > self._max_entries:
-                self._entries.popitem(last=False)
-```
-
-- [ ] **Step 4: Thêm cấu hình**
-
-Trong `app/config.py` thêm vào `Settings`:
-
-```python
-    grpc_port: int = 9091
-    grpc_max_concurrency: int = 4
-    grpc_max_image_bytes: int = 8 * 1024 * 1024
-    grpc_cache_entries: int = 512
-    grpc_cache_ttl_s: float = 600.0
-```
-
-- [ ] **Step 5: Chạy test + lint**
-
-Run: `uv run pytest tests/test_vector_cache.py -q && uv run ruff check . && uv run pyrefly check`
-Expected: 5 PASS, lint sạch.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add app/service/vector_cache.py app/config.py tests/test_vector_cache.py
-git commit -m "feat(grpc): cache vector LRU + TTL"
-```
+Chưa làm. Khi cần: `app/service/vector_cache.py` giữ `VectorCache(max_entries=512, ttl_s=600.0,
+clock=time.monotonic)` với `get`/`put` có lock; `SearchEmbedder.__init__(model, cache, *,
+max_image_bytes)` băm `sha256(bytes)` làm key và chỉ cache thành công; `Settings` thêm
+`grpc_cache_entries`, `grpc_cache_ttl_s`.
 
 ---
 
@@ -516,8 +343,7 @@ from io import BytesIO
 
 from app.grpc.embedding_service import EmbeddingServicer
 from app.grpc.gen import embedding_pb2
-from app.service.search_embedding import ImageTooLarge, InvalidImage, SearchEmbedder
-from app.service.vector_cache import VectorCache
+from app.service.search_embedding import SearchEmbedder
 
 
 class StubModel:
@@ -543,7 +369,7 @@ class Context:
 
 
 def servicer() -> EmbeddingServicer:
-    return EmbeddingServicer(SearchEmbedder(StubModel(), VectorCache()))
+    return EmbeddingServicer(SearchEmbedder(StubModel()))
 
 
 def png() -> bytes:
@@ -573,7 +399,7 @@ def test_broken_image_is_invalid_argument() -> None:
 
 
 def test_oversize_is_resource_exhausted() -> None:
-    embedder = SearchEmbedder(StubModel(), VectorCache(), max_image_bytes=10)
+    embedder = SearchEmbedder(StubModel(), max_image_bytes=10)
     context = Context()
     with pytest.raises(grpc.RpcError):
         EmbeddingServicer(embedder).embed_image(
@@ -639,7 +465,7 @@ class WrongDimModel:
 
 
 def test_wrong_model_dimension_is_internal() -> None:
-    embedder = SearchEmbedder(WrongDimModel(), VectorCache())
+    embedder = SearchEmbedder(WrongDimModel())
     context = Context()
     with pytest.raises(grpc.RpcError):
         EmbeddingServicer(embedder).embed_image(
@@ -688,7 +514,6 @@ from app.grpc.embedding_service import EmbeddingServicer
 from app.grpc.gen import embedding_pb2, embedding_pb2_grpc
 from app.grpc.server import serve, stop
 from app.service.search_embedding import SearchEmbedder
-from app.service.vector_cache import VectorCache
 
 
 class StubModel:
@@ -705,7 +530,7 @@ def png() -> bytes:
 @pytest.fixture
 def running():
     settings = Settings(_env_file=None, grpc_port=0)
-    servicer = EmbeddingServicer(SearchEmbedder(StubModel(), VectorCache()))
+    servicer = EmbeddingServicer(SearchEmbedder(StubModel()))
     server = serve(settings, servicer)
     yield server
     stop(server, grace_s=0)
@@ -791,13 +616,10 @@ Expected: PASS (2 test).
 
 - [ ] **Step 5: Nối vào container**
 
-Trong `app/container.py`: thêm import `SearchEmbedder`, `VectorCache`; trong `from_settings` sau khi tạo `model`:
+Trong `app/container.py`: thêm import `SearchEmbedder`; trong `from_settings` sau khi tạo `model`:
 
 ```python
-        cache = VectorCache(
-            max_entries=settings.grpc_cache_entries, ttl_s=settings.grpc_cache_ttl_s
-        )
-        embedder = SearchEmbedder(model, cache, max_image_bytes=settings.grpc_max_image_bytes)
+        embedder = SearchEmbedder(model, max_image_bytes=settings.grpc_max_image_bytes)
 ```
 
 và thêm vào `Container.__init__` (`self.embedder = embedder`) + `return cls(..., embedder=embedder)`.
@@ -880,9 +702,8 @@ class StubContainer:
         self.model = StubModel()
         self.processor = StubProcessor()
         from app.service.search_embedding import SearchEmbedder
-        from app.service.vector_cache import VectorCache
 
-        self.embedder = SearchEmbedder(self.model, VectorCache())
+        self.embedder = SearchEmbedder(self.model)
         self.closed = False
 
     def close(self) -> None:
