@@ -24,6 +24,8 @@ import com.minhnbnt.fashionstore.model.SellerSettlement;
 import com.minhnbnt.fashionstore.model.ShopMember;
 import com.minhnbnt.fashionstore.model.ShopRole;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
+import com.minhnbnt.fashionstore.model.Upload;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,6 +34,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -45,6 +48,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class ShopAuditIntegrationTest {
+
+    @Autowired
+
+    private UploadRepository uploads;
+
 
     @Autowired
     private CatalogService catalog;
@@ -253,13 +261,13 @@ class ShopAuditIntegrationTest {
 
     private UUID user(String prefix, String displayName) {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest(prefix + "-" + id + "@t.local", displayName, null));
+        users.upsert(id, new CreateUserRequest(prefix + "-" + id + "@t.local", displayName));
         return id;
     }
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = user("admin", "Admin");
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }
@@ -295,6 +303,11 @@ class ShopAuditIntegrationTest {
     }
 
     private CreateProductRequest productRequest(String slug) {
+        var imageIds = new ArrayList<UUID>();
+        for (int i = 1; i <= 3; i++) {
+            var key = "img" + i + "-" + UUID.randomUUID().toString().substring(0, 8) + ".webp";
+            imageIds.add(uploads.save(Upload.create(key, "image/webp")).getId());
+        }
         return new CreateProductRequest(
             "Áo Thun " + slug,
             slug,
@@ -302,9 +315,9 @@ class ShopAuditIntegrationTest {
             testCategory(),
             List.of(new CreateVariantRequest("SKU-" + slug, "M", "Den", 100000L, null, 10, true)),
             List.of(
-                new ImageItemRequest("img1.jpg", null, 0),
-                new ImageItemRequest("img2.jpg", null, 1),
-                new ImageItemRequest("img3.jpg", null, 2)
+                new ImageItemRequest(imageIds.get(0), null, 0),
+                new ImageItemRequest(imageIds.get(1), null, 1),
+                new ImageItemRequest(imageIds.get(2), null, 2)
             ),
             null, null, null, null, null, null, null, null, null, null, null, "ACTIVE"
         );

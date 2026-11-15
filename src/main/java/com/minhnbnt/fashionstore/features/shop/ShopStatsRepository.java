@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.features.shop;
 
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -14,6 +15,17 @@ import java.util.UUID;
 public class ShopStatsRepository {
 
     private final JdbcClient jdbc;
+
+    private final S3UrlService s3Urls;
+
+    /** FK bảo đảm upload tồn tại; thiếu là lỗi dữ liệu, fail loud. */
+    private @Nullable String imageUrlOf(@Nullable String s3Key) {
+
+        if (s3Key == null) {
+            return null;
+        }
+        return s3Urls.publicUrl(s3Key);
+    }
 
     public record TodayStatsRow(long todayRevenue, long todayOrders, long yesterdayRevenue, long yesterdayOrders) {}
 
@@ -61,7 +73,7 @@ public class ShopStatsRepository {
     public record ProductStatsRow(
         UUID productId,
         String productName,
-        @Nullable String defaultImageKey,
+        @Nullable String defaultImageUrl,
         long totalSold,
         long totalRevenue,
         long viewCount,
@@ -412,7 +424,8 @@ public class ShopStatsRepository {
             SELECT
                 p.id AS product_id,
                 p.name AS product_name,
-                (SELECT pi.s3_key FROM product_image pi
+                (SELECT u.s3_key FROM product_image pi
+                    JOIN upload u ON u.id = pi.upload_id
                     WHERE pi.product_id = p.id ORDER BY pi.sort_order ASC LIMIT 1) AS default_image_key,
                 COALESCE(SUM(oi.quantity), 0) AS total_sold,
                 COALESCE(SUM(oi.line_total), 0) AS total_revenue,
@@ -435,7 +448,7 @@ public class ShopStatsRepository {
             .query((rs, rowNum) -> new ProductStatsRow(
                 rs.getObject("product_id", UUID.class),
                 rs.getString("product_name"),
-                rs.getString("default_image_key"),
+                imageUrlOf(rs.getString("default_image_key")),
                 rs.getLong("total_sold"),
                 rs.getLong("total_revenue"),
                 rs.getLong("view_count"),
@@ -449,7 +462,8 @@ public class ShopStatsRepository {
             SELECT
                 p.id AS product_id,
                 p.name AS product_name,
-                (SELECT pi.s3_key FROM product_image pi
+                (SELECT u.s3_key FROM product_image pi
+                    JOIN upload u ON u.id = pi.upload_id
                     WHERE pi.product_id = p.id ORDER BY pi.sort_order ASC LIMIT 1) AS default_image_key,
                 COALESCE(SUM(oi.quantity), 0) AS total_sold,
                 COALESCE(SUM(oi.line_total), 0) AS total_revenue,
@@ -473,7 +487,7 @@ public class ShopStatsRepository {
             .query((rs, rowNum) -> new ProductStatsRow(
                 rs.getObject("product_id", UUID.class),
                 rs.getString("product_name"),
-                rs.getString("default_image_key"),
+                imageUrlOf(rs.getString("default_image_key")),
                 rs.getLong("total_sold"),
                 rs.getLong("total_revenue"),
                 rs.getLong("view_count"),
@@ -487,7 +501,8 @@ public class ShopStatsRepository {
             SELECT
                 p.id AS product_id,
                 p.name AS product_name,
-                (SELECT pi.s3_key FROM product_image pi
+                (SELECT u.s3_key FROM product_image pi
+                    JOIN upload u ON u.id = pi.upload_id
                     WHERE pi.product_id = p.id ORDER BY pi.sort_order ASC LIMIT 1) AS default_image_key,
                 COALESCE(SUM(oi.quantity), 0) AS total_sold,
                 COALESCE(SUM(oi.line_total), 0) AS total_revenue,
@@ -509,7 +524,7 @@ public class ShopStatsRepository {
             .query((rs, rowNum) -> new ProductStatsRow(
                 rs.getObject("product_id", UUID.class),
                 rs.getString("product_name"),
-                rs.getString("default_image_key"),
+                imageUrlOf(rs.getString("default_image_key")),
                 rs.getLong("total_sold"),
                 rs.getLong("total_revenue"),
                 rs.getLong("view_count"),
@@ -523,7 +538,8 @@ public class ShopStatsRepository {
             SELECT
                 p.id AS product_id,
                 p.name AS product_name,
-                (SELECT pi.s3_key FROM product_image pi
+                (SELECT u.s3_key FROM product_image pi
+                    JOIN upload u ON u.id = pi.upload_id
                     WHERE pi.product_id = p.id ORDER BY pi.sort_order ASC LIMIT 1) AS default_image_key,
                 COALESCE(SUM(oi.quantity), 0) AS total_sold,
                 COALESCE(SUM(oi.line_total), 0) AS total_revenue,
@@ -548,7 +564,7 @@ public class ShopStatsRepository {
             .query((rs, rowNum) -> new ProductStatsRow(
                 rs.getObject("product_id", UUID.class),
                 rs.getString("product_name"),
-                rs.getString("default_image_key"),
+                imageUrlOf(rs.getString("default_image_key")),
                 rs.getLong("total_sold"),
                 rs.getLong("total_revenue"),
                 rs.getLong("view_count"),

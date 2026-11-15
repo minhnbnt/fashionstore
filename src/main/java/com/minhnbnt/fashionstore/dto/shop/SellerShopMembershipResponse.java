@@ -20,11 +20,11 @@ public record SellerShopMembershipResponse(
     @Schema(description = "Slug gian hàng", example = "net-boutique")
     String shopSlug,
 
-    @Schema(description = "S3 key logo gian hàng")
-    @Nullable String logoKey,
+    @Schema(description = "URL logo gian hàng public path-style")
+    @Nullable String logoUrl,
 
-    @Schema(description = "S3 key ảnh bìa gian hàng")
-    @Nullable String bannerKey,
+    @Schema(description = "URL ảnh bìa gian hàng public path-style")
+    @Nullable String bannerUrl,
 
     @Schema(description = "Trạng thái phê duyệt gian hàng", example = "APPROVED")
     ShopStatus shopStatus,

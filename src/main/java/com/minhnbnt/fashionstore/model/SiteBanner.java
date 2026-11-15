@@ -13,7 +13,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Banner admin đặt theo vị trí trên storefront, có lịch chạy. Ảnh lưu S3 key.
+ * Banner admin đặt theo vị trí trên storefront, có lịch chạy. Ảnh tham chiếu row upload.
  */
 @Table("site_banner")
 @Getter
@@ -27,9 +27,9 @@ public class SiteBanner implements Persistable<UUID> {
 
     private String title;
 
-    private String imageKey;
+    private UUID imageUploadId;
 
-    private @Nullable String mobileImageKey;
+    private @Nullable UUID mobileImageUploadId;
 
     private @Nullable String linkUrl;
 
@@ -53,8 +53,8 @@ public class SiteBanner implements Persistable<UUID> {
     public static SiteBanner create(
         BannerPlacement placement,
         String title,
-        String imageKey,
-        @Nullable String mobileImageKey,
+        UUID imageUploadId,
+        @Nullable UUID mobileImageUploadId,
         @Nullable String linkUrl,
         int sortOrder,
         boolean active,
@@ -63,17 +63,17 @@ public class SiteBanner implements Persistable<UUID> {
         UUID adminId) {
         var now = Instant.now();
         var banner = new SiteBanner(
-            UUID.randomUUID(), placement, title, imageKey, null, null, 0, false, null, null, adminId, now, now, true);
+            UUID.randomUUID(), placement, title, imageUploadId, null, null, 0, false, null, null, adminId, now, now, true);
         banner.update(
-            placement, title, imageKey, mobileImageKey, linkUrl, sortOrder, active, startsAt, endsAt, adminId);
+            placement, title, imageUploadId, mobileImageUploadId, linkUrl, sortOrder, active, startsAt, endsAt, adminId);
         return banner;
     }
 
     public void update(
         BannerPlacement placement,
         String title,
-        String imageKey,
-        @Nullable String mobileImageKey,
+        UUID imageUploadId,
+        @Nullable UUID mobileImageUploadId,
         @Nullable String linkUrl,
         int sortOrder,
         boolean active,
@@ -84,8 +84,8 @@ public class SiteBanner implements Persistable<UUID> {
 
         this.placement = placement;
         this.title = title.trim();
-        this.imageKey = imageKey.trim();
-        this.mobileImageKey = ContentFields.optional(mobileImageKey);
+        this.imageUploadId = imageUploadId;
+        this.mobileImageUploadId = mobileImageUploadId;
         this.linkUrl = ContentFields.optional(linkUrl);
         this.sortOrder = sortOrder;
         this.active = active;

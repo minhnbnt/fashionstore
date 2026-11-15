@@ -27,7 +27,7 @@ public record SellerProductResponse(
     int totalStock,
     long minPrice,
     long maxPrice,
-    @Nullable String defaultImageKey,
+    @Nullable String defaultImageUrl,
     List<VariantResponse> variants,
     Instant createdAt,
     Instant updatedAt,

@@ -4,6 +4,7 @@ import com.minhnbnt.fashionstore.dto.admin.AdminProductReportResponse;
 import com.minhnbnt.fashionstore.dto.admin.AdminProductResponse;
 import com.minhnbnt.fashionstore.dto.admin.BannedKeywordResponse;
 import com.minhnbnt.fashionstore.dto.admin.ProductModerationHistoryResponse;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
 import com.minhnbnt.fashionstore.infrastructure.SqlLike;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ProductAdminQueryRepository {
 
+    private final S3UrlService s3Urls;
+
     private static final String BASE_FROM = """
         FROM product p
         JOIN shop s ON s.id = p.shop_id
@@ -55,8 +58,9 @@ public class ProductAdminQueryRepository {
             WHERE pv.product_id = p.id
         ) v ON TRUE
         LEFT JOIN LATERAL (
-            SELECT pi.s3_key
+            SELECT u.s3_key
             FROM product_image pi
+            JOIN upload u ON u.id = pi.upload_id
             WHERE pi.product_id = p.id
             ORDER BY pi.sort_order, pi.id
             LIMIT 1
@@ -93,7 +97,7 @@ public class ProductAdminQueryRepository {
             .params(filter.params())
             .param("limit", size)
             .param("offset", (long) page * size)
-            .query(ProductAdminQueryRepository::toAdminProduct)
+            .query(this::toAdminProduct)
             .list();
     }
 
@@ -109,7 +113,7 @@ public class ProductAdminQueryRepository {
     public Optional<AdminProductResponse> findById(UUID id) {
         return jdbc.sql(SELECT + " WHERE p.id = :id")
             .param("id", id)
-            .query(ProductAdminQueryRepository::toAdminProduct)
+            .query(this::toAdminProduct)
             .optional();
     }
 
@@ -265,7 +269,12 @@ public class ProductAdminQueryRepository {
         return "p.updated_at DESC, p.id";
     }
 
-    private static AdminProductResponse toAdminProduct(ResultSet rs, int rowNum) throws SQLException {
+    private AdminProductResponse toAdminProduct(ResultSet rs, int rowNum) throws SQLException {
+        var imageKey = rs.getString("image_key");
+        String imageUrl = null;
+        if (imageKey != null) {
+            imageUrl = s3Urls.publicUrl(imageKey);
+        }
         return new AdminProductResponse(
             rs.getObject("id", UUID.class),
             rs.getObject("shop_id", UUID.class),
@@ -283,7 +292,7 @@ public class ProductAdminQueryRepository {
             rs.getLong("max_price"),
             rs.getLong("total_stock"),
             rs.getLong("variant_count"),
-            rs.getString("image_key"),
+            imageUrl,
             instantOf(rs, "created_at"),
             instantOf(rs, "updated_at"),
             rs.getLong("open_reports"),

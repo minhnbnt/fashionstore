@@ -13,6 +13,7 @@ import com.minhnbnt.fashionstore.model.ProductVariant;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
 
 public final class CatalogMapper {
 
@@ -24,7 +25,9 @@ public final class CatalogMapper {
         List<VariantResponse> variants,
         List<ImageResponse> images,
         @Nullable Double averageRating,
-        long reviewCount
+        long reviewCount,
+        @Nullable String videoUrl,
+        @Nullable String garmentUrl
     ) {
         return new ProductResponse(
             product.getId(),
@@ -39,8 +42,10 @@ public final class CatalogMapper {
             product.getUpdatedAt(),
             averageRating,
             reviewCount,
-            product.getVideoKey(),
-            product.getGarmentKey(),
+            videoUrl,
+            garmentUrl,
+            product.getVideoUploadId(),
+            product.getGarmentUploadId(),
             product.isTryOnEnabled(),
             product.getMaterial(),
             product.getOrigin(),
@@ -67,11 +72,12 @@ public final class CatalogMapper {
         );
     }
 
-    public static ImageResponse toImageResponse(ProductImage image) {
+    public static ImageResponse toImageResponse(ProductImage image, @Nullable String url) {
         return new ImageResponse(
             image.getId(),
             image.getVariantId(),
-            image.getS3Key(),
+            Objects.requireNonNull(url, "upload row missing for image " + image.getId()),
+            image.getUploadId(),
             image.getSortOrder()
         );
     }
@@ -83,9 +89,36 @@ public final class CatalogMapper {
             hit.name(),
             hit.slug(),
             hit.minPrice(),
-            hit.defaultImageKey(),
+            hit.defaultImageUrl(),
             hit.rank()
         );
+    }
+
+    public static ProductSummaryResponse toSummary(ProductResponse product) {
+        return new ProductSummaryResponse(
+            product.id(),
+            product.shopId(),
+            product.name(),
+            product.slug(),
+            minVariantPrice(product.variants()),
+            firstImageUrl(product.images()),
+            null
+        );
+    }
+
+    private static @Nullable Long minVariantPrice(List<VariantResponse> variants) {
+        return variants.stream()
+            .map(VariantResponse::price)
+            .filter(Objects::nonNull)
+            .min(Long::compare)
+            .orElse(null);
+    }
+
+    private static @Nullable String firstImageUrl(List<ImageResponse> images) {
+        if (images.isEmpty()) {
+            return null;
+        }
+        return images.get(0).url();
     }
 
     public static CategoryResponse toCategoryResponse(Category category) {

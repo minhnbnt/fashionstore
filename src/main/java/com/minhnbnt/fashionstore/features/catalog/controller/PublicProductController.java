@@ -7,14 +7,13 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -25,25 +24,7 @@ import java.util.UUID;
 @Tag(name = "Products", description = "Xem hàng public")
 public class PublicProductController {
 
-    private static final int MAX_BATCH_IDS = 20;
-
     private final CatalogService catalog;
-
-    @GetMapping("/batch")
-    @Operation(
-        operationId = "batchProductSummaries", summary = "Lấy tóm tắt nhiều sản phẩm",
-        description = "Chỉ product ACTIVE của shop APPROVED mới được trả về; giữ thứ tự đầu vào và bỏ qua id không hợp lệ. Tối đa 20 id."
-    )
-    @ApiResponse(responseCode = "200", description = "Danh sách tóm tắt sản phẩm")
-    @ApiResponse(responseCode = "400", description = "Thiếu danh sách id, vượt quá 20 id hoặc id sai định dạng UUID")
-    public List<ProductSummaryResponse> batchProductSummaries(
-        @Parameter(description = "Danh sách id product (tối đa 20)") @RequestParam List<UUID> ids
-    ) {
-        if (ids.size() > MAX_BATCH_IDS) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Maximum 20 product ids allowed");
-        }
-        return catalog.getSummaryBatch(ids);
-    }
 
     @GetMapping("/{id}")
     @Operation(
@@ -56,5 +37,22 @@ public class PublicProductController {
         @Parameter(description = "Id (UUID) hoặc slug của product") @PathVariable String id
     ) {
         return catalog.getDetailByIdentifier(id);
+    }
+
+    @GetMapping("/batch")
+    @Operation(
+        operationId = "batchProductSummaries", summary = "Lấy summary nhiều sản phẩm theo id",
+        description = "Chỉ product ACTIVE của shop APPROVED, đúng thứ tự id truyền vào; "
+            + "id không tìm thấy hoặc không hiển thị được bị bỏ qua."
+    )
+    @ApiResponse(responseCode = "200", description = "Danh sách summary theo thứ tự id")
+    @ApiResponse(responseCode = "400", description = "Quá 20 id hoặc id sai định dạng")
+    public List<ProductSummaryResponse> batchSummaries(
+        @Parameter(description = "Id product, phân cách bởi dấu phẩy")
+        @RequestParam
+        @Size(max = 20)
+        List<UUID> ids
+    ) {
+        return catalog.getSummaries(ids);
     }
 }

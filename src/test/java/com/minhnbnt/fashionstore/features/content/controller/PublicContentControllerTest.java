@@ -58,11 +58,11 @@ class PublicContentControllerTest {
     void bannersNeedNoLogin() throws Exception {
         var id = UUID.randomUUID();
         when(banners.running(BannerPlacement.HOME_CAROUSEL))
-            .thenReturn(List.of(new PublicBannerResponse(id, "Sale", "a.webp", null, "/search")));
+            .thenReturn(List.of(new PublicBannerResponse(id, "Sale", "http://s3.test/a.webp", null, "/search")));
 
         mockMvc.perform(get("/api/public/banners").param("placement", "HOME_CAROUSEL"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].imageKey").value("a.webp"));
+            .andExpect(jsonPath("$[0].imageUrl").value("http://s3.test/a.webp"));
     }
 
     @Test

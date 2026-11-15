@@ -19,7 +19,11 @@ public record PopupResponse(
 
     @Nullable String body,
 
-    @Nullable String imageKey,
+    @Schema(description = "URL public ảnh popup, null = popup chỉ có chữ")
+    @Nullable String imageUrl,
+
+    @Schema(description = "Id upload ảnh popup — FE echo lại khi cập nhật popup, null = popup chỉ có chữ")
+    @Nullable UUID imageUploadId,
 
     @Nullable String ctaLabel,
 
@@ -45,13 +49,14 @@ public record PopupResponse(
     Instant updatedAt
 ) {
 
-    public static PopupResponse of(SitePopup popup, Instant now) {
+    public static PopupResponse of(SitePopup popup, @Nullable String imageUrl, Instant now) {
         return new PopupResponse(
             popup.getId(),
             popup.getName(),
             popup.getTitle(),
             popup.getBody(),
-            popup.getImageKey(),
+            imageUrl,
+            popup.getImageUploadId(),
             popup.getCtaLabel(),
             popup.getLinkUrl(),
             popup.getAudience(),

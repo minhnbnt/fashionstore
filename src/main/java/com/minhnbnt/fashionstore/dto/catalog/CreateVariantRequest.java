@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.Nullable;
 
+import java.util.UUID;
+
 public record CreateVariantRequest(
     @Schema(description = "SKU duy nhất trong shop", example = "AO-THUN-DEN-M")
     @NotBlank
@@ -38,9 +40,9 @@ public record CreateVariantRequest(
     @NotNull
     Boolean defaultVariant,
 
-    @Schema(description = "S3 key ảnh riêng cho màu/biến thể này", nullable = true)
+    @Schema(description = "Upload id ảnh riêng cho màu/biến thể này", nullable = true)
     @Nullable
-    String imageKey
+    UUID imageUploadId
 ) {
     public CreateVariantRequest(
         String sku,

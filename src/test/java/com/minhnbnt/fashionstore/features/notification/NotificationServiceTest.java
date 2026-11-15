@@ -172,7 +172,7 @@ class NotificationServiceTest {
 
     private UUID user() {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("notification-service-" + id + "@t.local", "Notification User", null));
+        users.upsert(id, new CreateUserRequest("notification-service-" + id + "@t.local", "Notification User"));
         return id;
     }
 }

@@ -13,6 +13,7 @@ import com.minhnbnt.fashionstore.features.notification.NotificationRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.test.ProductTestFixtures;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -30,6 +31,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
 class OrderAutoCompleteJobTest {
+
+    @Autowired
+
+    private UploadRepository uploads;
+
 
     @Autowired
     private OrderAutoCompleteJob job;
@@ -57,7 +63,7 @@ class OrderAutoCompleteJobTest {
 
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("ac-" + id + "@t.local", "U", null));
+        users.upsert(id, new CreateUserRequest("ac-" + id + "@t.local", "U"));
         return id;
     }
 
@@ -67,7 +73,7 @@ class OrderAutoCompleteJobTest {
         var buyerId = mirroredUser();
         var adminId = mirroredUser();
         var suffix = UUID.randomUUID().toString().substring(0, 8);
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop AC " + suffix, "ac-" + suffix));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop AC " + suffix, "ac-" + suffix));
         shops.approve(adminId, shop.id());
 
         var product = catalog.createProduct(

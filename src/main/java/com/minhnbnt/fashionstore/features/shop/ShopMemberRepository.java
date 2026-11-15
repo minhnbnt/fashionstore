@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.features.shop;
 
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
 import com.minhnbnt.fashionstore.model.MemberRole;
 import com.minhnbnt.fashionstore.model.ShopMember;
 import com.minhnbnt.fashionstore.model.ShopStatus;
@@ -21,6 +22,8 @@ import java.util.UUID;
 public class ShopMemberRepository {
 
     private final JdbcClient jdbc;
+
+    private final S3UrlService s3Urls;
 
     public void add(ShopMember member) {
         java.time.OffsetDateTime invitedAt = null;
@@ -119,8 +122,8 @@ public class ShopMemberRepository {
         UUID shopId,
         String shopName,
         String shopSlug,
-        @Nullable String logoKey,
-        @Nullable String bannerKey,
+        @Nullable String logoUrl,
+        @Nullable String bannerUrl,
         ShopStatus shopStatus,
         MemberRole role,
         @Nullable UUID roleId,
@@ -137,8 +140,8 @@ public class ShopMemberRepository {
                 sm.shop_id,
                 s.name as shop_name,
                 s.slug as shop_slug,
-                s.logo_key,
-                s.banner_key,
+                lg.s3_key AS logo_s3_key,
+                bg.s3_key AS banner_s3_key,
                 s.status as shop_status,
                 sm.role,
                 sm.role_id,
@@ -148,6 +151,8 @@ public class ShopMemberRepository {
                 sr.permissions
             FROM shop_member sm
             JOIN shop s ON s.id = sm.shop_id
+            LEFT JOIN upload lg ON lg.id = s.logo_upload_id
+            LEFT JOIN upload bg ON bg.id = s.banner_upload_id
             LEFT JOIN shop_role sr ON sr.id = sm.role_id AND sr.shop_id = sm.shop_id
             WHERE sm.user_id = :user
             ORDER BY sm.joined_at DESC
@@ -168,8 +173,8 @@ public class ShopMemberRepository {
                     (UUID) rs.getObject("shop_id"),
                     rs.getString("shop_name"),
                     rs.getString("shop_slug"),
-                    rs.getString("logo_key"),
-                    rs.getString("banner_key"),
+                    publicUrlOf(rs.getString("logo_s3_key")),
+                    publicUrlOf(rs.getString("banner_s3_key")),
                     ShopStatus.valueOf(rs.getString("shop_status")),
                     role,
                     rs.getObject("role_id", UUID.class),
@@ -187,6 +192,14 @@ public class ShopMemberRepository {
             .param("shop", shopId)
             .query((rs, rowNum) -> (UUID) rs.getObject("user_id"))
             .optional();
+    }
+
+    private @Nullable String publicUrlOf(@Nullable String s3Key) {
+
+        if (s3Key == null) {
+            return null;
+        }
+        return s3Urls.publicUrl(s3Key);
     }
 
     public List<UUID> findActiveUserIdsByShop(UUID shopId) {

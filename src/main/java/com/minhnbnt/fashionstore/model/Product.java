@@ -40,9 +40,9 @@ public class Product implements Persistable<UUID> {
 
     private @Nullable UUID createdBy;
 
-    private @Nullable String videoKey;
+    private @Nullable UUID videoUploadId;
 
-    private @Nullable String garmentKey;
+    private @Nullable UUID garmentUploadId;
 
     private boolean tryOnEnabled;
 
@@ -76,8 +76,8 @@ public class Product implements Persistable<UUID> {
         String slug,
         String description,
         ProductStatus initialStatus,
-        @Nullable String videoKey,
-        @Nullable String garmentKey,
+        @Nullable UUID videoUploadId,
+        @Nullable UUID garmentUploadId,
         boolean tryOnEnabled,
         @Nullable String material,
         @Nullable String origin,
@@ -101,8 +101,8 @@ public class Product implements Persistable<UUID> {
             null,
             null,
             createdBy,
-            videoKey,
-            garmentKey,
+            videoUploadId,
+            garmentUploadId,
             tryOnEnabled,
             material,
             origin,
@@ -244,8 +244,8 @@ public class Product implements Persistable<UUID> {
         @Nullable String name,
         @Nullable String description,
         @Nullable UUID categoryId,
-        @Nullable String videoKey,
-        @Nullable String garmentKey,
+        @Nullable UUID videoUploadId,
+        @Nullable UUID garmentUploadId,
         @Nullable Boolean tryOnEnabled,
         @Nullable String material,
         @Nullable String origin,
@@ -265,12 +265,9 @@ public class Product implements Persistable<UUID> {
         if (categoryId != null) {
             this.categoryId = categoryId;
         }
-        if (videoKey != null) {
-            this.videoKey = videoKey;
-        }
-        if (garmentKey != null) {
-            this.garmentKey = garmentKey;
-        }
+        // Media: null = xoá (service quyết định), id = đặt/đổi. Giữ nguyên do service echo id cũ.
+        this.videoUploadId = videoUploadId;
+        this.garmentUploadId = garmentUploadId;
         if (tryOnEnabled != null) {
             this.tryOnEnabled = tryOnEnabled;
         }

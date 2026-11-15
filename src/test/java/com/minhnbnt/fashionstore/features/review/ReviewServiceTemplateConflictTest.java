@@ -6,10 +6,13 @@ import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.review.repository.ReviewHelpfulRepository;
+import com.minhnbnt.fashionstore.features.review.repository.ReviewMediaRepository;
 import com.minhnbnt.fashionstore.features.review.repository.ReviewReplyTemplateRepository;
 import com.minhnbnt.fashionstore.features.review.repository.ReviewRepository;
 import com.minhnbnt.fashionstore.features.review.repository.SellerReviewQueryRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.infrastructure.media.VideoMetadataService;
 import com.minhnbnt.fashionstore.model.ReviewReplyTemplate;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
@@ -50,6 +53,7 @@ class ReviewServiceTemplateConflictTest {
         reviewService = new ReviewService(
             mock(ReviewRepository.class),
             mock(ReviewHelpfulRepository.class),
+            mock(ReviewMediaRepository.class),
             templates,
             mock(SellerReviewQueryRepository.class),
             mock(ProductStockService.class),
@@ -58,7 +62,9 @@ class ReviewServiceTemplateConflictTest {
             access,
             audit,
             mock(NotificationService.class),
-            mock(VideoMetadataService.class)
+            mock(VideoMetadataService.class),
+            mock(UploadRepository.class),
+            mock(S3UrlService.class)
         );
     }
 

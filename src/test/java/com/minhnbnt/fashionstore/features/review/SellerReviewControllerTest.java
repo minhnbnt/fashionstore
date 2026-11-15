@@ -86,7 +86,6 @@ class SellerReviewControllerTest {
             5,
             "Áo mặc thoáng mát lắm.",
             List.of(),
-            null,
             List.of(ReviewTag.QUALITY_GOOD),
             true,
             3,

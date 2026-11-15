@@ -88,13 +88,11 @@ class DemoShopOpsSeeder {
 
         var hanh = users.upsert(UUID.randomUUID(), new CreateUserRequest(
             "hanh@demo.local",
-            "Hạnh, CSKH",
-            null
+            "Hạnh, CSKH"
         ));
         var dung = users.upsert(UUID.randomUUID(), new CreateUserRequest(
             "dung@demo.local",
-            "Dũng, Kho vận",
-            null
+            "Dũng, Kho vận"
         ));
 
         var hanhInvite = staff.inviteStaff(ownerId, shopId, new InviteStaffRequest("hanh@demo.local", kho.id()));

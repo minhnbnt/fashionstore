@@ -20,7 +20,9 @@ import com.minhnbnt.fashionstore.features.shop.ShopDecorationService;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.features.shop.ShopStaffService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.model.Category;
+import com.minhnbnt.fashionstore.model.Upload;
 
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -33,11 +35,6 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -78,6 +75,8 @@ public class DemoSeeder implements ApplicationRunner {
 
     private final UserService userService;
 
+    private final UploadRepository uploads;
+
     private final ShopRepository shopRepository;
 
     private final CategoryRepository categoryRepository;
@@ -86,24 +85,24 @@ public class DemoSeeder implements ApplicationRunner {
 
     private final String bucket;
 
+    private final DemoImageFetcher imageFetcher;
+
     private final DemoOrderSeeder orderSeeder;
 
     private final DemoEngagementSeeder engagementSeeder;
 
     private final DemoShopOpsSeeder opsSeeder;
 
-    private final HttpClient http = HttpClient.newBuilder()
-        .followRedirects(HttpClient.Redirect.NORMAL)
-        .build();
-
     public DemoSeeder(
         ShopService shopService,
         CatalogService catalogService,
         UserService userService,
+        UploadRepository uploads,
         ShopRepository shopRepository,
         CategoryRepository categoryRepository,
         S3Client s3,
         @Value("${s3.bucket}") String bucket,
+        DemoImageFetcher imageFetcher,
         OrderService orderService,
         ReviewService reviewService,
         ReturnRequestService returnRequestService,
@@ -117,10 +116,12 @@ public class DemoSeeder implements ApplicationRunner {
         this.shopService = shopService;
         this.catalogService = catalogService;
         this.userService = userService;
+        this.uploads = uploads;
         this.shopRepository = shopRepository;
         this.categoryRepository = categoryRepository;
         this.s3 = s3;
         this.bucket = bucket;
+        this.imageFetcher = imageFetcher;
         this.orderSeeder = new DemoOrderSeeder(userService, orderService);
         this.engagementSeeder = new DemoEngagementSeeder(reviewService, returnRequestService, chatService);
         this.opsSeeder = new DemoShopOpsSeeder(
@@ -134,6 +135,11 @@ public class DemoSeeder implements ApplicationRunner {
         );
     }
 
+    /** Tạo row upload MỚI cho media seed (không lookup) — trả id để gắn vào request nghiệp vụ. */
+    private UUID seedUploadId(String s3Key, String contentType) {
+        return uploads.save(Upload.create(s3Key, contentType)).getId();
+    }
+
     @Override
     public void run(ApplicationArguments args) {
         if (shopRepository.findBySlug(SHOP_SLUG).isPresent()) {
@@ -143,7 +149,7 @@ public class DemoSeeder implements ApplicationRunner {
         log.info("Seeding demo data (shop '{}')...", SHOP_SLUG);
 
         var ownerId = UUID.randomUUID();
-        userService.upsert(ownerId, new CreateUserRequest("demo-owner@local", "Demo Owner", null));
+        userService.upsert(ownerId, new CreateUserRequest("demo-owner@local", "Demo Owner"));
 
         var shop = shopService.register(
             ownerId,
@@ -151,8 +157,8 @@ public class DemoSeeder implements ApplicationRunner {
                 SHOP_NAME,
                 SHOP_SLUG,
                 "Mặc đẹp là nét riêng của bạn.",
-                "demo/logo.webp",
-                "demo/banner.webp",
+                seedUploadId("demo/logo.webp", "image/webp"),
+                seedUploadId("demo/banner.webp", "image/webp"),
                 "0901234567",
                 "123 Đường Thời Trang, Hà Nội",
                 "INDIVIDUAL",
@@ -161,9 +167,9 @@ public class DemoSeeder implements ApplicationRunner {
                 "01/01/2021",
                 "Cục Cảnh sát QLHC về TTXH",
                 null,
-                "demo/id-front.webp",
-                "demo/id-back.webp",
-                "demo/id-selfie.webp",
+                seedUploadId("demo/id-front.webp", "image/webp"),
+                seedUploadId("demo/id-back.webp", "image/webp"),
+                seedUploadId("demo/id-selfie.webp", "image/webp"),
                 null,
                 "Vietcombank",
                 "0123456789",
@@ -218,7 +224,7 @@ public class DemoSeeder implements ApplicationRunner {
     private AttachImagesRequest toImageRequest(List<String> keys) {
         var items = new ArrayList<ImageItemRequest>();
         for (int i = 0; i < keys.size(); i++) {
-            items.add(new ImageItemRequest(keys.get(i), null, i));
+            items.add(new ImageItemRequest(seedUploadId(keys.get(i), "image/jpeg"), null, i));
         }
         return new AttachImagesRequest(items);
     }
@@ -235,23 +241,17 @@ public class DemoSeeder implements ApplicationRunner {
     }
 
     private boolean uploadOne(String slug, int index, String key) {
-        try {
-            var request = HttpRequest.newBuilder(
-                URI.create("https://picsum.photos/seed/net-" + slug + "-" + index + "/600/750")
-            ).GET().build();
-            var body = http.send(request, HttpResponse.BodyHandlers.ofByteArray()).body();
-            s3.putObject(
-                PutObjectRequest.builder().bucket(bucket).key(key).contentType("image/jpeg").build(),
-                RequestBody.fromBytes(body)
-            );
-            return true;
-        } catch (IOException | InterruptedException | RuntimeException e) {
-            log.warn("Skipping demo image {}: {}", key, e.getMessage());
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
+
+        var body = imageFetcher.fetch("https://picsum.photos/seed/net-" + slug + "-" + index + "/600/750");
+        if (body.isEmpty()) {
             return false;
         }
+
+        s3.putObject(
+            PutObjectRequest.builder().bucket(bucket).key(key).contentType("image/jpeg").build(),
+            RequestBody.fromBytes(body.get())
+        );
+        return true;
     }
 
     private record DemoVariant(

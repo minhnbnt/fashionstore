@@ -6,6 +6,10 @@ import org.jspecify.annotations.Nullable;
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * Hồ sơ shop cho seller (/mine) và khách (/{slug}). Không mang giấy tờ KYC —
+ * dữ liệu định danh chỉ admin mới xem được (presigned GET qua AdminShopResponse).
+ */
 public record ShopResponse(
     UUID id,
 
@@ -15,13 +19,21 @@ public record ShopResponse(
 
     String description,
 
-    @Schema(description = "S3 key, frontend tự ghép base URL", nullable = true)
+    @Schema(description = "URL logo public path-style, null nếu chưa có. Không trả S3 key.")
     @Nullable
-    String logoKey,
+    String logoUrl,
 
-    @Schema(description = "S3 key, frontend tự ghép base URL", nullable = true)
+    @Schema(description = "Id upload logo — FE echo lại khi cập nhật để giữ nguyên, null = chưa có")
     @Nullable
-    String bannerKey,
+    UUID logoUploadId,
+
+    @Schema(description = "URL ảnh bìa public path-style, null nếu chưa có. Không trả S3 key.")
+    @Nullable
+    String bannerUrl,
+
+    @Schema(description = "Id upload ảnh bìa — FE echo lại khi cập nhật để giữ nguyên, null = chưa có")
+    @Nullable
+    UUID bannerUploadId,
 
     @Schema(example = "APPROVED")
     String status,
@@ -73,42 +85,6 @@ public record ShopResponse(
     @Schema(description = "Giờ làm việc", nullable = true)
     @Nullable
     String workingHours,
-
-    @Schema(description = "Họ tên thật chủ shop theo CCCD", nullable = true)
-    @Nullable
-    String legalName,
-
-    @Schema(description = "Số CCCD", nullable = true)
-    @Nullable
-    String idNumber,
-
-    @Schema(description = "Ngày cấp CCCD", nullable = true)
-    @Nullable
-    String idIssuedDate,
-
-    @Schema(description = "Nơi cấp CCCD", nullable = true)
-    @Nullable
-    String idIssuedPlace,
-
-    @Schema(description = "Mã số thuế", nullable = true)
-    @Nullable
-    String taxCode,
-
-    @Schema(description = "S3 key ảnh mặt trước CCCD", nullable = true)
-    @Nullable
-    String idFrontKey,
-
-    @Schema(description = "S3 key ảnh mặt sau CCCD", nullable = true)
-    @Nullable
-    String idBackKey,
-
-    @Schema(description = "S3 key ảnh selfie cầm CCCD", nullable = true)
-    @Nullable
-    String idSelfieKey,
-
-    @Schema(description = "S3 key giấy chứng nhận ĐKKD", nullable = true)
-    @Nullable
-    String businessCertKey,
 
     @Schema(description = "Trạng thái định danh eKYC: PENDING_REVIEW, VERIFIED, REJECTED", example = "PENDING_REVIEW")
     String kycStatus,

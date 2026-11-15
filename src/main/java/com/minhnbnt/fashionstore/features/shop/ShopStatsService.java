@@ -365,7 +365,7 @@ public class ShopStatsService {
         return new ProductStatsResponse(
             row.productId(),
             row.productName(),
-            row.defaultImageKey(),
+            row.defaultImageUrl(),
             row.totalSold(),
             row.totalRevenue(),
             row.viewCount(),

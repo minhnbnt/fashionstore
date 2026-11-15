@@ -16,6 +16,8 @@ import com.minhnbnt.fashionstore.features.cart.repository.CartRepository;
 import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.model.Cart;
 import com.minhnbnt.fashionstore.model.CartItem;
 import com.minhnbnt.fashionstore.model.ProductImage;
@@ -48,6 +50,15 @@ public class CartService {
     private final ShopService shops;
 
     private final OrderService orders;
+
+    private final UploadRepository uploads;
+
+    private final S3UrlService s3Urls;
+
+    /** FK bảo đảm upload tồn tại; thiếu là lỗi dữ liệu, fail loud. */
+    private String imageUrlOf(UUID uploadId) {
+        return s3Urls.publicUrl(uploads.findById(uploadId).orElseThrow().getS3Key());
+    }
 
     @Transactional(readOnly = true)
     public CartResponse getCart(@NonNull UUID buyerId) {
@@ -367,15 +378,15 @@ public class CartService {
 
             var productImages = imageCache.computeIfAbsent(variant.getProductId(), catalog::findImagesByProductId);
 
-            String imageKey = null;
+            String imageUrl = null;
             for (var img : productImages) {
                 if (variant.getId().equals(img.getVariantId())) {
-                    imageKey = img.getS3Key();
+                    imageUrl = imageUrlOf(img.getUploadId());
                     break;
                 }
             }
-            if (imageKey == null && !productImages.isEmpty()) {
-                imageKey = productImages.getFirst().getS3Key();
+            if (imageUrl == null && !productImages.isEmpty()) {
+                imageUrl = imageUrlOf(productImages.getFirst().getUploadId());
             }
 
             itemCount += item.getQuantity();
@@ -393,7 +404,7 @@ public class CartService {
                 variant.getShopId(),
                 shopName,
                 product.getName(),
-                imageKey,
+                imageUrl,
                 variant.getSize() + " / " + variant.getColor(),
                 variant.getSku(),
                 variant.getPrice(),

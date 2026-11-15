@@ -2,6 +2,7 @@ package com.minhnbnt.fashionstore.features.catalog;
 
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.catalog.ProductResponse;
+import com.minhnbnt.fashionstore.dto.catalog.ProductSummaryResponse;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,10 +28,14 @@ class CatalogServiceGetDetailsIntegrationTest {
     @Autowired
     private JdbcClient jdbc;
 
+    @Autowired
+    private com.minhnbnt.fashionstore.features.upload.S3UrlService s3Urls;
+
     private UUID shopId;
     private UUID categoryId;
     private UUID prod1Id; // đầy đủ dữ liệu: variant + image + 1 review 4 sao
     private UUID prod2Id; // có variant, không review
+    private String prod1ImageKey;
 
     @BeforeEach
     void setUp() {
@@ -43,7 +48,7 @@ class CatalogServiceGetDetailsIntegrationTest {
         insertCategory();
         insertProduct(prod1Id, "Áo Có Đầy Đủ Dữ Liệu", Instant.now().minusSeconds(1000));
         insertVariant(prod1Id, 250000, null);
-        insertImage(prod1Id, "shop/ao-day-du-1.jpg", 1);
+        prod1ImageKey = insertImage(prod1Id, 1);
         insertBuyerAndReview(prod1Id, 4);
         insertProduct(prod2Id, "Áo Không Review", Instant.now().minusSeconds(500));
         insertVariant(prod2Id, 150000, 300000L);
@@ -72,6 +77,44 @@ class CatalogServiceGetDetailsIntegrationTest {
         assertThat(catalogService.getDetails(List.of())).isEmpty();
     }
 
+    @Test
+    void skipsProductsFromShopsNotApproved() {
+        var pendingShopId = UUID.randomUUID();
+        jdbc.sql("INSERT INTO shop (id, name, slug, status) VALUES (:id, :name, :slug, 'PENDING')")
+            .param("id", pendingShopId)
+            .param("name", "Shop Chưa Duyệt")
+            .param("slug", "shop-pending-" + pendingShopId)
+            .update();
+        var hiddenProdId = UUID.randomUUID();
+        insertProduct(pendingShopId, hiddenProdId, "Áo Shop Chưa Duyệt", Instant.now().minusSeconds(100));
+
+        var responses = catalogService.getDetails(List.of(prod1Id, hiddenProdId, prod2Id));
+
+        assertThat(responses).extracting(ProductResponse::id).containsExactly(prod1Id, prod2Id);
+    }
+
+    @Test
+    void summariesKeepInputOrderAndMapCheapestVariantAndFirstImage() {
+        var summaries = catalogService.getSummaries(List.of(prod2Id, prod1Id));
+
+        assertThat(summaries).hasSize(2);
+        assertThat(summaries.get(0).id()).isEqualTo(prod2Id);
+        assertThat(summaries.get(0).minPrice()).isEqualTo(150000L);
+        assertThat(summaries.get(0).defaultImageUrl()).isNull();
+        assertThat(summaries.get(0).rank()).isNull();
+        assertThat(summaries.get(1).id()).isEqualTo(prod1Id);
+        assertThat(summaries.get(1).minPrice()).isEqualTo(250000L);
+        assertThat(summaries.get(1).defaultImageUrl()).isEqualTo(s3Urls.publicUrl(prod1ImageKey));
+    }
+
+    @Test
+    void summariesSkipMissingIdsAndEmptyInputIsEmpty() {
+        assertThat(catalogService.getSummaries(List.of(prod1Id, UUID.randomUUID(), prod2Id)))
+            .extracting(ProductSummaryResponse::id)
+            .containsExactly(prod1Id, prod2Id);
+        assertThat(catalogService.getSummaries(List.of())).isEmpty();
+    }
+
     private void insertShop() {
         jdbc.sql("INSERT INTO shop (id, name, slug, status) VALUES (:id, :name, :slug, 'APPROVED')")
             .param("id", shopId)
@@ -89,12 +132,16 @@ class CatalogServiceGetDetailsIntegrationTest {
     }
 
     private void insertProduct(UUID productId, String name, Instant createdAt) {
+        insertProduct(shopId, productId, name, createdAt);
+    }
+
+    private void insertProduct(UUID productShopId, UUID productId, String name, Instant createdAt) {
         jdbc.sql("""
             INSERT INTO product (id, shop_id, category_id, name, slug, status, description, created_at)
             VALUES (:id, :shopId, :catId, :name, :slug, 'ACTIVE', 'mô tả', :createdAt)
             """)
             .param("id", productId)
-            .param("shopId", shopId)
+            .param("shopId", productShopId)
             .param("catId", categoryId)
             .param("name", name)
             .param("slug", "prod-" + productId)
@@ -117,16 +164,24 @@ class CatalogServiceGetDetailsIntegrationTest {
             .update();
     }
 
-    private void insertImage(UUID productId, String s3Key, int sortOrder) {
+    /** Tạo row upload (s3_key UNIQUE nên key phải unique theo prodId) + product_image tham chiếu. */
+    private String insertImage(UUID productId, int sortOrder) {
+        var s3Key = "shop/" + productId + "-" + sortOrder + "-"
+            + UUID.randomUUID().toString().substring(0, 8) + ".jpg";
+        jdbc.sql("INSERT INTO upload (id, s3_key, content_type) VALUES (:id, :s3Key, 'image/jpeg')")
+            .param("id", UUID.randomUUID())
+            .param("s3Key", s3Key)
+            .update();
         jdbc.sql("""
-            INSERT INTO product_image (id, product_id, s3_key, sort_order)
-            VALUES (:id, :prodId, :s3Key, :sortOrder)
+            INSERT INTO product_image (id, product_id, upload_id, sort_order)
+            VALUES (:id, :prodId, (SELECT id FROM upload WHERE s3_key = :s3Key), :sortOrder)
             """)
             .param("id", UUID.randomUUID())
             .param("prodId", productId)
             .param("s3Key", s3Key)
             .param("sortOrder", sortOrder)
             .update();
+        return s3Key;
     }
 
     private void insertBuyerAndReview(UUID productId, int stars) {

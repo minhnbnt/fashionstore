@@ -12,7 +12,7 @@ public record WishlistItemResponse(
     @Schema(description = "Gia thap nhat hien tai, null khi khong con ban", nullable = true)
     @Nullable Long minPrice,
     @Schema(description = "Anh bia hien tai, null khi khong con ban", nullable = true)
-    @Nullable String defaultImageKey,
+    @Nullable String defaultImageUrl,
     @Schema(description = "false = van luu nhung tam khong mua duoc") Boolean available,
     @Schema(description = "Ly do khi available = false, null khi mua duoc", nullable = true)
     @Nullable String unavailableReason

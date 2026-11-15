@@ -17,6 +17,7 @@ import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.model.ProductViolationType;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,6 +36,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AdminProductServiceTest {
 
     @Autowired
+
+    private UploadRepository uploads;
+
+
+    @Autowired
     private AdminProductService adminProducts;
 
     @Autowired
@@ -51,13 +57,13 @@ class AdminProductServiceTest {
 
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U", null));
+        users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U"));
         return id;
     }
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = mirroredUser();
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }

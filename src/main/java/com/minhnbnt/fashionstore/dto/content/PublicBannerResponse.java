@@ -12,20 +12,24 @@ public record PublicBannerResponse(
     @Schema(description = "Dùng làm alt ảnh")
     String title,
 
-    String imageKey,
+    @Schema(description = "URL public ảnh desktop")
+    String imageUrl,
 
-    @Schema(description = "null = dùng ảnh desktop")
-    @Nullable String mobileImageKey,
+    @Schema(description = "URL public ảnh mobile, null = dùng ảnh desktop")
+    @Nullable String mobileImageUrl,
 
     @Nullable String linkUrl
 ) {
 
-    public static PublicBannerResponse of(SiteBanner banner) {
+    public static PublicBannerResponse of(
+        SiteBanner banner,
+        String imageUrl,
+        @Nullable String mobileImageUrl) {
         return new PublicBannerResponse(
             banner.getId(),
             banner.getTitle(),
-            banner.getImageKey(),
-            banner.getMobileImageKey(),
+            imageUrl,
+            mobileImageUrl,
             banner.getLinkUrl()
         );
     }

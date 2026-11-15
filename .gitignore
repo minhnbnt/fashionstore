@@ -52,3 +52,6 @@ tools/marketplace-browser/node_modules/
 .agents/
 openspec/
 .worktrees/
+
+# Generated spec (export via: ./gradlew openApiExport) - FE keeps its own copy
+/docs/openapi.json

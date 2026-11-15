@@ -8,6 +8,7 @@ import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.model.ShopRole;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -27,6 +28,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class StaffMemberStatusIntegrationTest {
+
+    @Autowired
+
+    private UploadRepository uploads;
+
 
     @Autowired
     private ShopStaffService staff;
@@ -87,12 +93,12 @@ class StaffMemberStatusIntegrationTest {
 
     private UUID user(String prefix) {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest(prefix + "-" + id + "@t.local", prefix, null));
+        users.upsert(id, new CreateUserRequest(prefix + "-" + id + "@t.local", prefix));
         return id;
     }
 
     private UUID shop(UUID ownerId) {
-        return shops.register(ownerId, ShopTestFixtures.createRequest(
+        return shops.register(ownerId, ShopTestFixtures.createRequest(uploads, 
             "Status Shop",
             "status-shop-" + UUID.randomUUID()
         )).id();

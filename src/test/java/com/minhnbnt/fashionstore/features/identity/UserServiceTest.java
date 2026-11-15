@@ -4,12 +4,16 @@ import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.dto.admin.AdminUserResponse;
 import com.minhnbnt.fashionstore.dto.admin.StatusHistoryResponse;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.model.AccountStatus;
+import com.minhnbnt.fashionstore.model.Upload;
 import com.minhnbnt.fashionstore.model.UserRole;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
@@ -27,21 +31,32 @@ class UserServiceTest {
     @Autowired
     private AccountProvisioner provisioner;
 
+    @Autowired
+    private UploadRepository uploads;
+
+    @Autowired
+    private S3UrlService s3Urls;
+
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
-        userService.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U", null));
+        userService.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U"));
         return id;
+    }
+
+    /** Row upload thật trong DB để changeAvatar validate qua DB, không phải mock. */
+    private UUID uploadOf(String contentType) {
+        return uploads.save(Upload.create(UUID.randomUUID() + ".png", contentType)).getId();
     }
 
     @Test
     void upsertCreatesProfileOnFirstLogin() {
         var id = UUID.randomUUID();
 
-        var created = userService.upsert(id, new CreateUserRequest("create@t.local", "An", "avatar/1.png"));
+        var created = userService.upsert(id, new CreateUserRequest("create@t.local", "An"));
 
         assertThat(created.id()).isEqualTo(id);
         assertThat(created.email()).isEqualTo("create@t.local");
-        assertThat(created.avatarKey()).isEqualTo("avatar/1.png");
+        assertThat(created.avatarUrl()).isNull();
         assertThat(created.role()).isEqualTo("CUSTOMER");
         assertThat(created.status()).isEqualTo("ACTIVE");
     }
@@ -49,12 +64,81 @@ class UserServiceTest {
     @Test
     void upsertUpdatesProfileOnNextLogin() {
         var id = UUID.randomUUID();
-        userService.upsert(id, new CreateUserRequest("update-old@t.local", "An", null));
+        userService.upsert(id, new CreateUserRequest("update-old@t.local", "An"));
 
-        var updated = userService.upsert(id, new CreateUserRequest("update-new@t.local", "Binh", null));
+        var updated = userService.upsert(id, new CreateUserRequest("update-new@t.local", "Binh"));
 
         assertThat(updated.email()).isEqualTo("update-new@t.local");
         assertThat(updated.displayName()).isEqualTo("Binh");
+    }
+
+    @Test
+    void changeAvatarStoresUploadReference() {
+        var id = mirroredUser();
+        var uploadId = uploadOf("image/png");
+        var expectedUrl = s3Urls.publicUrl(uploads.findById(uploadId).orElseThrow().getS3Key());
+
+        var updated = userService.changeAvatar(id, uploadId);
+
+        assertThat(updated.avatarUrl()).isEqualTo(expectedUrl);
+        assertThat(userService.getById(id).avatarUrl()).isEqualTo(expectedUrl);
+    }
+
+    @Test
+    void clearAvatarRemovesUrl() {
+        var id = mirroredUser();
+        userService.changeAvatar(id, uploadOf("image/png"));
+
+        var cleared = userService.clearAvatar(id);
+
+        assertThat(cleared.avatarUrl()).isNull();
+        assertThat(userService.getById(id).avatarUrl()).isNull();
+    }
+
+    @Test
+    void changeAvatarUnknownUserIsNotFound() {
+        assertThatThrownBy(() -> userService.changeAvatar(UUID.randomUUID(), uploadOf("image/png")))
+            .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void changeAvatarUnknownUploadIsBadRequest() {
+        var id = mirroredUser();
+
+        assertThatThrownBy(() -> userService.changeAvatar(id, UUID.randomUUID()))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void changeAvatarRejectsVideoUpload() {
+        var id = mirroredUser();
+
+        assertThatThrownBy(() -> userService.changeAvatar(id, uploadOf("video/mp4")))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void changeAvatarRejectsSvgUpload() {
+        var id = mirroredUser();
+
+        // Bucket public read: mở thẳng URL svg thì script trong file chạy được.
+        assertThatThrownBy(() -> userService.changeAvatar(id, uploadOf("image/svg+xml")))
+            .isInstanceOfSatisfying(ResponseStatusException.class,
+                e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void upsertKeepsExistingAvatar() {
+        var id = mirroredUser();
+        var uploadId = uploadOf("image/png");
+        var expectedUrl = s3Urls.publicUrl(uploads.findById(uploadId).orElseThrow().getS3Key());
+        userService.changeAvatar(id, uploadId);
+
+        var updated = userService.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U"));
+
+        assertThat(updated.avatarUrl()).isEqualTo(expectedUrl);
     }
 
     @Test

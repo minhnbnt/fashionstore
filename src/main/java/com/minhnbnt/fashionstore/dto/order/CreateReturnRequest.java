@@ -5,9 +5,10 @@ import jakarta.validation.constraints.NotBlank;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.UUID;
 
 public record CreateReturnRequest(
-    @Schema(description = "Lý do đổi trả (WRONG_ITEM, DAMAGED, NOT_AS_DESCRIBED, CHANGE_MIND)", example = "DAMAGED")
+    @Schema(description = "Lý do đổi/trả (WRONG_ITEM, DAMAGED, NOT_AS_DESCRIBED, CHANGE_MIND)", example = "DAMAGED")
     @NotBlank
     String reason,
 
@@ -15,8 +16,8 @@ public record CreateReturnRequest(
     @Nullable
     String description,
 
-    @Schema(description = "Mảng S3 keys ảnh hoặc video chứng minh", nullable = true)
+    @Schema(description = "Danh sách uploadId ảnh/video bằng chứng (image/* trừ svg, video/*)", nullable = true)
     @Nullable
-    List<String> evidenceKeys
+    List<UUID> evidenceUploadIds
 ) {
 }

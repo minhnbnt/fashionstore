@@ -39,7 +39,7 @@ public interface ReviewRepository extends CrudRepository<Review, UUID> {
         SELECT r.* FROM review r
         WHERE r.product_id = :productId
           AND r.stars BETWEEN :minStars AND :maxStars
-          AND (:hasMedia = FALSE OR cardinality(r.image_keys) > 0 OR r.video_key IS NOT NULL)
+          AND (:hasMedia = FALSE OR EXISTS (SELECT 1 FROM review_media rm WHERE rm.review_id = r.id))
         ORDER BY r.helpful_count DESC, r.created_at DESC
         """)
     List<Review> findFilteredOrderByHelpful(UUID productId, int minStars, int maxStars, boolean hasMedia);
@@ -48,7 +48,7 @@ public interface ReviewRepository extends CrudRepository<Review, UUID> {
         SELECT r.* FROM review r
         WHERE r.product_id = :productId
           AND r.stars BETWEEN :minStars AND :maxStars
-          AND (:hasMedia = FALSE OR cardinality(r.image_keys) > 0 OR r.video_key IS NOT NULL)
+          AND (:hasMedia = FALSE OR EXISTS (SELECT 1 FROM review_media rm WHERE rm.review_id = r.id))
         ORDER BY r.created_at DESC
         """)
     List<Review> findFilteredOrderByNewest(UUID productId, int minStars, int maxStars, boolean hasMedia);
@@ -61,7 +61,7 @@ public interface ReviewRepository extends CrudRepository<Review, UUID> {
                COUNT(*) FILTER (WHERE r.stars = 3) AS three_star_count,
                COUNT(*) FILTER (WHERE r.stars = 2) AS two_star_count,
                COUNT(*) FILTER (WHERE r.stars = 1) AS one_star_count,
-               COUNT(*) FILTER (WHERE cardinality(r.image_keys) > 0 OR r.video_key IS NOT NULL) AS with_media_count
+               COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM review_media rm WHERE rm.review_id = r.id)) AS with_media_count
         FROM review r
         WHERE r.product_id = :productId
         """)
@@ -75,7 +75,7 @@ public interface ReviewRepository extends CrudRepository<Review, UUID> {
                COUNT(*) FILTER (WHERE r.stars = 3) AS three_star_count,
                COUNT(*) FILTER (WHERE r.stars = 2) AS two_star_count,
                COUNT(*) FILTER (WHERE r.stars = 1) AS one_star_count,
-               COUNT(*) FILTER (WHERE cardinality(r.image_keys) > 0 OR r.video_key IS NOT NULL) AS with_media_count
+               COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM review_media rm WHERE rm.review_id = r.id)) AS with_media_count
         FROM review r
         JOIN product p ON p.id = r.product_id
         WHERE p.shop_id = :shopId

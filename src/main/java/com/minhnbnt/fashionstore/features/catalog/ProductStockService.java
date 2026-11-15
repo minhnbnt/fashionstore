@@ -5,6 +5,8 @@ import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductVariantRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.StockMovementRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.model.Product;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.model.ProductVariant;
@@ -34,6 +36,8 @@ public class ProductStockService {
     private final ProductImageRepository images;
     private final StockMovementRepository movements;
     private final ShopService shops;
+    private final UploadRepository uploads;
+    private final S3UrlService s3Urls;
 
     @Transactional(readOnly = true)
     public Optional<ProductVariant> findVariantById(@NonNull UUID variantId) {
@@ -102,8 +106,8 @@ public class ProductStockService {
     public record ProductDisplayInfo(
         UUID productId,
         boolean available,
-        @Nullable String defaultImageKey,
-        Map<UUID, String> variantImageKeys
+        @Nullable String defaultImageUrl,
+        Map<UUID, String> variantImageUrls
     ) {}
 
     @Transactional(readOnly = true)
@@ -121,18 +125,28 @@ public class ProductStockService {
             return Map.of();
         }
         var shopSummaries = shops.findShopSummariesByIds(shopIds);
-        var genericDefault = new LinkedHashMap<UUID, String>();
-        var anyDefault = new LinkedHashMap<UUID, String>();
-        var variantImages = new LinkedHashMap<UUID, Map<UUID, String>>();
+        var genericDefault = new LinkedHashMap<UUID, UUID>();
+        var anyDefault = new LinkedHashMap<UUID, UUID>();
+        var variantImages = new LinkedHashMap<UUID, Map<UUID, UUID>>();
         for (var image : images.findByProductIdInOrderBySortOrderAsc(productsById.keySet())) {
-            anyDefault.putIfAbsent(image.getProductId(), image.getS3Key());
+            anyDefault.putIfAbsent(image.getProductId(), image.getUploadId());
             if (image.getVariantId() == null) {
-                genericDefault.putIfAbsent(image.getProductId(), image.getS3Key());
+                genericDefault.putIfAbsent(image.getProductId(), image.getUploadId());
             } else {
                 variantImages
                     .computeIfAbsent(image.getProductId(), ignored -> new LinkedHashMap<>())
-                    .putIfAbsent(image.getVariantId(), image.getS3Key());
+                    .putIfAbsent(image.getVariantId(), image.getUploadId());
             }
+        }
+        var uploadIds = new LinkedHashSet<UUID>();
+        uploadIds.addAll(genericDefault.values());
+        uploadIds.addAll(anyDefault.values());
+        for (var byVariant : variantImages.values()) {
+            uploadIds.addAll(byVariant.values());
+        }
+        var urls = new LinkedHashMap<UUID, String>();
+        for (var upload : uploads.findAllById(uploadIds)) {
+            urls.put(upload.getId(), s3Urls.publicUrl(upload.getS3Key()));
         }
         var result = new LinkedHashMap<UUID, ProductDisplayInfo>();
         for (var entry : productsById.entrySet()) {
@@ -142,15 +156,19 @@ public class ProductStockService {
             boolean available = product.getStatus() == ProductStatus.ACTIVE
                 && shop != null
                 && shop.approved();
-            var defaultKey = genericDefault.get(productId);
-            if (defaultKey == null) {
-                defaultKey = anyDefault.get(productId);
+            var defaultUploadId = genericDefault.get(productId);
+            if (defaultUploadId == null) {
+                defaultUploadId = anyDefault.get(productId);
+            }
+            var variantUrls = new LinkedHashMap<UUID, String>();
+            for (var byVariant : variantImages.getOrDefault(productId, Map.of()).entrySet()) {
+                variantUrls.put(byVariant.getKey(), urls.get(byVariant.getValue()));
             }
             result.put(productId, new ProductDisplayInfo(
                 productId,
                 available,
-                defaultKey,
-                variantImages.getOrDefault(productId, Map.of())
+                urls.get(defaultUploadId),
+                variantUrls
             ));
         }
         return result;

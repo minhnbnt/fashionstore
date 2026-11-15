@@ -13,8 +13,8 @@ public record ProductStatsResponse(
     @Schema(description = "Tên sản phẩm", example = "Áo Polo Nam Classic")
     String productName,
 
-    @Schema(description = "S3 key của ảnh đại diện sản phẩm", nullable = true)
-    @Nullable String imageKey,
+    @Schema(description = "URL public của ảnh đại diện sản phẩm", nullable = true)
+    @Nullable String imageUrl,
 
     @Schema(description = "Tổng số lượng đã bán", example = "120")
     long totalSold,

@@ -121,7 +121,7 @@ class DemoOrderSeeder {
     }
 
     private UUID buyer(String email, String displayName) {
-        var response = users.upsert(UUID.randomUUID(), new CreateUserRequest(email, displayName, null));
+        var response = users.upsert(UUID.randomUUID(), new CreateUserRequest(email, displayName));
         return response.id();
     }
 

@@ -17,8 +17,10 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(UserController.class)
@@ -88,5 +90,51 @@ class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"not-an-email\",\"displayName\":\"An\"}"))
             .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void changeAvatarWithoutAuthIsUnauthorized() throws Exception {
+        mockMvc.perform(put("/api/users/me/avatar")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"avatarUploadId\":\"" + UUID.randomUUID() + "\"}"))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void changeAvatarReturnsProfile() throws Exception {
+        var id = UUID.randomUUID();
+        var uploadId = UUID.randomUUID();
+        var response = new UserResponse(
+            id, "a@t.local", "An", "http://localhost:9000/fashionstore/" + uploadId + ".png",
+            "CUSTOMER", "ACTIVE", null, Instant.now());
+        when(userService.changeAvatar(id, uploadId)).thenReturn(response);
+
+        mockMvc.perform(put("/api/users/me/avatar")
+                .with(jwt().jwt(builder -> builder.subject(id.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"avatarUploadId\":\"" + uploadId + "\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.avatarUrl").value("http://localhost:9000/fashionstore/" + uploadId + ".png"));
+    }
+
+    @Test
+    void changeAvatarRejectsMalformedUploadId() throws Exception {
+        mockMvc.perform(put("/api/users/me/avatar")
+                .with(jwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"avatarUploadId\":\"../avatar/a.png\"}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void clearAvatarReturnsProfileWithoutUrl() throws Exception {
+        var id = UUID.randomUUID();
+        var response = new UserResponse(id, "a@t.local", "An", null, "CUSTOMER", "ACTIVE", null, Instant.now());
+        when(userService.clearAvatar(id)).thenReturn(response);
+
+        mockMvc.perform(delete("/api/users/me/avatar")
+                .with(jwt().jwt(builder -> builder.subject(id.toString()))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.avatarUrl").doesNotExist());
     }
 }

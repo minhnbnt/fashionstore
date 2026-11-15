@@ -22,6 +22,9 @@ import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.ProductImage;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
+import com.minhnbnt.fashionstore.model.Upload;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -39,6 +42,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class OrderServiceTest {
+
+    @Autowired
+
+    private UploadRepository uploads;
+
+    @Autowired
+    private S3UrlService s3Urls;
+
 
     @Autowired
     private OrderService orders;
@@ -66,13 +77,13 @@ class OrderServiceTest {
 
     private UUID mirroredUser() {
         var id = UUID.randomUUID();
-        users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U", null));
+        users.upsert(id, new CreateUserRequest("u-" + id + "@t.local", "U"));
         return id;
     }
 
     private UUID approvedShop(UUID ownerId, String slug) {
         var adminId = mirroredUser();
-        var shop = shops.register(ownerId, ShopTestFixtures.createRequest("Shop " + slug, slug));
+        var shop = shops.register(ownerId, ShopTestFixtures.createRequest(uploads, "Shop " + slug, slug));
         shops.approve(adminId, shop.id());
         return shop.id();
     }
@@ -492,8 +503,12 @@ class OrderServiceTest {
         var shopId = approvedShop(ownerId, "shop-order-enrich");
         var variantId = variantInShop(ownerId, shopId, "ao-order-enrich", "SKU-ORDER-ENR", 10);
         var variant = catalog.findVariantById(variantId).orElseThrow();
-        productImages.save(ProductImage.create(variant.getProductId(), null, "products/generic.jpg", 0));
-        productImages.save(ProductImage.create(variant.getProductId(), variantId, "products/variant.jpg", 1));
+        var genericKey = "products/generic-" + UUID.randomUUID().toString().substring(0, 8) + ".jpg";
+        var variantImgKey = "products/variant-" + UUID.randomUUID().toString().substring(0, 8) + ".jpg";
+        var genericUploadId = uploads.save(Upload.create(genericKey, "image/webp")).getId();
+        var variantImgUploadId = uploads.save(Upload.create(variantImgKey, "image/webp")).getId();
+        productImages.save(ProductImage.create(variant.getProductId(), null, genericUploadId, 0));
+        productImages.save(ProductImage.create(variant.getProductId(), variantId, variantImgUploadId, 1));
 
         var created = orders.checkout(
             buyerId,
@@ -501,7 +516,7 @@ class OrderServiceTest {
         );
         assertThat(created.shopName()).isEqualTo("Shop shop-order-enrich");
         assertThat(created.shopSlug()).isEqualTo("shop-order-enrich");
-        assertThat(created.items().getFirst().imageKey()).isEqualTo("products/variant.jpg");
+        assertThat(created.items().getFirst().imageUrl()).isEqualTo(s3Urls.publicUrl(variantImgKey));
         assertThat(created.items().getFirst().productAvailable()).isTrue();
 
         catalog.updateProduct(

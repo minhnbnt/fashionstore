@@ -16,9 +16,9 @@ public record AdminUserResponse(
     @Schema(example = "An")
     String displayName,
 
-    @Schema(description = "S3 key avatar", nullable = true)
+    @Schema(description = "URL avatar public path-style, null nếu chưa có. Không trả S3 key.")
     @Nullable
-    String avatarKey,
+    String avatarUrl,
 
     @Schema(example = "CUSTOMER")
     String role,

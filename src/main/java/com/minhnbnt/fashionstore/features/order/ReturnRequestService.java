@@ -3,15 +3,20 @@ package com.minhnbnt.fashionstore.features.order;
 import com.minhnbnt.fashionstore.dto.order.ApproveReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.CreateReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.RejectReturnRequest;
+import com.minhnbnt.fashionstore.dto.order.ReturnEvidenceResponse;
 import com.minhnbnt.fashionstore.dto.order.ReturnRequestResponse;
 import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
 import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
+import com.minhnbnt.fashionstore.features.order.repository.ReturnEvidenceRepository;
 import com.minhnbnt.fashionstore.features.order.repository.ReturnRequestRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
+import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.model.Order;
 import com.minhnbnt.fashionstore.model.OrderStatus;
+import com.minhnbnt.fashionstore.model.ReturnEvidence;
 import com.minhnbnt.fashionstore.model.ReturnRequest;
 import com.minhnbnt.fashionstore.model.ReturnStatus;
 import com.minhnbnt.fashionstore.model.ShopPermission;
@@ -25,12 +30,15 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -48,6 +56,8 @@ public class ReturnRequestService {
 
     private final ReturnRequestRepository returns;
 
+    private final ReturnEvidenceRepository evidence;
+
     private final OrderRepository orders;
 
     private final ShopService shops;
@@ -57,6 +67,10 @@ public class ReturnRequestService {
     private final ShopAuditService audit;
 
     private final NotificationService notifications;
+
+    private final UploadRepository uploads;
+
+    private final S3UrlService s3Urls;
 
     @Transactional
     public ReturnRequestResponse create(
@@ -85,21 +99,18 @@ public class ReturnRequestService {
             );
         }
 
-        String[] evidenceArr = new String[0];
-        if (request.evidenceKeys() != null) {
-            evidenceArr = request.evidenceKeys().toArray(new String[0]);
-        }
+        var evidenceUploadIds = validateEvidenceUploads(request.evidenceUploadIds());
 
         var returnReq = ReturnRequest.create(
             order.getId(),
             order.getShopId(),
             buyerId,
             reason,
-            request.description(),
-            evidenceArr
+            request.description()
         );
 
         var saved = returns.save(returnReq);
+        saveEvidence(saved.getId(), evidenceUploadIds);
         notifications.create(
             shops.findActiveUserIdsByShop(saved.getShopId()),
             NotificationCategory.SELLING,
@@ -110,7 +121,7 @@ public class ReturnRequestService {
             saved.getId()
         );
 
-        return toResponse(saved, order);
+        return toSingleResponse(saved, order);
     }
 
     @Transactional(readOnly = true)
@@ -185,7 +196,7 @@ public class ReturnRequestService {
             saved.getId()
         );
 
-        return toResponse(saved, order);
+        return toSingleResponse(saved, order);
     }
 
     @Transactional
@@ -221,7 +232,7 @@ public class ReturnRequestService {
             saved.getId()
         );
 
-        return toResponse(saved, order);
+        return toSingleResponse(saved, order);
     }
 
     @Transactional
@@ -256,7 +267,7 @@ public class ReturnRequestService {
             saved.getId()
         );
 
-        return toResponse(saved, order);
+        return toSingleResponse(saved, order);
     }
 
     @Transactional(readOnly = true)
@@ -311,17 +322,114 @@ public class ReturnRequestService {
         Map<UUID, Order> ordersById = new LinkedHashMap<>();
         orders.findAllById(orderIds).forEach(order -> ordersById.put(order.getId(), order));
 
+        var grouped = evidenceByRequestId(requests);
+        var urls = urlMapForGroups(grouped);
+
         var result = new ArrayList<ReturnRequestResponse>(requests.size());
         for (var req : requests) {
-            result.add(toResponse(req, ordersById.get(req.getOrderId())));
+            result.add(toResponse(
+                req,
+                ordersById.get(req.getOrderId()),
+                grouped.getOrDefault(req.getId(), List.of()),
+                urls));
         }
         return result;
     }
 
-    private static ReturnRequestResponse toResponse(ReturnRequest req, @Nullable Order order) {
-        List<String> evidence = List.of();
-        if (req.getEvidenceKeys() != null) {
-            evidence = Arrays.asList(req.getEvidenceKeys());
+    /**
+     * Chỉ nhận ảnh trình duyệt render được hoặc video. Bỏ {@code image/svg+xml}: bucket
+     * public read, mở thẳng URL thì script trong file chạy được (cùng lý do với avatar,
+     * ảnh sản phẩm).
+     */
+    private static boolean isSupportedEvidence(String contentType) {
+
+        var image = contentType.startsWith("image/") && !contentType.equals("image/svg+xml");
+        return image || contentType.startsWith("video/");
+    }
+
+    private List<UUID> validateEvidenceUploads(@Nullable List<UUID> rawIds) {
+
+        if (rawIds == null || rawIds.isEmpty()) {
+            return List.of();
+        }
+        var ids = new LinkedHashSet<UUID>(rawIds);
+        for (var id : ids) {
+            var upload = uploads.findById(id).orElse(null);
+            if (upload == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Return evidence upload not found");
+            }
+            if (!isSupportedEvidence(upload.getContentType())) {
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Return evidence upload must be an image or a video");
+            }
+        }
+        return List.copyOf(ids);
+    }
+
+    private void saveEvidence(UUID returnRequestId, List<UUID> uploadIds) {
+
+        var rows = new ArrayList<ReturnEvidence>(uploadIds.size());
+        for (var i = 0; i < uploadIds.size(); i++) {
+            rows.add(ReturnEvidence.create(returnRequestId, uploadIds.get(i), i));
+        }
+        evidence.saveAll(rows);
+    }
+
+    private Map<UUID, List<ReturnEvidence>> evidenceByRequestId(List<ReturnRequest> requests) {
+
+        var ids = new ArrayList<UUID>(requests.size());
+        for (var req : requests) {
+            ids.add(req.getId());
+        }
+        var grouped = new HashMap<UUID, List<ReturnEvidence>>();
+        for (var e : evidence.findByReturnRequestIdIn(ids)) {
+            grouped.computeIfAbsent(e.getReturnRequestId(), key -> new ArrayList<>()).add(e);
+        }
+        for (var group : grouped.values()) {
+            group.sort(Comparator.comparingInt(ReturnEvidence::getSortOrder));
+        }
+        return grouped;
+    }
+
+    /** Batch uploadId -> URL public cho một nhóm evidence. */
+    private Map<UUID, String> urlMapFor(Collection<ReturnEvidence> evidenceList) {
+
+        var uploadIds = new ArrayList<UUID>(evidenceList.size());
+        for (var e : evidenceList) {
+            uploadIds.add(e.getUploadId());
+        }
+        var urls = new HashMap<UUID, String>();
+        for (var upload : uploads.findAllById(uploadIds)) {
+            urls.put(upload.getId(), s3Urls.publicUrl(upload.getS3Key()));
+        }
+        return urls;
+    }
+
+    private Map<UUID, String> urlMapForGroups(Map<UUID, List<ReturnEvidence>> grouped) {
+
+        var all = new ArrayList<ReturnEvidence>();
+        for (var group : grouped.values()) {
+            all.addAll(group);
+        }
+        return urlMapFor(all);
+    }
+
+    private ReturnRequestResponse toSingleResponse(ReturnRequest req, @Nullable Order order) {
+
+        var evidenceList = evidence.findByReturnRequestIdOrderBySortOrderAsc(req.getId());
+        return toResponse(req, order, evidenceList, urlMapFor(evidenceList));
+    }
+
+    private ReturnRequestResponse toResponse(
+        ReturnRequest req,
+        @Nullable Order order,
+        List<ReturnEvidence> evidenceList,
+        Map<UUID, String> urls
+    ) {
+        var evidenceResponses = new ArrayList<ReturnEvidenceResponse>(evidenceList.size());
+        for (var e : evidenceList) {
+            // FK + validate phía request bảo đảm upload tồn tại; thiếu là lỗi dữ liệu, fail loud.
+            evidenceResponses.add(new ReturnEvidenceResponse(Objects.requireNonNull(urls.get(e.getUploadId()))));
         }
         String orderCode = "";
         String orderStatus = OrderStatus.DELIVERED.name();
@@ -339,7 +447,7 @@ public class ReturnRequestService {
             req.getBuyerId(),
             req.getReason(),
             req.getDescription(),
-            evidence,
+            evidenceResponses,
             req.getStatus().name(),
             req.getResolution(),
             req.getRefundAmount(),

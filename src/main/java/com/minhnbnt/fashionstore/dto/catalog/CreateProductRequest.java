@@ -44,13 +44,13 @@ public record CreateProductRequest(
     @Valid
     List<ImageItemRequest> images,
 
-    @Schema(description = "S3 key video giới thiệu sản phẩm (tối đa 60s)", nullable = true)
+    @Schema(description = "Upload id video giới thiệu sản phẩm (tối đa 60s)", nullable = true)
     @Nullable
-    String videoKey,
+    UUID videoUploadId,
 
-    @Schema(description = "S3 key ảnh sản phẩm phẳng (nền trắng) cho Virtual Try-On", nullable = true)
+    @Schema(description = "Upload id ảnh sản phẩm phẳng (nền trắng) cho Virtual Try-On", nullable = true)
     @Nullable
-    String garmentKey,
+    UUID garmentUploadId,
 
     @Schema(description = "Bật tính năng thử đồ ảo (Virtual Try-On)", nullable = true)
     @Nullable

@@ -1,9 +1,7 @@
-package com.minhnbnt.fashionstore.features.catalog.controller;
+package com.minhnbnt.fashionstore.features.upload;
 
-import com.minhnbnt.fashionstore.features.catalog.CatalogService;
-import com.minhnbnt.fashionstore.dto.catalog.PresignRequest;
-import com.minhnbnt.fashionstore.dto.catalog.PresignResponse;
-import com.minhnbnt.fashionstore.infrastructure.S3Storage;
+import com.minhnbnt.fashionstore.dto.upload.PresignRequest;
+import com.minhnbnt.fashionstore.dto.upload.PresignResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -18,27 +16,23 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/uploads")
 @RequiredArgsConstructor
-@Tag(name = "Uploads", description = "Xin URL upload ảnh trực tiếp lên S3")
+@Tag(name = "Uploads", description = "Xin URL upload ảnh/video trực tiếp lên S3")
 public class UploadController {
 
-    private final S3Storage storage;
+    private final UploadService uploads;
 
     @PostMapping("/presign")
     @Operation(
         summary = "Xin URL upload",
-        description = "Nhận image/* hoặc video/*. Frontend PUT file lên url, rồi lấy key gắn vào product."
+        description = "Nhận image/* hoặc video/*. Tạo bản ghi upload ngay và trả uploadId + uploadUrl; "
+            + "frontend PUT file lên uploadUrl rồi gửi uploadId vào các request nghiệp vụ. "
+            + "purpose=kyc đặt key dưới prefix kyc/ (chặn đọc ẩn danh, xem qua presigned GET)."
     )
-    @ApiResponse(responseCode = "200", description = "Key và URL upload")
-    @ApiResponse(responseCode = "400", description = "Content-type không phải ảnh hoặc video")
+    @ApiResponse(responseCode = "200", description = "uploadId và URL upload")
+    @ApiResponse(responseCode = "400", description = "Content-type không phải ảnh/video hoặc purpose không hợp lệ")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
     @SecurityRequirement(name = "bearerAuth")
     public PresignResponse presign(@Valid @RequestBody PresignRequest request) {
-        var upload = storage.presign(request.contentType());
-
-        return new PresignResponse(
-            upload.key(),
-            upload.url(),
-            upload.expiresAt()
-        );
+        return uploads.presign(request);
     }
 }

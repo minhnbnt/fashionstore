@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class UserProfileTest {
 
     private static UserProfile customer() {
-        return UserProfile.create(UUID.randomUUID(), "an@t.local", "An", null);
+        return UserProfile.create(UUID.randomUUID(), "an@t.local", "An");
     }
 
     @Test

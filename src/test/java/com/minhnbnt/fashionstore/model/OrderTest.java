@@ -121,18 +121,16 @@ class OrderTest {
             5,
             "San pham dep va dung size",
             new String[0],
-            null,
-            new String[0],
             false
         );
         assertThat(review.getEditedAt()).isNull();
 
-        review.update(4, "Cap nhat lan 1 day du ky tu", new String[0], null, new String[0], false);
+        review.update(4, "Cap nhat lan 1 day du ky tu", new String[0], false);
         assertThat(review.getStars()).isEqualTo(4);
         assertThat(review.getComment()).isEqualTo("Cap nhat lan 1 day du ky tu");
         assertThat(review.getEditedAt()).isNotNull();
 
-        assertThatThrownBy(() -> review.update(3, "Sua lan 2 day du ky tu", new String[0], null, new String[0], false))
+        assertThatThrownBy(() -> review.update(3, "Sua lan 2 day du ky tu", new String[0], false))
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(ex -> {
                 var statusEx = (ResponseStatusException) ex;

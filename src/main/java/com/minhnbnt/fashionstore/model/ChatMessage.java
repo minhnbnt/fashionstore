@@ -28,7 +28,7 @@ public class ChatMessage implements Persistable<UUID> {
 
     private String content;
 
-    private @Nullable String imageKey;
+    private @Nullable UUID imageUploadId;
 
     private Instant sentAt;
 
@@ -42,7 +42,7 @@ public class ChatMessage implements Persistable<UUID> {
         UUID senderId,
         String senderType,
         String content,
-        @Nullable String imageKey
+        @Nullable UUID imageUploadId
     ) {
         return new ChatMessage(
             UUID.randomUUID(),
@@ -50,7 +50,7 @@ public class ChatMessage implements Persistable<UUID> {
             senderId,
             senderType,
             content,
-            imageKey,
+            imageUploadId,
             Instant.now(),
             false,
             true

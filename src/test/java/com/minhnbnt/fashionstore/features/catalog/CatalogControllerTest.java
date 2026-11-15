@@ -2,7 +2,6 @@ package com.minhnbnt.fashionstore.features.catalog;
 
 import com.minhnbnt.fashionstore.config.SecurityConfig;
 import com.minhnbnt.fashionstore.dto.catalog.CategoryResponse;
-import com.minhnbnt.fashionstore.dto.catalog.PresignResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSearchRequest;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSearchResponse;
@@ -13,8 +12,6 @@ import com.minhnbnt.fashionstore.features.catalog.controller.CategoryController;
 import com.minhnbnt.fashionstore.features.catalog.controller.PublicProductController;
 import com.minhnbnt.fashionstore.features.catalog.controller.SearchController;
 import com.minhnbnt.fashionstore.features.catalog.controller.ShopProductController;
-import com.minhnbnt.fashionstore.features.catalog.controller.UploadController;
-import com.minhnbnt.fashionstore.infrastructure.S3Storage;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +28,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -43,8 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     CategoryController.class,
     ShopProductController.class,
     PublicProductController.class,
-    SearchController.class,
-    UploadController.class
+    SearchController.class
 })
 @Import(SecurityConfig.class)
 class CatalogControllerTest {
@@ -57,9 +55,6 @@ class CatalogControllerTest {
 
     @MockitoBean
     private CatalogService catalog;
-
-    @MockitoBean
-    private S3Storage storage;
 
     private static ProductResponse product(UUID id, UUID shopId) {
         return new ProductResponse(
@@ -114,13 +109,15 @@ class CatalogControllerTest {
                      "description":"Mô tả chi tiết áo thun",
                      "categoryId":"%s",
                      "images":[
-                       {"s3Key":"p/1.jpg","sortOrder":0},
-                       {"s3Key":"p/2.jpg","sortOrder":1},
-                       {"s3Key":"p/3.jpg","sortOrder":2}
+                       {"uploadId":"%s","sortOrder":0},
+                       {"uploadId":"%s","sortOrder":1},
+                       {"uploadId":"%s","sortOrder":2}
                      ],
                      "variants":[{"sku":"SKU-1","size":"M","color":"Đen",
                       "price":100000,"stockQuantity":10,"defaultVariant":true}]}
-                    """.formatted(categoryId)))
+                    """.formatted(
+                        categoryId,
+                        UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID())))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.slug").value("ao-thun"));
     }
@@ -135,8 +132,8 @@ class CatalogControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"name":"Áo thun cao cấp","slug":"ao-thun","description":"Mô tả",
-                    "categoryId":"%s","images":[{"s3Key":"1.jpg","sortOrder":0},
-                    {"s3Key":"2.jpg","sortOrder":1},{"s3Key":"3.jpg","sortOrder":2}],
+                    "categoryId":"%s","images":[{"uploadId":"10000000-0000-0000-0000-000000000000","sortOrder":0},
+                    {"uploadId":"10000000-0000-0000-0000-000000000000","sortOrder":1},{"uploadId":"10000000-0000-0000-0000-000000000000","sortOrder":2}],
                     "variants":[]}
                     """.formatted(UUID.randomUUID())))
             .andExpect(status().isBadRequest());
@@ -155,8 +152,8 @@ class CatalogControllerTest {
                      "description":"Mô tả chi tiết",
                      "categoryId":"%s",
                      "images":[
-                       {"s3Key":"p/1.jpg","sortOrder":0},
-                       {"s3Key":"p/2.jpg","sortOrder":1}
+                       {"uploadId":"10000000-0000-0000-0000-000000000000","sortOrder":0},
+                       {"uploadId":"10000000-0000-0000-0000-000000000000","sortOrder":1}
                      ],
                      "variants":[{"sku":"SKU-1","size":"M","color":"Đen",
                       "price":100000,"stockQuantity":10,"defaultVariant":true}]}
@@ -174,7 +171,7 @@ class CatalogControllerTest {
             if (i > 1) {
                 images.append(",");
             }
-            images.append("\"s3Key\":\"p/%d.jpg\",\"sortOrder\":%d".formatted(i, i - 1));
+            images.append("\"uploadId\":\"%s\",\"sortOrder\":%d".formatted(UUID.randomUUID(), i - 1));
         }
 
         mockMvc.perform(post("/api/shops/{shopId}/products", shopId)
@@ -204,9 +201,9 @@ class CatalogControllerTest {
                      "description":"Mô tả chi tiết",
                      "categoryId":"%s",
                      "images":[
-                       {"s3Key":"p/1.jpg","sortOrder":0},
-                       {"s3Key":"p/2.jpg","sortOrder":1},
-                       {"s3Key":"p/3.jpg","sortOrder":2}
+                       {"uploadId":"10000000-0000-0000-0000-000000000000","sortOrder":0},
+                       {"uploadId":"10000000-0000-0000-0000-000000000000","sortOrder":1},
+                       {"uploadId":"10000000-0000-0000-0000-000000000000","sortOrder":2}
                      ],
                      "variants":[{"sku":"SKU-1","size":"M","color":"Đen",
                       "price":100000,"stockQuantity":10,"defaultVariant":true}]}
@@ -254,35 +251,36 @@ class CatalogControllerTest {
     }
 
     @Test
-    void batchSummariesIsPublicAndPreservesOrder() throws Exception {
+    void batchSummariesIsPublicAndKeepsInputOrder() throws Exception {
         var id1 = UUID.randomUUID();
         var id2 = UUID.randomUUID();
-        var shopId = UUID.randomUUID();
-        var items = List.of(
-            new ProductSummaryResponse(id1, shopId, "Áo Khoác Parka", "ao-khoac-parka", 450000L, "p1.jpg", null),
-            new ProductSummaryResponse(id2, shopId, "Quần Jeans", "quan-jeans", 320000L, "p2.jpg", null)
-        );
-        when(catalog.getSummaryBatch(List.of(id1, id2))).thenReturn(items);
+        when(catalog.getSummaries(any())).thenReturn(List.of(
+            new ProductSummaryResponse(id1, UUID.randomUUID(), "Áo thun", "ao-thun", 100000L, null, null),
+            new ProductSummaryResponse(id2, UUID.randomUUID(), "Váy hoa", "vay-hoa", 250000L, "v/vay.jpg", null)
+        ));
 
-        mockMvc.perform(get("/api/products/batch")
-                .param("ids", id1.toString(), id2.toString()))
+        mockMvc.perform(get("/api/products/batch").param("ids", id1 + "," + id2))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(2))
             .andExpect(jsonPath("$[0].id").value(id1.toString()))
-            .andExpect(jsonPath("$[0].name").value("Áo Khoác Parka"))
-            .andExpect(jsonPath("$[0].minPrice").value(450000))
-            .andExpect(jsonPath("$[0].defaultImageKey").value("p1.jpg"))
-            .andExpect(jsonPath("$[1].id").value(id2.toString()));
+            .andExpect(jsonPath("$[0].slug").value("ao-thun"))
+            .andExpect(jsonPath("$[1].id").value(id2.toString()))
+            .andExpect(jsonPath("$[1].slug").value("vay-hoa"));
     }
 
     @Test
-    void batchSummariesRejectsMoreThanTwentyIds() throws Exception {
-        var ids = java.util.stream.IntStream.range(0, 21)
-            .mapToObj(i -> UUID.randomUUID().toString())
-            .toArray(String[]::new);
+    void batchSummariesRejectsMoreThan20Ids() throws Exception {
+        var ids = new StringBuilder();
+        for (int i = 0; i < 21; i++) {
+            if (i > 0) {
+                ids.append(",");
+            }
+            ids.append(UUID.randomUUID());
+        }
 
-        mockMvc.perform(get("/api/products/batch").param("ids", ids))
+        mockMvc.perform(get("/api/products/batch").param("ids", ids.toString()))
             .andExpect(status().isBadRequest());
+
+        verify(catalog, never()).getSummaries(any());
     }
 
     @Test
@@ -378,39 +376,5 @@ class CatalogControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.sizes[1]").value("M"))
             .andExpect(jsonPath("$.maxPrice").value(300000));
-    }
-
-    @Test
-    void presignNeedsAuth() throws Exception {
-        mockMvc.perform(post("/api/uploads/presign")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"contentType\":\"image/jpeg\"}"))
-            .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void presignRejectsNonImage() throws Exception {
-        var userId = UUID.randomUUID();
-
-        mockMvc.perform(post("/api/uploads/presign")
-                .with(jwt().jwt(builder -> builder.subject(userId.toString())))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"contentType\":\"text/plain\"}"))
-            .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void presignReturnsKeyAndUrl() throws Exception {
-        var userId = UUID.randomUUID();
-        var now = Instant.now();
-        when(storage.presign("image/jpeg"))
-            .thenReturn(new S3Storage.PresignedUpload("abc.jpg", "http://x/abc.jpg", now));
-
-        mockMvc.perform(post("/api/uploads/presign")
-                .with(jwt().jwt(builder -> builder.subject(userId.toString())))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"contentType\":\"image/jpeg\"}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.key").value("abc.jpg"));
     }
 }

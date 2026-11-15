@@ -65,7 +65,7 @@ class SystemSettingsServiceTest {
             .update());
 
         adminId = UUID.randomUUID();
-        users.upsert(adminId, new CreateUserRequest("admin-" + adminId + "@t.local", "Admin", null));
+        users.upsert(adminId, new CreateUserRequest("admin-" + adminId + "@t.local", "Admin"));
     }
 
     private static UpdateSettingsRequest only(

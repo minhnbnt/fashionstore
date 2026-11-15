@@ -37,7 +37,7 @@ class S3StorageTest {
 
     @Test
     void presignReturnsSignedPathStyleUrlForGeneratedKey() {
-        var upload = storage().presign("image/png");
+        var upload = storage().presign("image/png", "");
 
         assertThat(upload.key()).endsWith(".png");
         assertThat(upload.url())
@@ -46,15 +46,20 @@ class S3StorageTest {
     }
 
     @Test
+    void prefixIsPrependedToKey() {
+        assertThat(storage().presign("image/png", "kyc/").key()).startsWith("kyc/").endsWith(".png");
+    }
+
+    @Test
     void svgContentTypeGetsSvgExtension() {
-        assertThat(storage().presign("image/svg+xml").key()).endsWith(".svg");
+        assertThat(storage().presign("image/svg+xml", "").key()).endsWith(".svg");
     }
 
     @Test
     void urlExpiresInTenMinutes() {
         var now = Instant.now();
 
-        assertThat(storage().presign("image/png").expiresAt())
+        assertThat(storage().presign("image/png", "").expiresAt())
                 .isBetween(now.plusSeconds(9 * 60), now.plusSeconds(11 * 60));
     }
 
@@ -62,7 +67,7 @@ class S3StorageTest {
     void urlTtlIsConfigurable() {
         var now = Instant.now();
 
-        assertThat(storage(Duration.ofSeconds(90)).presign("image/png").expiresAt())
+        assertThat(storage(Duration.ofSeconds(90)).presign("image/png", "").expiresAt())
                 .isBetween(now.plusSeconds(80), now.plusSeconds(100));
     }
 }
