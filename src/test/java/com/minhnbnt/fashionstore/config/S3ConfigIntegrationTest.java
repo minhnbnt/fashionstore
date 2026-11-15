@@ -6,6 +6,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -44,8 +45,14 @@ class S3ConfigIntegrationTest {
         .withEnv("VGW_PORT", ":9000")
         .withEnv("VGW_BACKEND", "posix")
         .withEnv("VGW_BACKEND_ARGS", "/data/s3")
+        .withEnv("VGW_CORS_ALLOW_ORIGIN", "*")
+        .withEnv("VGW_ARGS", "--health /health")
         .withExposedPorts(9000)
-        .waitingFor(Wait.forListeningPort());
+        .waitingFor(
+            Wait.forHttp("/health")
+                .forPort(9000)
+                .withStartupTimeout(Duration.ofMinutes(2))
+        );
 
     private static final HttpClient HTTP = HttpClient.newHttpClient();
 

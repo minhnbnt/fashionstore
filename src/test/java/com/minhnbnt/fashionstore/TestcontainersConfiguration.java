@@ -9,7 +9,6 @@ import java.util.UUID;
 import com.minhnbnt.fashionstore.infrastructure.seed.DemoImageFetcher;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.jdbc.autoconfigure.JdbcConnectionDetails;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -37,28 +36,52 @@ public class TestcontainersConfiguration {
     private static @Nullable GenericContainer<?> sharedS3;
 
     /**
-     * Container dùng chung cho cả JVM. {@code destroyMethod = ""} chặn Spring gọi {@code close()} khi một
-     * context bị destroy — nếu không, một context fail giữa chừng sẽ kill container dùng chung và làm nổ
-     * dây chuyền {@code ConnectException} cho mọi context còn lại (JUnit chạy class song song).
+     * Container Postgres dùng chung cho cả JVM — cố ý KHÔNG đăng ký làm bean: Spring Boot 4
+     * ({@code TestcontainersLifecycleBeanPostProcessor}) gọi {@code close()} trên mọi bean
+     * {@code Startable} khi một context bị destroy, kể cả với {@code destroyMethod = ""} —
+     * một context fail boot sẽ kill container dùng chung và làm nổ dây chuyền
+     * {@code ConnectException} cho mọi context còn lại (JUnit chạy class song song).
+     * Static + synchronized giữ đúng một container cho cả JVM; JVM thoát thì JVM-hook
+     * reaper của Testcontainers dọn.
      */
-    @Bean(destroyMethod = "")
-    PostgreSQLContainer postgresContainer() {
+    public static synchronized PostgreSQLContainer postgresContainer() {
 
-        synchronized (TestcontainersConfiguration.class) {
-
-            if (sharedPostgres == null) {
-                sharedPostgres = startedPostgres();
-            }
-
-            return sharedPostgres;
+        if (sharedPostgres == null) {
+            sharedPostgres = startedPostgres();
         }
+
+        return sharedPostgres;
     }
 
     /** Tương tự {@link #postgresContainer()}: container sống theo JVM, không theo vòng đời context. */
-    @Bean(destroyMethod = "")
-    GenericContainer<?> s3Container() {
-        return s3();
+    public static synchronized GenericContainer<?> s3Container() {
+
+        if (sharedS3 == null) {
+            sharedS3 = startedS3();
+        }
+
+        return sharedS3;
     }
+
+    /**
+     * Database rỗng mới trên container Postgres dùng chung, cho test cần schema trắng để tự
+     * dựng từ đầu (migration tests): thay vì mỗi class tự dựng một container — chết giữa chừng
+     * khi nhiều container start song song làm podman quá tải — tạo database chỉ tốn ~100ms.
+     */
+    public static IsolatedDatabase isolatedDatabase() {
+
+        var container = postgresContainer();
+        var database = createEmptyDatabase(container);
+
+        var base = container.getJdbcUrl();
+        var slash = base.lastIndexOf('/');
+        var jdbcUrl = base.substring(0, slash + 1) + database;
+
+        return new IsolatedDatabase(jdbcUrl, container.getUsername(), container.getPassword());
+    }
+
+    /** Thông tin truy cập một database rỗng trên container Postgres dùng chung. */
+    public record IsolatedDatabase(String jdbcUrl, String username, String password) {}
 
     /** Ảnh demo fake, đè {@code PicsumImageFetcher}: seed chạy được nhưng không tải ảnh thật. */
     @Bean
@@ -72,11 +95,12 @@ public class TestcontainersConfiguration {
      * versitygw đang chạy ngoài máy, và không ghi rác vào bucket dev.
      */
     @Bean
-    DynamicPropertyRegistrar s3Properties(@Qualifier("s3Container") GenericContainer<?> container) {
+    DynamicPropertyRegistrar s3Properties() {
 
         // Bucket riêng cho từng context: S3Config.ensureBucketExists sẽ tự tạo lúc boot,
         // tránh data chéo giữa các context chạy song song.
         var bucket = "fashionstore-test-" + UUID.randomUUID().toString().replace("-", "");
+        var container = s3Container();
 
         return registry -> {
             registry.add("s3.endpoint", () -> endpointOf(container));
@@ -87,13 +111,9 @@ public class TestcontainersConfiguration {
         };
     }
 
-    private static synchronized GenericContainer<?> s3() {
-
-        if (sharedS3 == null) {
-            sharedS3 = startedS3();
-        }
-
-        return sharedS3;
+    @Bean
+    JdbcConnectionDetails jdbcConnectionDetails() {
+        return new PerContextConnectionDetails();
     }
 
     private static String endpointOf(GenericContainer<?> container) {
@@ -135,57 +155,47 @@ public class TestcontainersConfiguration {
         return container;
     }
 
-    @Bean
-    JdbcConnectionDetails jdbcConnectionDetails() {
-        return new PerContextConnectionDetails(postgresContainer());
-    }
-
     private static final class PerContextConnectionDetails implements JdbcConnectionDetails {
 
-        private final PostgreSQLContainer container;
+        private final IsolatedDatabase database;
 
-        private final String database;
-
-        private PerContextConnectionDetails(PostgreSQLContainer container) {
-            this.container = container;
-            this.database = createDatabase(container);
+        private PerContextConnectionDetails() {
+            this.database = isolatedDatabase();
         }
 
         @Override
         public @NonNull String getJdbcUrl() {
-            var base = container.getJdbcUrl();
-            var slash = base.lastIndexOf('/');
-            return base.substring(0, slash + 1) + database;
+            return database.jdbcUrl();
         }
 
         @Override
         public @Nullable String getUsername() {
-            return container.getUsername();
+            return database.username();
         }
 
         @Override
         public @Nullable String getPassword() {
-            return container.getPassword();
+            return database.password();
+        }
+    }
+
+    private static String createEmptyDatabase(PostgreSQLContainer container) {
+
+        var database = "test_" + UUID.randomUUID().toString().replace("-", "");
+
+        try (
+            var connection = DriverManager.getConnection(
+                container.getJdbcUrl(),
+                container.getUsername(),
+                container.getPassword()
+            );
+            var statement = connection.createStatement()
+        ) {
+            statement.execute("CREATE DATABASE " + database);
+        } catch (SQLException ex) {
+            throw new IllegalStateException("Failed to create test database " + database, ex);
         }
 
-        private static String createDatabase(PostgreSQLContainer container) {
-
-            var database = "test_" + UUID.randomUUID().toString().replace("-", "");
-
-            try (
-                var connection = DriverManager.getConnection(
-                    container.getJdbcUrl(),
-                    container.getUsername(),
-                    container.getPassword()
-                );
-                var statement = connection.createStatement()
-            ) {
-                statement.execute("CREATE DATABASE " + database);
-            } catch (SQLException ex) {
-                throw new IllegalStateException("Failed to create test database " + database, ex);
-            }
-
-            return database;
-        }
+        return database;
     }
 }

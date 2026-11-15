@@ -5,19 +5,15 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
+import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.configuration.FluentConfiguration;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -29,7 +25,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * cũ map đúng sang FK, cột key bị drop, NULL giữ nguyên và FK chặn xoá upload đang
  * được tham chiếu.
  */
-@Testcontainers
 class ProductUploadMigrationTest {
 
     private static final String IMAGE_KEY = "c1111111-1111-1111-1111-111111111111.webp";
@@ -40,11 +35,7 @@ class ProductUploadMigrationTest {
     private static final String SHOP_SLUG = "product-legacy-shop";
     private static final String PLAIN_SLUG = "product-plain-shop";
 
-    @Container
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
-        DockerImageName.parse("ghcr.io/minhnbnt/postgresql:latest")
-            .asCompatibleSubstituteFor("postgres"))
-        .withStartupTimeout(Duration.ofMinutes(3));
+    private static final TestcontainersConfiguration.IsolatedDatabase DB = TestcontainersConfiguration.isolatedDatabase();
 
     @BeforeAll
     static void migrateSeedAndMigrateAgain() throws SQLException {
@@ -67,7 +58,7 @@ class ProductUploadMigrationTest {
     private static FluentConfiguration baseFlyway() {
 
         return Flyway.configure()
-            .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+            .dataSource(DB.jdbcUrl(), DB.username(), DB.password())
             .locations("classpath:db/migration")
             .outOfOrder(true);
     }
@@ -119,7 +110,7 @@ class ProductUploadMigrationTest {
     private static Connection connection() throws SQLException {
 
         return DriverManager.getConnection(
-            POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+            DB.jdbcUrl(), DB.username(), DB.password());
     }
 
     @Test

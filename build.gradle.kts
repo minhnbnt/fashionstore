@@ -57,6 +57,12 @@ dependencies {
 tasks.withType<Test> {
     useJUnitPlatform()
 
+    // TC 2.x chỉ đọc biến env NGAY TRONG executor JVM để quyết định có khởi động Ryuk hay không.
+    // Nếu env này mất giữa daemon -> executor, Ryuk sẽ được dựng lên và kill + DELETE container
+    // giữa chừng khi executor bị SIGTERM hoặc có run chồng chéo (quan sát được qua journal podman).
+    // Khai báo ở đây để bảo đảm mọi executor đều tắt Ryuk, không phụ thuộc shell gọi gradlew.
+    environment("TESTCONTAINERS_RYUK_DISABLED", "true")
+
     // config/springboot.yml (dev) cũng được nạp khi test: tắt bootstrap admin + GoTrue thật để test không ghi vào GoTrue dev.
     // System property ưu tiên hơn file import nên ghi đè được.
     systemProperty("app.bootstrap-admin.email", "")
