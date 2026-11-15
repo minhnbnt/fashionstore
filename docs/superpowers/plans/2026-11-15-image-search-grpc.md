@@ -1165,14 +1165,16 @@ git commit -m "feat(search): client gRPC embed ảnh + map mã lỗi"
 
 - [ ] **Step 1: Viết test thất bại**
 
-`ImageSearchRepositoryTest.java` (Testcontainers, seed tay; vector dựng bằng `PGvector`):
+`ImageSearchRepositoryTest.java` (Testcontainers, seed tay; vector dựng bằng `PGvector`.
+`product_embedding.product_image_id` là FK tới `product_image`, nên phải tạo `upload` + `product_image`):
 
 ```java
 package com.minhnbnt.fashionstore.features.catalog;
 
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
 import com.minhnbnt.fashionstore.features.catalog.search.ImageSearchRepository;
-import org.pgvector.PGvector;
+import com.pgvector.PGvector;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -1196,48 +1198,61 @@ class ImageSearchRepositoryTest {
     private JdbcClient jdbc;
 
     private UUID shopId;
-    private UUID categoryId;
 
     @BeforeEach
     void setUp() {
-        jdbc.sql("TRUNCATE product_embedding, product_image, product_variant, product, shop CASCADE").update();
+        jdbc.sql("""
+            TRUNCATE product_embedding, product_image, product_variant, product, upload, shop CASCADE
+            """).update();
         shopId = UUID.randomUUID();
-        categoryId = UUID.randomUUID();
         jdbc.sql("INSERT INTO shop (id, name, slug) VALUES (:id, 'S', 's-repo')")
             .param("id", shopId).update();
     }
 
-    private UUID product(String slug, String status, String shopStatus, float[] vector) {
+    private UUID product(String slug, String status, String shopStatus, float @Nullable [] vector) {
         var id = UUID.randomUUID();
         jdbc.sql("UPDATE shop SET status = :st WHERE id = :id")
             .param("st", shopStatus).param("id", shopId).update();
-        jdbc.sql("INSERT INTO product (id, shop_id, name, slug, status) VALUES (:id, :shop, 'P', :slug, :status)")
+        jdbc.sql("""
+            INSERT INTO product (id, shop_id, name, slug, status)
+            VALUES (:id, :shop, 'P', :slug, :status)
+            """)
             .param("id", id).param("shop", shopId).param("slug", slug).param("status", status).update();
         if (vector != null) {
-            jdbc.sql("""
-                INSERT INTO product_embedding (product_image_id, product_id, embedding)
-                VALUES (:imageId, :productId, cast(:vec as vector))
-                """)
-                .param("imageId", UUID.randomUUID())
-                .param("productId", id)
-                .param("vec", new PGvector(vector).getValue())
-                .update();
+            image(id, vector);
         }
         return id;
+    }
+
+    private void image(UUID productId, float[] vector) {
+        var uploadId = UUID.randomUUID();
+        var imageId = UUID.randomUUID();
+        jdbc.sql("INSERT INTO upload (id, s3_key, content_type) VALUES (:id, :key, 'image/jpeg')")
+            .param("id", uploadId).param("key", "img-" + uploadId).update();
+        jdbc.sql("INSERT INTO product_image (id, product_id, upload_id) VALUES (:id, :product, :upload)")
+            .param("id", imageId).param("product", productId).param("upload", uploadId).update();
+        jdbc.sql("""
+            INSERT INTO product_embedding (product_image_id, product_id, embedding)
+            VALUES (:imageId, :productId, cast(:vec as vector))
+            """)
+            .param("imageId", imageId)
+            .param("productId", productId)
+            .param("vec", new PGvector(vector).getValue())
+            .update();
     }
 
     @Test
     void ordersByDistanceAndKeepsBestImagePerProduct() {
         var near = product("near", "ACTIVE", "APPROVED", unit(0));
-        product("near-second-image", "ACTIVE", "APPROVED", null);
+        image(near, unit(1));
         var far = product("far", "ACTIVE", "APPROVED", unit(256));
 
         var hits = repository.search(unit(0), 10);
 
-        assertThat(hits).extracting(ImageSearchRepository.Scored::productId).contains(near);
         assertThat(hits.get(0).productId()).isEqualTo(near);
-        assertThat(hits).extracting(ImageSearchRepository.Scored::productId).doesNotHaveDuplicates();
         assertThat(hits.get(hits.size() - 1).productId()).isEqualTo(far);
+        // Repo trả cả 2 ảnh của "near"; service mới dedupe.
+        assertThat(hits).extracting(ImageSearchRepository.Scored::productId).containsOnly(near, far);
     }
 
     @Test
@@ -1277,7 +1292,7 @@ package com.minhnbnt.fashionstore.infrastructure;
 
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.pgvector.PGvector;
+import com.pgvector.PGvector;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
