@@ -49,6 +49,36 @@ public class NotificationService {
     }
 
     @Transactional
+    public void createIdempotent(
+        Collection<UUID> recipients,
+        NotificationCategory category,
+        String type,
+        String title,
+        String body,
+        @Nullable String link,
+        UUID refId
+    ) {
+        if (recipients.isEmpty()) {
+            return;
+        }
+
+        for (var recipientId : recipients) {
+            var inserted = notifications.insertIfAbsent(
+                recipientId,
+                category,
+                type,
+                title,
+                body,
+                link,
+                refId
+            );
+            if (inserted.isPresent()) {
+                publisher.publish(recipientId, toResponse(inserted.get()));
+            }
+        }
+    }
+
+    @Transactional
     public void notifyInvitation(
         UUID userId,
         UUID invitationId,
