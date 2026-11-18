@@ -44,7 +44,14 @@ public class ProductSearchRepository {
         String slug,
         long minPrice,
         @Nullable String defaultImageUrl,
-        @Nullable Double rank
+        @Nullable Double rank,
+        @Nullable Long compareAtPrice,
+        @Nullable Double averageRating,
+        long reviewCount,
+        long soldCount,
+        @Nullable String shopName,
+        @Nullable String shopSlug,
+        long totalStock
     ) {
     }
 
@@ -77,7 +84,11 @@ public class ProductSearchRepository {
             WITH prices AS (
                 SELECT
                     product_id,
-                    min(price) AS min_price
+                    min(price) AS min_price,
+                    max(compare_at_price) FILTER (
+                        WHERE compare_at_price IS NOT NULL AND compare_at_price > price
+                    ) AS compare_at_price,
+                    coalesce(sum(stock_quantity), 0) AS total_stock
                 FROM product_variant
                 GROUP BY product_id
             ),
@@ -88,6 +99,23 @@ public class ProductSearchRepository {
                 FROM product_image pi
                 JOIN upload u ON u.id = pi.upload_id
                 ORDER BY pi.product_id, pi.sort_order
+            ),
+            review_stats AS (
+                SELECT
+                    r.product_id,
+                    avg(r.stars)::double precision AS average_rating,
+                    count(*) AS review_count
+                FROM review r
+                GROUP BY r.product_id
+            ),
+            sold_stats AS (
+                SELECT
+                    oi.product_id,
+                    coalesce(sum(oi.quantity), 0) AS sold_count
+                FROM order_item oi
+                JOIN orders o ON o.id = oi.order_id
+                WHERE o.status != 'CANCELLED'
+                GROUP BY oi.product_id
             )
             SELECT
                 p.id AS id,
@@ -96,10 +124,19 @@ public class ProductSearchRepository {
                 p.slug AS slug,
                 coalesce(prices.min_price, 0) AS min_price,
                 covers.s3_key AS default_image,
-                %s AS rank
+                %s AS rank,
+                prices.compare_at_price AS compare_at_price,
+                review_stats.average_rating AS average_rating,
+                coalesce(review_stats.review_count, 0) AS review_count,
+                coalesce(sold_stats.sold_count, 0) AS sold_count,
+                s.name AS shop_name,
+                s.slug AS shop_slug,
+                coalesce(prices.total_stock, 0) AS total_stock
             %s
             LEFT JOIN prices ON prices.product_id = p.id
             LEFT JOIN covers ON covers.product_id = p.id
+            LEFT JOIN review_stats ON review_stats.product_id = p.id
+            LEFT JOIN sold_stats ON sold_stats.product_id = p.id
             WHERE %s
             ORDER BY %s
             LIMIT :limit OFFSET :offset
@@ -116,7 +153,14 @@ public class ProductSearchRepository {
                 rs.getString("slug"),
                 rs.getLong("min_price"),
                 publicUrlOf(rs.getString("default_image")),
-                rs.getObject("rank", Double.class)
+                rs.getObject("rank", Double.class),
+                rs.getObject("compare_at_price", Long.class),
+                rs.getObject("average_rating", Double.class),
+                rs.getLong("review_count"),
+                rs.getLong("sold_count"),
+                rs.getString("shop_name"),
+                rs.getString("shop_slug"),
+                rs.getLong("total_stock")
             ))
             .list();
     }

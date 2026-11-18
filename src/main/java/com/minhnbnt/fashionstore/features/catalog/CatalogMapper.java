@@ -90,7 +90,14 @@ public final class CatalogMapper {
             hit.slug(),
             hit.minPrice(),
             hit.defaultImageUrl(),
-            hit.rank()
+            hit.rank(),
+            hit.compareAtPrice(),
+            hit.averageRating(),
+            hit.reviewCount(),
+            hit.soldCount(),
+            hit.shopName(),
+            hit.shopSlug(),
+            hit.totalStock()
         );
     }
 
@@ -102,7 +109,14 @@ public final class CatalogMapper {
             product.slug(),
             minVariantPrice(product.variants()),
             firstImageUrl(product.images()),
-            null
+            null,
+            maxDiscountCompareAtPrice(product.variants()),
+            product.averageRating(),
+            product.reviewCount(),
+            0L,
+            null,
+            null,
+            totalVariantStock(product.variants())
         );
     }
 
@@ -112,6 +126,28 @@ public final class CatalogMapper {
             .filter(Objects::nonNull)
             .min(Long::compare)
             .orElse(null);
+    }
+
+    private static @Nullable Long maxDiscountCompareAtPrice(List<VariantResponse> variants) {
+        Long maxCompareAt = null;
+        for (var variant : variants) {
+            var compareAt = variant.compareAtPrice();
+            var price = variant.price();
+            if (compareAt != null && price != null && compareAt > price) {
+                if (maxCompareAt == null || compareAt > maxCompareAt) {
+                    maxCompareAt = compareAt;
+                }
+            }
+        }
+        return maxCompareAt;
+    }
+
+    private static long totalVariantStock(List<VariantResponse> variants) {
+        long total = 0L;
+        for (var variant : variants) {
+            total += variant.stockQuantity();
+        }
+        return total;
     }
 
     private static @Nullable String firstImageUrl(List<ImageResponse> images) {
