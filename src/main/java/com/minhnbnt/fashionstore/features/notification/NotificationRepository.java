@@ -12,6 +12,7 @@ import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -56,6 +57,33 @@ public class NotificationRepository {
             .param("ref", refId)
             .query(NotificationRepository::toRow)
             .single();
+    }
+
+    public Optional<NotificationRow> insertIfAbsent(
+        UUID userId,
+        NotificationCategory category,
+        String type,
+        String title,
+        String body,
+        @Nullable String link,
+        UUID refId
+    ) {
+        return jdbc.sql("""
+            INSERT INTO user_notification (id, user_id, category, type, title, body, link, ref_id)
+            VALUES (:id, :user, :category, :type, :title, :body, :link, :ref)
+            ON CONFLICT DO NOTHING
+            RETURNING id, category, type, title, body, link, read_at, created_at
+            """)
+            .param("id", UUID.randomUUID())
+            .param("user", userId)
+            .param("category", category.name())
+            .param("type", type)
+            .param("title", title)
+            .param("body", body)
+            .param("link", link)
+            .param("ref", refId)
+            .query(NotificationRepository::toRow)
+            .optional();
     }
 
     public List<NotificationRow> findPage(UUID userId, int page, int size) {

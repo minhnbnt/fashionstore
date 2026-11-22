@@ -14,7 +14,7 @@
 
 ## 2. Key Product & Architectural Decisions
 
-1. **Configurable content limit:** Default `1..1000` characters (`app.qna.max-length=1000`). All text inputs are trimmed before validation; empty or whitespace-only content is rejected (`400 Bad Request`).
+1. **Fixed content limit:** `1..1000` characters. All text inputs are trimmed before validation; empty or whitespace-only content is rejected (`400 Bad Request`).
 2. **Verified Buyer rule (`QNA-C03`):** Reuses `OrderService.hasDeliveredAndReceivedProduct(buyerId, productId)` — a customer is a verified buyer for a product if and only if they have at least one order containing that product with `status = DELIVERED` and `received_at IS NOT NULL` (consistent with the Reviews domain).
 3. **Question status lifecycle:**
    - `UNANSWERED`: Default when created; means **no Shop answer exists yet** (even if verified buyers have replied).
