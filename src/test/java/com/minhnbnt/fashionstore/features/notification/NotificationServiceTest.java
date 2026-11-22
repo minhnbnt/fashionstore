@@ -170,6 +170,34 @@ class NotificationServiceTest {
         assertThat(summary.byCategory()).containsEntry("ACTIVITY", 1L);
     }
 
+    @Test
+    void createIdempotentDedupsByUserIdTypeAndRefId() {
+        var recipient = user();
+        var refId = UUID.randomUUID();
+
+        notifications.createIdempotent(
+            Set.of(recipient),
+            NotificationCategory.ACTIVITY,
+            "QNA_NEW_QUESTION",
+            "Câu hỏi mới",
+            "Nội dung câu hỏi",
+            "/qna/1",
+            refId
+        );
+
+        notifications.createIdempotent(
+            Set.of(recipient),
+            NotificationCategory.ACTIVITY,
+            "QNA_NEW_QUESTION",
+            "Câu hỏi mới trùng lặp",
+            "Nội dung câu hỏi trùng lặp",
+            "/qna/1",
+            refId
+        );
+
+        assertThat(notifications.unreadCount(recipient, null)).isEqualTo(1);
+    }
+
     private UUID user() {
         var id = UUID.randomUUID();
         users.upsert(id, new CreateUserRequest("notification-service-" + id + "@t.local", "Notification User"));

@@ -297,7 +297,14 @@ class CatalogControllerTest {
             "ao-thun",
             100000L,
             null,
-            0.5
+            0.5,
+            150000L,
+            4.7,
+            18L,
+            64L,
+            "DHMQ Studio",
+            "dhmq-studio",
+            25L
         );
         return new ProductSearchResponse(List.of(summary), 1L, 0, 20);
     }
@@ -309,6 +316,13 @@ class CatalogControllerTest {
         mockMvc.perform(get("/api/search/products").param("q", "ao thun"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.items[0].slug").value("ao-thun"))
+            .andExpect(jsonPath("$.items[0].compareAtPrice").value(150000))
+            .andExpect(jsonPath("$.items[0].averageRating").value(4.7))
+            .andExpect(jsonPath("$.items[0].reviewCount").value(18))
+            .andExpect(jsonPath("$.items[0].soldCount").value(64))
+            .andExpect(jsonPath("$.items[0].shopName").value("DHMQ Studio"))
+            .andExpect(jsonPath("$.items[0].shopSlug").value("dhmq-studio"))
+            .andExpect(jsonPath("$.items[0].totalStock").value(25))
             .andExpect(jsonPath("$.total").value(1));
     }
 
