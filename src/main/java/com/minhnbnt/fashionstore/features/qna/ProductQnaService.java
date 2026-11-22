@@ -715,9 +715,8 @@ public class ProductQnaService {
         var answer = ProductAnswer.createShopAnswer(questionId, userId, shopName, content);
         var savedAnswer = answers.save(answer);
 
-        if (question.getStatus() == ProductQuestionStatus.UNANSWERED) {
-            question.markAnswered();
-            questions.save(question);
+        if (queryRepository.markAnsweredIfOpen(questionId) == 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Question is closed");
         }
 
         audit.record(
@@ -814,11 +813,7 @@ public class ProductQnaService {
 
         answers.delete(answer);
         notifications.deleteByRefId(answerId);
-
-        if (answers.countByQuestionIdAndAuthorRole(question.getId(), ProductAnswerRole.SHOP) == 0) {
-            question.markUnanswered();
-            questions.save(question);
-        }
+        queryRepository.markUnansweredIfNoShopAnswer(question.getId());
 
         audit.record(
             question.getShopId(),

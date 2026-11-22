@@ -16,6 +16,7 @@ import com.minhnbnt.fashionstore.features.notification.NotificationRepository;
 import com.minhnbnt.fashionstore.features.notification.NotificationService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.qna.repository.ProductAnswerRepository;
+import com.minhnbnt.fashionstore.features.qna.repository.ProductQnaQueryRepository;
 import com.minhnbnt.fashionstore.features.qna.repository.ProductQuestionRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopMemberAuditRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopMemberRepository;
@@ -85,6 +86,9 @@ class ProductQnaServiceTest {
 
     @Autowired
     private ProductQuestionRepository questions;
+
+    @Autowired
+    private ProductQnaQueryRepository qnaQuery;
 
     @Autowired
     private ProductAnswerRepository answers;
@@ -243,6 +247,41 @@ class ProductQnaServiceTest {
         );
         var notifsAfterDuplicate = findNotificationsByRefId(response.id());
         assertThat(notifsAfterDuplicate).hasSize(1);
+    }
+
+    @Test
+    void conditionalStatusUpdatesNeverResurrectClosedQuestion() {
+        var ownerId = mirroredUser("Chủ Shop Race");
+        var shopId = approvedShop(ownerId, "shop-qna-race-" + UUID.randomUUID().toString().substring(0, 6));
+        var productId = createProduct(
+            ownerId,
+            shopId,
+            "Áo race",
+            "ao-race-" + UUID.randomUUID(),
+            "SKU-RACE"
+        );
+        var askerId = mirroredUser("Người Hỏi Race");
+        var staffId = staffWith(ownerId, shopId, ShopPermission.REVIEW_READ, ShopPermission.REVIEW_REPLY);
+
+        var question = qnaService.createQuestion(askerId, productId, new CreateQuestionRequest("Câu hỏi race?"));
+        var answered = qnaService.createShopAnswer(staffId, question.id(), new CreateAnswerRequest("Trả lời của shop"));
+        assertThat(answered.status()).isEqualTo(ProductQuestionStatus.ANSWERED);
+
+        qnaService.closeQuestion(staffId, question.id());
+
+        // Close đã commit trước: câu UPDATE ANSWERED không được ghi đè CLOSED.
+        assertThat(qnaQuery.markAnsweredIfOpen(question.id())).isZero();
+        var afterLateAnswer = questions.findById(question.id()).orElseThrow();
+        assertThat(afterLateAnswer.getStatus()).isEqualTo(ProductQuestionStatus.CLOSED);
+        assertThat(afterLateAnswer.getClosedAt()).isNotNull();
+
+        // Path xoá answer SHOP cuối cũng không được revert CLOSED -> UNANSWERED.
+        var answerId = answers.findByQuestionIdOrderByCreatedAtAscIdAsc(question.id()).getFirst().getId();
+        answers.deleteById(answerId);
+        assertThat(qnaQuery.markUnansweredIfNoShopAnswer(question.id())).isZero();
+        var afterLateDelete = questions.findById(question.id()).orElseThrow();
+        assertThat(afterLateDelete.getStatus()).isEqualTo(ProductQuestionStatus.CLOSED);
+        assertThat(afterLateDelete.getClosedAt()).isNotNull();
     }
 
     @Test

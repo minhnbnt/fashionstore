@@ -288,6 +288,43 @@ public class ProductQnaQueryRepository {
         return spec.query(Long.class).single();
     }
 
+    /**
+     * Đánh dấu ANSWERED chỉ khi question chưa bị đóng. Trả về số row bị update:
+     * 0 nghĩa là status đã chuyển CLOSED trước khi câu UPDATE này chạy.
+     */
+    public int markAnsweredIfOpen(UUID questionId) {
+        return jdbc.sql("""
+            UPDATE product_question
+            SET status = 'ANSWERED', updated_at = now()
+            WHERE id = :id AND status <> 'CLOSED'
+            """)
+            .param("id", questionId)
+            .update();
+    }
+
+    /**
+     * Khoá row question rồi mới recompute status, chặn race 2 luồng xoá answer
+     * SHOP cuối cùng cùng thấy answer của nhau (chưa commit) và cùng bỏ revert.
+     */
+    public int markUnansweredIfNoShopAnswer(UUID questionId) {
+        return jdbc.sql("""
+            WITH locked AS (
+                SELECT id FROM product_question WHERE id = :id FOR UPDATE
+            )
+            UPDATE product_question q
+            SET status = 'UNANSWERED', updated_at = now()
+            FROM locked
+            WHERE q.id = locked.id
+              AND q.status = 'ANSWERED'
+              AND NOT EXISTS (
+                  SELECT 1 FROM product_answer a
+                  WHERE a.question_id = q.id AND a.author_role = 'SHOP'
+              )
+            """)
+            .param("id", questionId)
+            .update();
+    }
+
     public Optional<SellerQuestionRow> findShopQuestionRowById(UUID questionId) {
         var sql = """
             SELECT q.id,
