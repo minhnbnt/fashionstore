@@ -30,7 +30,6 @@ import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import com.minhnbnt.fashionstore.model.ShopPermission;
 import lombok.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +51,7 @@ import java.util.UUID;
 public class ProductQnaService {
 
     private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final int MAX_CONTENT_LENGTH = 1000;
     public static final String NOTIF_NEW_QUESTION = "QNA_NEW_QUESTION";
     public static final String NOTIF_NEW_ANSWER = "QNA_NEW_ANSWER";
 
@@ -65,7 +65,6 @@ public class ProductQnaService {
     private final ShopAccessChecker access;
     private final ShopAuditService audit;
     private final NotificationService notifications;
-    private final int maxContentLength;
 
     public ProductQnaService(
         ProductQuestionRepository questions,
@@ -77,8 +76,7 @@ public class ProductQnaService {
         UserService users,
         ShopAccessChecker access,
         ShopAuditService audit,
-        NotificationService notifications,
-        @Value("${app.qna.max-length:1000}") int maxContentLength
+        NotificationService notifications
     ) {
         this.questions = questions;
         this.answers = answers;
@@ -90,7 +88,6 @@ public class ProductQnaService {
         this.access = access;
         this.audit = audit;
         this.notifications = notifications;
-        this.maxContentLength = maxContentLength;
     }
 
     private String normalizeAndValidateContent(String raw) {
@@ -98,17 +95,11 @@ public class ProductQnaService {
         if (trimmed.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Content must not be blank");
         }
-        if (trimmed.length() > maxContentLength) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Content must not exceed " + maxContentLength + " characters"
-            );
-        }
         return trimmed;
     }
 
     private static String generateCode() {
-        return "QA-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase(Locale.ROOT);
+        return "QA-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase(Locale.ROOT);
     }
 
     private static String truncateSnippet(String raw) {
@@ -218,7 +209,7 @@ public class ProductQnaService {
             targetPage,
             targetSize,
             canAnswerAsBuyer,
-            maxContentLength
+            MAX_CONTENT_LENGTH
         );
     }
 

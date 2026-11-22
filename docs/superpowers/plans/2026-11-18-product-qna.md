@@ -16,7 +16,7 @@
 - Follow `fashionstore/docs/structure.md`: `features/qna/` uses 3-layer split (`controller/`, `repository/`, service at domain root) and never injects repositories of other domains (call `ProductStockService`, `OrderService`, `ShopService`, `UserService`, `NotificationService`, `ShopAuditService`).
 - Follow `fashionstore-ui/AGENTS.md` & `docs/design-system.md`: `pnpm` only; no ternary (`? :`); `@phosphor-icons/react` icons; shared `Modal.tsx` and `ConfirmDialog.tsx`; Vietnamese UI copy; light + dark theme tokens.
 - **No violation reporting:** Do NOT add report endpoints, DB report columns, or report buttons anywhere in Customer or Seller Q&A.
-- Configurable content limit defaults to `1..1000` characters (`app.qna.max-length=1000`); trim before checking; reject blank/whitespace-only (`400 Bad Request`).
+- Content limit is fixed at `1..1000` characters; trim before checking; reject blank/whitespace-only (`400 Bad Request`).
 - Verified buyer condition strictly uses `OrderService.hasDeliveredAndReceivedProduct(userId, productId)`.
 
 ## Review Focus
@@ -158,8 +158,8 @@
   Expected: Compilation/test failure because `ProductQnaService` does not exist yet.
 
 - [ ] **Step 3: Implement `ProductQnaService.java`**
-  - Use an explicit constructor (instead of `@RequiredArgsConstructor`, so `@Value` is preserved cleanly) injecting `@Value("${app.qna.max-length:1000}") int maxContentLength` alongside all required service/repository dependencies.
-  - Generate question code `"QA-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase(Locale.ROOT)`.
+  - Use an explicit constructor injecting all required service/repository dependencies; content length is a fixed constant, no configuration property.
+  - Generate question code `"QA-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase(Locale.ROOT)` (12 hex chars to keep collision probability negligible at ~100k questions).
   - Trim & validate content (`1..maxContentLength`), returning `400 Bad Request` on blank or over-limit.
   - Enforce `productStock.requireActiveProduct(productId)` on all customer/public operations.
   - Batch load answers via `answers.findByQuestionIdInOrderByCreatedAtAscIdAsc(questionIds)` and product thumbnails via `productStock.findProductDisplayInfos(productIds)` to avoid N+1 queries.

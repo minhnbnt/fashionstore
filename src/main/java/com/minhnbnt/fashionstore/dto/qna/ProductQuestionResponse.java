@@ -12,7 +12,7 @@ public record ProductQuestionResponse(
     @Schema(description = "ID câu hỏi")
     UUID id,
 
-    @Schema(description = "Mã câu hỏi công khai", example = "Q-123456")
+    @Schema(description = "Mã câu hỏi công khai", example = "QA-A1B2C3D4E5F6")
     String code,
 
     @Schema(description = "ID sản phẩm")

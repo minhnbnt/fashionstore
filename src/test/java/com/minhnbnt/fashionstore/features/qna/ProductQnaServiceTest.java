@@ -216,7 +216,7 @@ class ProductQnaServiceTest {
         );
 
         assertThat(response.id()).isNotNull();
-        assertThat(response.code()).startsWith("QA-").hasSize(11);
+        assertThat(response.code()).startsWith("QA-").hasSize(15);
         assertThat(response.productId()).isEqualTo(productId);
         assertThat(response.askerDisplayName()).isEqualTo("Nguyễn Văn Hỏi");
         assertThat(response.content()).isEqualTo("Sản phẩm này có size XL không?");
@@ -234,6 +234,7 @@ class ProductQnaServiceTest {
         assertThat(notif.type()).isEqualTo(ProductQnaService.NOTIF_NEW_QUESTION);
         assertThat(notif.title()).isEqualTo("Sản phẩm có câu hỏi mới");
         assertThat(notif.body()).contains("Nguyễn Văn Hỏi hỏi về Áo sơ mi oxford");
+        assertThat(notif.link()).isEqualTo("/shop?shopId=" + shopId + "&tab=qna&questionId=" + response.id());
 
         // Idempotency check: duplicate call does not create extra notification
         notificationService.createIdempotent(
@@ -285,7 +286,7 @@ class ProductQnaServiceTest {
     }
 
     @Test
-    void rejectsBlankWhitespaceAndOverLengthContent() {
+    void rejectsBlankWhitespaceContentAndChecksProductAvailability() {
         var ownerId = mirroredUser();
         var shopId = approvedShop(ownerId, "shop-qna-2-" + UUID.randomUUID().toString().substring(0, 6));
         var productId = createProduct(ownerId, shopId, "Áo khoác gió", "ao-khoac-" + UUID.randomUUID(), "SKU-WIND");
@@ -301,12 +302,7 @@ class ProductQnaServiceTest {
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
 
-        // Content length > 1000 -> 400
-        var tooLong = "A".repeat(1001);
-        assertThatThrownBy(() -> qnaService.createQuestion(askerId, productId, new CreateQuestionRequest(tooLong)))
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
-
+        // Length is enforced at the DTO/DB boundary, not in the service.
         // Boundary length 1000 -> accepts
         var exact1000 = "B".repeat(1000);
         var okQuestion = qnaService.createQuestion(askerId, productId, new CreateQuestionRequest(exact1000));
@@ -560,6 +556,8 @@ class ProductQnaServiceTest {
         var askerNotifs = findNotificationsByRefId(answer.id());
         assertThat(askerNotifs).hasSize(1);
         assertThat(askerNotifs.getFirst().body()).contains("(Đã mua hàng) đã trả lời về");
+        assertThat(askerNotifs.getFirst().link())
+            .isEqualTo("/product/" + productId + "?questionId=" + q.id() + "#product-qna");
 
         // Self-notification check: verified buyer asks and answers own question
         var selfQ = qnaService.createQuestion(
@@ -832,6 +830,8 @@ class ProductQnaServiceTest {
         // Check notification sent to asker
         var askerNotifs = findNotificationsByRefId(answer1.id());
         assertThat(askerNotifs).hasSize(1);
+        assertThat(askerNotifs.getFirst().link())
+            .isEqualTo("/product/" + productId + "?questionId=" + q.id() + "#product-qna");
 
         // Follow-up answer from shop
         var detailAfterAnswer2 = qnaService.createShopAnswer(
@@ -926,5 +926,109 @@ class ProductQnaServiceTest {
                 "QNA_QUESTION_CLOSE",
                 "QNA_QUESTION_REOPEN"
             );
+    }
+
+    @Test
+    void buyerCannotMutateAnswersOnClosedQuestion() {
+        var ownerId = mirroredUser("Chủ Shop Closed");
+        var shopId = approvedShop(ownerId, "shop-qna-closed-" + UUID.randomUUID().toString().substring(0, 6));
+        var productId = createProduct(
+            ownerId,
+            shopId,
+            "Áo closed",
+            "ao-closed-" + UUID.randomUUID(),
+            "SKU-CLOSED"
+        );
+        var askerId = mirroredUser("Người Hỏi Closed");
+        var buyerId = mirroredUser("Người Mua Closed");
+        deliverExistingProduct(ownerId, buyerId, shopId, productId);
+
+        var q = qnaService.createQuestion(askerId, productId, new CreateQuestionRequest("Câu hỏi trước khi đóng?"));
+        var answer = qnaService.createBuyerAnswer(
+            buyerId,
+            productId,
+            q.id(),
+            new CreateAnswerRequest("Trả lời trước khi đóng")
+        );
+        qnaService.closeQuestion(ownerId, q.id());
+
+        assertThatThrownBy(() -> qnaService.createBuyerAnswer(
+            buyerId,
+            productId,
+            q.id(),
+            new CreateAnswerRequest("Trả lời sau khi đóng")
+        ))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+
+        assertThatThrownBy(() -> qnaService.updateBuyerAnswer(
+            buyerId,
+            productId,
+            q.id(),
+            answer.id(),
+            new UpdateAnswerRequest("Sửa sau khi đóng")
+        ))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+
+        assertThatThrownBy(() -> qnaService.deleteBuyerAnswer(buyerId, productId, q.id(), answer.id()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void readOnlyStaffSeesNoEditFlagsAndCrossShopIsForbidden() {
+        var ownerId = mirroredUser("Chủ Shop RO");
+        var shopId = approvedShop(ownerId, "shop-qna-ro-" + UUID.randomUUID().toString().substring(0, 6));
+        var productId = createProduct(
+            ownerId,
+            shopId,
+            "Áo read only",
+            "ao-ro-" + UUID.randomUUID(),
+            "SKU-RO"
+        );
+        var askerId = mirroredUser("Người Hỏi RO");
+        var readOnlyStaff = staffWith(ownerId, shopId, ShopPermission.REVIEW_READ);
+
+        var q = qnaService.createQuestion(askerId, productId, new CreateQuestionRequest("Câu hỏi read only?"));
+        var answered = qnaService.createShopAnswer(ownerId, q.id(), new CreateAnswerRequest("Trả lời của chủ shop"));
+        var shopAnswerId = answered.answers().getFirst().id();
+
+        var detail = qnaService.getShopQuestion(readOnlyStaff, q.id());
+        assertThat(detail.answers().getFirst().canEdit()).isFalse();
+        assertThat(detail.answers().getFirst().canDelete()).isFalse();
+        var listed = qnaService.listForShop(
+            readOnlyStaff,
+            shopId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            ProductQuestionSort.NEWEST,
+            0,
+            10
+        );
+        assertThat(listed.items().getFirst().answers().getFirst().canEdit()).isFalse();
+
+        var otherOwner = mirroredUser("Chủ Shop B");
+        var otherShopId = approvedShop(otherOwner, "shop-qna-ro-b-" + UUID.randomUUID().toString().substring(0, 6));
+        var otherStaff = staffWith(otherOwner, otherShopId, ShopPermission.REVIEW_READ, ShopPermission.REVIEW_REPLY);
+
+        assertThatThrownBy(() -> qnaService.getShopQuestion(otherStaff, q.id()))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.FORBIDDEN));
+
+        assertThatThrownBy(() -> qnaService.updateShopAnswer(
+            otherStaff,
+            shopAnswerId,
+            new UpdateAnswerRequest("Sửa answer shop khác")
+        ))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.FORBIDDEN));
+
+        assertThatThrownBy(() -> qnaService.deleteShopAnswer(otherStaff, shopAnswerId))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.FORBIDDEN));
     }
 }

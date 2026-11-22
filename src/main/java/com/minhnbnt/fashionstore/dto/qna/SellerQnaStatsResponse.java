@@ -15,7 +15,7 @@ public record SellerQnaStatsResponse(
     @Schema(description = "Số câu hỏi đã đóng")
     long closedCount,
 
-    @Schema(description = "Tỷ lệ phản hồi của shop (0.0 đến 1.0)")
+    @Schema(description = "Tỷ lệ phản hồi của shop, tính theo phần trăm (0.0 đến 100.0)")
     double responseRate
 ) {
 }

@@ -71,7 +71,7 @@ public class SellerQnaController {
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Nullable LocalDate to,
         @Parameter(description = "Từ khóa tìm kiếm")
         @RequestParam(required = false) @Nullable String q,
-        @Parameter(description = "Thứ tự sắp xếp (NEWEST | OLDEST | UNANSWERED_FIRST)")
+        @Parameter(description = "Thứ tự sắp xếp (NEWEST | OLDEST)")
         @RequestParam(defaultValue = "NEWEST") ProductQuestionSort sort,
         @Parameter(description = "Số trang (bắt đầu từ 0)")
         @RequestParam(defaultValue = "0") int page,
