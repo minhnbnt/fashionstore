@@ -82,6 +82,64 @@ services:
       retries: 5
       start_period: 10s
 
+  embed-worker:
+    image: ghcr.io/minhnbnt/fashionstore-embed-worker:latest
+
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/fashionstore
+      S3_ENDPOINT_URL: http://s3:9000
+      GRPC_BIND_HOST: 0.0.0.0
+
+    ports:
+      - "9091:9091"
+
+    healthcheck:
+      test: ["CMD", "node", "dist/grpc-health.mjs"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      s3:
+        condition: service_healthy
+
+  ai-backend:
+    image: ghcr.io/minhnbnt/fashionstore-ai-backend:latest
+
+    environment:
+      GOTRUE_URL: http://gotrue:9999
+      GOTRUE_JWT_AUD: authenticated
+      AI_BASE_URL: https://api.kilo.ai/api/gateway/v1
+      AI_API_KEY: ${AI_API_KEY:-xxx}
+      AI_MODEL: ${AI_MODEL:-}
+      STORE_API_URL: http://host.containers.internal:8080
+      CORS_ORIGIN: "*"
+      S3_ENDPOINT_URL: http://s3:9000
+      S3_BUCKET: fashionstore
+      S3_ACCESS_KEY: fashionstore
+      S3_SECRET_KEY: passwordpassword
+      S3_REGION: us-east-1
+      ASSETS_URL: http://fashionstore.web.localhost:3902
+
+    ports:
+      - "3000:3000"
+
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r => { if (!r.ok) process.exit(1); }).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+    depends_on:
+      gotrue:
+        condition: service_started
+      s3:
+        condition: service_healthy
+
   caddy:
     image: quay.io/hummingbird/caddy:2
 
