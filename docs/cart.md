@@ -76,11 +76,11 @@ Luật:
 
 ```json
 {"shippingName": "An", "shippingPhone": "0900000000",
- "shippingAddress": "12 Nguyễn Trãi, Sài Gòn", "shippingFee": null,
+ "shippingAddress": "12 Nguyễn Trãi, Sài Gòn",
  "variantIds": ["uuid"]}
 ```
 
-`shippingFee` tùy chọn (null = 0), áp cho **mỗi** đơn được tạo — cùng ngữ nghĩa với buy-now.
+Client **không gửi phí ship**: server tính riêng cho từng đơn (xem #85a), cùng hàm với buy-now.
 `variantIds` tùy chọn: null/rỗng = cả giỏ; có giá trị thì chỉ đặt các variant đó, xong chỉ xóa đúng các item đã đặt (item không tick nằm lại giỏ). Variant không có trong giỏ → `400`.
 
 Luật cổng (chạy hết trước khi đặt, hỏng 1 item là dừng cả đợt):
@@ -95,7 +95,27 @@ Luật cổng (chạy hết trước khi đặt, hỏng 1 item là dừng cả �
  "items": [{"variantId": "uuid", "reason": "Insufficient stock, available: 0"}]}
 ```
 
-- Qua cổng → đặt từng shop bằng đúng logic buy-now (`OrderService.checkout`: snapshot tên/giá/SKU theo giá lúc đặt, trừ kho ở bước seller confirm chứ không trừ ở đây), địa chỉ giao hàng chụp nguyên văn vào từng đơn (sửa sổ địa chỉ sau này không viết lại lịch sử đơn), xong xóa các item đã đặt khỏi giỏ.
+- Qua cổng → đặt từng shop bằng đúng logic buy-now (`OrderService.checkout`: snapshot tên/giá/SKU theo giá lúc đặt, trừ kho nguyên tử ngay lúc đặt), địa chỉ giao hàng chụp nguyên văn vào từng đơn (sửa sổ địa chỉ sau này không viết lại lịch sử đơn), xong xóa các item đã đặt khỏi giỏ.
+
+## #85a — Xem trước thanh toán + phí ship
+
+`POST /api/cart/checkout/preview` — auth, `200`. Body `{"variantIds": ["uuid"]}` (null/rỗng = cả giỏ; variant không có trong giỏ → `400`). Không đặt đơn, không giữ hàng; món hết hàng/ngừng bán vẫn được tính, chỉ checkout mới chặn; variant đã bị xoá thì bỏ qua.
+
+```json
+{"shops": [{"shopId": "uuid", "itemCount": 1, "subtotal": 100000,
+            "shippingFee": 30000, "originalShippingFee": 30000,
+            "freeShipApplied": false, "amountToFreeShip": 400000, "total": 130000}],
+ "subtotal": 100000, "shippingFee": 30000, "total": 130000}
+```
+
+Phí ship do server tính (`ShippingFeeService`), mỗi đơn (mỗi shop) 1 lần, công thức phẳng theo cấu hình sàn:
+
+```
+phí = shipping.base_fee + max(0, số món - shipping.base_items) × shipping.extra_item_fee
+shipping.free_threshold > 0 và tiền hàng của đơn ≥ ngưỡng → phí = 0
+```
+
+Mặc định (V48): phí cơ bản 30.000đ, mỗi món thêm 0đ, ngưỡng freeship 500.000đ **theo từng đơn shop**. Admin chỉnh ở `PUT /api/admin/settings` (`shippingBaseFee`, `shippingExtraItemFee`). Checkout dùng đúng hàm này nên số preview = số trên đơn (trừ khi admin đổi cấu hình hoặc giá đổi giữa hai lần gọi). Chưa tính theo vùng/hãng vận chuyển (địa chỉ còn là text tự do).
 
 ## Sơ đồ code
 

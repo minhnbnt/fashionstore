@@ -5,6 +5,9 @@ import com.minhnbnt.fashionstore.dto.cart.CartItemRequest;
 import com.minhnbnt.fashionstore.dto.cart.CartItemResponse;
 import com.minhnbnt.fashionstore.dto.cart.CartResponse;
 import com.minhnbnt.fashionstore.dto.cart.CheckoutBlockedItem;
+import com.minhnbnt.fashionstore.dto.cart.CheckoutPreviewRequest;
+import com.minhnbnt.fashionstore.dto.cart.CheckoutPreviewResponse;
+import com.minhnbnt.fashionstore.dto.cart.ShopCheckoutPreview;
 import com.minhnbnt.fashionstore.dto.cart.ReorderItemIssue;
 import com.minhnbnt.fashionstore.dto.cart.ReorderResponse;
 import com.minhnbnt.fashionstore.dto.order.CheckoutItemRequest;
@@ -15,6 +18,7 @@ import com.minhnbnt.fashionstore.features.cart.repository.CartItemRepository;
 import com.minhnbnt.fashionstore.features.cart.repository.CartRepository;
 import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
+import com.minhnbnt.fashionstore.features.shipping.ShippingFeeService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.features.upload.S3UrlService;
 import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
@@ -24,6 +28,7 @@ import com.minhnbnt.fashionstore.model.ProductImage;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,6 +59,8 @@ public class CartService {
     private final UploadRepository uploads;
 
     private final S3UrlService s3Urls;
+
+    private final ShippingFeeService shipping;
 
     /** FK bảo đảm upload tồn tại; thiếu là lỗi dữ liệu, fail loud. */
     private String imageUrlOf(UUID uploadId) {
@@ -133,6 +140,82 @@ public class CartService {
         return toResponse(List.of());
     }
 
+    /**
+     * Xem trước tiền các đơn sẽ tạo (mỗi shop 1 đơn) với giá và phí ship do server tính.
+     * Không giữ hàng, không chặn món hết hàng/ngừng bán — checkout mới chặn; variant đã bị xoá thì bỏ qua.
+     */
+    @Transactional(readOnly = true)
+    public CheckoutPreviewResponse previewCheckout(@NonNull UUID buyerId, @NonNull CheckoutPreviewRequest request) {
+        List<CartItem> lines = List.of();
+        var cart = carts.findByBuyerId(buyerId).orElse(null);
+        if (cart != null) {
+            lines = items.findByCartIdOrderByCreatedAtAsc(cart.getId());
+        }
+
+        var selected = selectLines(lines, request.variantIds());
+
+        var totalsByShop = new LinkedHashMap<UUID, ShopLineTotals>();
+        for (var item : selected) {
+            var variant = catalog.findVariantById(item.getVariantId()).orElse(null);
+            if (variant == null) {
+                continue;
+            }
+
+            var line = new ShopLineTotals(variant.getPrice() * item.getQuantity(), item.getQuantity());
+            totalsByShop.merge(variant.getShopId(), line, ShopLineTotals::plus);
+        }
+
+        var shopPreviews = new ArrayList<ShopCheckoutPreview>();
+        var subtotal = 0L;
+        var shippingFee = 0L;
+        for (var entry : totalsByShop.entrySet()) {
+            var totals = entry.getValue();
+            var quote = shipping.quote(totals.subtotal(), totals.itemCount());
+
+            shopPreviews.add(new ShopCheckoutPreview(
+                entry.getKey(),
+                totals.itemCount(),
+                totals.subtotal(),
+                quote.fee(),
+                quote.originalFee(),
+                quote.freeShipApplied(),
+                quote.amountToFreeShip(),
+                totals.subtotal() + quote.fee()
+            ));
+            subtotal += totals.subtotal();
+            shippingFee += quote.fee();
+        }
+
+        return new CheckoutPreviewResponse(shopPreviews, subtotal, shippingFee, subtotal + shippingFee);
+    }
+
+    private record ShopLineTotals(long subtotal, int itemCount) {
+
+        ShopLineTotals plus(ShopLineTotals other) {
+            return new ShopLineTotals(subtotal + other.subtotal, itemCount + other.itemCount);
+        }
+    }
+
+    /** Lọc các dòng được chọn; null/rỗng = cả giỏ. Chọn món không có trong giỏ → 400. */
+    private static List<CartItem> selectLines(List<CartItem> lines, @Nullable List<UUID> selectedIds) {
+        if (selectedIds == null || selectedIds.isEmpty()) {
+            return lines;
+        }
+
+        var wanted = new HashSet<>(selectedIds);
+        var selected = new ArrayList<CartItem>();
+        for (var item : lines) {
+            if (wanted.remove(item.getVariantId())) {
+                selected.add(item);
+            }
+        }
+        if (!wanted.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Some selected items are not in the cart");
+        }
+
+        return selected;
+    }
+
     @Transactional
     public List<OrderResponse> checkout(@NonNull UUID buyerId, @NonNull CartCheckoutRequest request) {
         var cart = getOrCreate(buyerId);
@@ -143,20 +226,7 @@ public class CartService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart is empty");
         }
 
-        var checked = lines;
-        var selectedIds = request.variantIds();
-        if (selectedIds != null && !selectedIds.isEmpty()) {
-            var wanted = new HashSet<>(selectedIds);
-            checked = new ArrayList<>();
-            for (var item : lines) {
-                if (wanted.remove(item.getVariantId())) {
-                    checked.add(item);
-                }
-            }
-            if (!wanted.isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Some selected items are not in the cart");
-            }
-        }
+        var checked = selectLines(lines, request.variantIds());
 
         var linesByShop = new LinkedHashMap<UUID, List<CheckoutItemRequest>>();
         var problems = new ArrayList<CheckoutBlockedItem>();
@@ -211,8 +281,7 @@ public class CartService {
                     entry.getValue(),
                     request.shippingName(),
                     request.shippingPhone(),
-                    request.shippingAddress(),
-                    request.shippingFee()
+                    request.shippingAddress()
                 )
             ));
         }

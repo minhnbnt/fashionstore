@@ -80,9 +80,9 @@ class SellerOrderBulkConfirmTest {
         var v2 = variantInShop(ownerId, shopId, "ao-bulk-2", "SKU-B2", 10);
         var v3 = variantInShop(ownerId, shopId, "ao-bulk-3", "SKU-B3", 10);
 
-        var o1 = orders.checkout(buyerId, new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(v1, 1)), "B1", "0901", "HN", 0L));
-        var o2 = orders.checkout(buyerId, new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(v2, 1)), "B2", "0902", "HN", 0L));
-        var o3 = orders.checkout(buyerId, new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(v3, 1)), "B3", "0903", "HN", 0L));
+        var o1 = orders.checkout(buyerId, new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(v1, 1)), "B1", "0901", "HN"));
+        var o2 = orders.checkout(buyerId, new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(v2, 1)), "B2", "0902", "HN"));
+        var o3 = orders.checkout(buyerId, new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(v3, 1)), "B3", "0903", "HN"));
 
         // o3 is cancelled
         orders.cancel(buyerId, o3.id());
@@ -110,7 +110,7 @@ class SellerOrderBulkConfirmTest {
         var shopId = approvedShop(ownerId, "shop-timeline");
         var v1 = variantInShop(ownerId, shopId, "ao-tl-1", "SKU-TL1", 10);
 
-        var o = orders.checkout(buyerId, new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(v1, 1)), "B", "0901", "HN", 0L));
+        var o = orders.checkout(buyerId, new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(v1, 1)), "B", "0901", "HN"));
         orders.confirm(ownerId, o.id());
         orders.ship(ownerId, o.id());
 

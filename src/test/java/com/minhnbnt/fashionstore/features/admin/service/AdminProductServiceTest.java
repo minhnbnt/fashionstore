@@ -120,7 +120,7 @@ class AdminProductServiceTest {
         adminProducts.ban(adminId, product.id(), ProductViolationType.PROHIBITED, "Hàng cấm kinh doanh");
 
         var request = new CheckoutRequest(
-            shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L
+            shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi"
         );
 
         assertThatThrownBy(() -> orders.checkout(buyerId, request))

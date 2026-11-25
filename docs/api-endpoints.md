@@ -65,7 +65,7 @@ Chi tiết luồng này xem `docs/catalog.md`.
 
 | Xong | # | Method | Path | Mô tả |
 |------|---|--------|------|-------|
-| [x] | 17 | POST | `/api/orders` | Checkout, 1 đơn đúng 1 shop |
+| [x] | 17 | POST | `/api/orders` | Checkout, 1 đơn đúng 1 shop; phí ship server tính (xem `docs/cart.md` #85a) |
 | [x] | 18 | GET | `/api/orders/mine` | Buyer xem đơn của mình |
 | [x] | 19 | GET | `/api/orders/{id}` | Buyer xem chi tiết (chỉ khi `PENDING` mới cancel được) |
 | [x] | 19b | PATCH | `/api/orders/{id}/cancel` | Buyer hủy đơn (chỉ khi `PENDING`), tùy chọn `{reason, note}` (`CHANGE_MIND`, `FOUND_CHEAPER`, `ORDERED_BY_MISTAKE`, `OTHER`) |
@@ -254,7 +254,8 @@ Buyer tạo/sửa/xóa đánh giá đã chuyển hẳn về Flow 14 (`review`, b
 | [x] | 82 | PUT | `/api/cart/items/{variantId}` | Đổi số lượng (tối thiểu 1) |
 | [x] | 83 | DELETE | `/api/cart/items/{variantId}` | Xóa item |
 | [x] | 84 | DELETE | `/api/cart` | Xóa sạch giỏ |
-| [x] | 85 | POST | `/api/cart/checkout` | Kiểm tra hết rồi đặt, mỗi shop 1 đơn; `variantIds` tùy chọn để chỉ đặt item đã tick, hỏng thì 409 kèm từng item lỗi |
+| [x] | 85a | POST | `/api/cart/checkout/preview` | Xem trước tiền từng đơn (mỗi shop 1 đơn): tiền hàng, phí ship server tính, freeship, tổng; không đặt đơn |
+| [x] | 85 | POST | `/api/cart/checkout` | Kiểm tra hết rồi đặt, mỗi shop 1 đơn, phí ship server tính; `variantIds` tùy chọn để chỉ đặt item đã tick, hỏng thì 409 kèm từng item lỗi |
 | [x] | 85b | POST | `/api/cart/reorder/{orderId}` | Mua lại đơn hàng cũ: thêm các món còn hợp lệ vào giỏ và báo cáo chi tiết món hết hàng/giảm số lượng |
 
 Chi tiết luồng này xem `docs/cart.md`. Địa chỉ giao hàng vẫn là text thuần (cart chưa dùng tới sổ địa chỉ `V5__address_book`) — xem mục "Nâng cấp sau" trong đó.

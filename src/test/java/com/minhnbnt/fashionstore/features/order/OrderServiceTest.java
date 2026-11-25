@@ -117,12 +117,45 @@ class OrderServiceTest {
 
         var response = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 2)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 2)), "An", "0901", "Ha Noi")
         );
 
         assertThat(response.status()).isEqualTo("PENDING");
-        assertThat(response.total()).isEqualTo(200000L);
+        assertThat(response.total()).isEqualTo(230000L); // 2 x 100k + ship 30k
         assertThat(response.items()).hasSize(1);
+    }
+
+    @Test
+    void checkoutChargesServerComputedShippingFee() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-order-fee");
+        var variantId = variantInShop(ownerId, shopId, "ao-order-fee", "SKU-ORDER-FEE", 10);
+
+        var response = orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
+        );
+
+        assertThat(response.subtotal()).isEqualTo(100000L);
+        assertThat(response.shippingFee()).isEqualTo(30000L);
+        assertThat(response.total()).isEqualTo(130000L);
+    }
+
+    @Test
+    void checkoutWaivesShippingFeeAtFreeShipThreshold() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-order-freeship");
+        var variantId = variantInShop(ownerId, shopId, "ao-order-freeship", "SKU-ORDER-FREESHIP", 10);
+
+        var response = orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 5)), "An", "0901", "Ha Noi")
+        );
+
+        assertThat(response.shippingFee()).isZero();
+        assertThat(response.total()).isEqualTo(500000L);
     }
 
     @Test
@@ -135,7 +168,7 @@ class OrderServiceTest {
 
         assertThatThrownBy(() -> orders.checkout(
             buyerId,
-            new CheckoutRequest(shopA, List.of(new CheckoutItemRequest(variantB, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopA, List.of(new CheckoutItemRequest(variantB, 1)), "An", "0901", "Ha Noi")
         )).isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.BAD_REQUEST));
     }
@@ -149,7 +182,7 @@ class OrderServiceTest {
         var variantId = variantInShop(ownerId, shopId, "ao-order-c", "SKU-ORDER-C", 10);
         var created = orders.checkout(
             buyerA,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         );
 
         assertThatThrownBy(() -> orders.getDetail(buyerB, created.id()))
@@ -165,7 +198,7 @@ class OrderServiceTest {
         var variantId = variantInShop(ownerId, shopId, "ao-order-d", "SKU-ORDER-D", 5);
         var created = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 3)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 3)), "An", "0901", "Ha Noi")
         );
 
         var confirmed = orders.confirm(ownerId, created.id());
@@ -188,7 +221,7 @@ class OrderServiceTest {
         var variantId = variantInShop(ownerId, shopId, "ao-order-sc", "SKU-ORDER-SC", 10);
         var created = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 2)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 2)), "An", "0901", "Ha Noi")
         );
         assertThat(catalog.findVariantById(variantId).orElseThrow().getStockQuantity()).isEqualTo(8);
 
@@ -204,7 +237,7 @@ class OrderServiceTest {
         var variantId = variantInShop(ownerId, shopId, "ao-order-f", "SKU-ORDER-F", 10);
         var created = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         );
 
         var cancelled = orders.cancel(buyerId, created.id());
@@ -220,7 +253,7 @@ class OrderServiceTest {
         var variantId = variantInShop(ownerId, shopId, "ao-order-g", "SKU-ORDER-G", 10);
         var created = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         );
         orders.confirm(ownerId, created.id());
 
@@ -237,10 +270,10 @@ class OrderServiceTest {
         var variantId = variantInShop(ownerId, shopId, "ao-order-h", "SKU-ORDER-H", 10);
         var created = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 5000L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         );
 
-        assertThat(created.total()).isEqualTo(105000L);
+        assertThat(created.total()).isEqualTo(130000L); // 100k + ship 30k
 
         var shipped = orders.ship(ownerId, orders.confirm(ownerId, created.id()).id());
 
@@ -261,7 +294,7 @@ class OrderServiceTest {
         var variantId = variantInShop(ownerId, shopId, "ao-order-i", "SKU-ORDER-I", 10);
         orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         );
 
         assertThat(orders.listSellerOrders(ownerId)).hasSize(1);
@@ -277,7 +310,7 @@ class OrderServiceTest {
         var variantId = variantInShop(ownerId, shopId, "ao-order-j", "SKU-ORDER-J", 10);
         var created = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         );
 
         assertThatThrownBy(() -> orders.confirm(strangerId, created.id()))
@@ -293,7 +326,7 @@ class OrderServiceTest {
         var variantId = variantInShop(ownerId, shopId, "ao-expired", "SKU-EXPIRED", 10);
         var created = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         );
 
         jdbc.sql("UPDATE orders SET created_at = NOW() - INTERVAL '25 hours' WHERE id = ?")
@@ -319,7 +352,7 @@ class OrderServiceTest {
 
         var created = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         );
 
         var ownerPage = notifications.findPage(ownerId, null, 0, 10);
@@ -344,7 +377,7 @@ class OrderServiceTest {
 
         var created = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         );
 
         // Confirm
@@ -384,7 +417,7 @@ class OrderServiceTest {
 
         var created = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         );
 
         orders.cancel(buyerId, created.id());
@@ -408,7 +441,7 @@ class OrderServiceTest {
 
         var created = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         );
 
         orders.sellerCancel(
@@ -440,8 +473,7 @@ class OrderServiceTest {
                 List.of(new CheckoutItemRequest(UUID.randomUUID(), 1)),
                 "An",
                 "0901",
-                "Ha Noi",
-                0L
+                "Ha Noi"
             )
         )).isInstanceOf(ResponseStatusException.class);
 
@@ -458,7 +490,7 @@ class OrderServiceTest {
 
         orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 3)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 3)), "An", "0901", "Ha Noi")
         );
 
         var variant = catalog.findVariantById(variantId).orElseThrow();
@@ -474,7 +506,7 @@ class OrderServiceTest {
 
         assertThatThrownBy(() -> orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 5)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 5)), "An", "0901", "Ha Noi")
         )).isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
     }
@@ -488,7 +520,7 @@ class OrderServiceTest {
 
         var created = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 4)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 4)), "An", "0901", "Ha Noi")
         );
         assertThat(catalog.findVariantById(variantId).orElseThrow().getStockQuantity()).isEqualTo(6);
 
@@ -512,7 +544,7 @@ class OrderServiceTest {
 
         var created = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         );
         assertThat(created.shopName()).isEqualTo("Shop shop-order-enrich");
         assertThat(created.shopSlug()).isEqualTo("shop-order-enrich");
@@ -538,7 +570,7 @@ class OrderServiceTest {
         var longAddress = "So nha 123, " + "Duong Dai Lo Thang Long, ".repeat(12) + "Ha Noi";
         var created = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", longAddress, 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", longAddress)
         );
 
         orders.confirm(ownerId, created.id());
@@ -580,7 +612,7 @@ class OrderServiceTest {
 
         var toCancel = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         );
         assertThatThrownBy(() -> orders.cancel(buyerId, toCancel.id(), new BuyerCancelOrderRequest("OTHER", "  ")))
             .isInstanceOf(ResponseStatusException.class)
@@ -597,7 +629,7 @@ class OrderServiceTest {
 
         var order = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         );
         orders.confirm(ownerId, order.id());
         orders.ship(ownerId, order.id(), null);

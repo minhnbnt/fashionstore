@@ -137,7 +137,7 @@ class ReviewServiceTest {
     private UUID checkout(UUID buyerId, UUID shopId, List<CheckoutItemRequest> items) {
         return orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, items, "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, items, "An", "0901", "Ha Noi")
         ).id();
     }
 

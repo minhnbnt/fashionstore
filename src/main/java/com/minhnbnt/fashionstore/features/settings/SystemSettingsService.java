@@ -27,6 +27,8 @@ public class SystemSettingsService {
     private static final String SUPPORT_EMAIL = "site.support_email";
     private static final String FREE_THRESHOLD = "shipping.free_threshold";
     private static final String BASE_ITEMS = "shipping.base_items";
+    private static final String BASE_FEE = "shipping.base_fee";
+    private static final String EXTRA_ITEM_FEE = "shipping.extra_item_fee";
     private static final String HOLD_MINUTES = "order.payment_hold_minutes";
     private static final String AUTO_COMPLETE_DAYS = "order.auto_complete_days";
     private static final String COD_MIN = "order.cod_min_total";
@@ -64,6 +66,8 @@ public class SystemSettingsService {
         put(changes, SUPPORT_EMAIL, request.supportEmail());
         put(changes, FREE_THRESHOLD, request.freeShippingThreshold());
         put(changes, BASE_ITEMS, request.baseItems());
+        put(changes, BASE_FEE, request.shippingBaseFee());
+        put(changes, EXTRA_ITEM_FEE, request.shippingExtraItemFee());
         put(changes, HOLD_MINUTES, request.paymentHoldMinutes());
         put(changes, AUTO_COMPLETE_DAYS, request.autoCompleteDays());
         put(changes, COD_MIN, request.codMinTotal());
@@ -100,6 +104,8 @@ public class SystemSettingsService {
             s.supportEmail(),
             s.freeShippingThreshold(),
             s.baseItems(),
+            s.shippingBaseFee(),
+            s.shippingExtraItemFee(),
             s.paymentHoldMinutes(),
             s.autoCompleteDays(),
             s.codMinTotal(),
@@ -120,6 +126,8 @@ public class SystemSettingsService {
             require(rows, SUPPORT_EMAIL),
             Long.parseLong(require(rows, FREE_THRESHOLD)),
             Integer.parseInt(require(rows, BASE_ITEMS)),
+            Long.parseLong(require(rows, BASE_FEE)),
+            Long.parseLong(require(rows, EXTRA_ITEM_FEE)),
             Integer.parseInt(require(rows, HOLD_MINUTES)),
             Integer.parseInt(require(rows, AUTO_COMPLETE_DAYS)),
             Long.parseLong(require(rows, COD_MIN)),

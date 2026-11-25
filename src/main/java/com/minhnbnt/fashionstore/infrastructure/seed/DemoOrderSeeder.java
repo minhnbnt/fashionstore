@@ -141,7 +141,7 @@ class DemoOrderSeeder {
         String address,
         CheckoutItemRequest... items
     ) {
-        var order = orders.checkout(buyerId, new CheckoutRequest(shopId, List.of(items), name, phone, address, 0L));
+        var order = orders.checkout(buyerId, new CheckoutRequest(shopId, List.of(items), name, phone, address));
         return order.id();
     }
 

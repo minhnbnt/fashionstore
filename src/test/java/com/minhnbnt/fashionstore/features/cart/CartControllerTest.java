@@ -6,6 +6,9 @@ import com.minhnbnt.fashionstore.dto.cart.CartItemRequest;
 import com.minhnbnt.fashionstore.dto.cart.CartItemResponse;
 import com.minhnbnt.fashionstore.dto.cart.CartResponse;
 import com.minhnbnt.fashionstore.dto.cart.CheckoutBlockedItem;
+import com.minhnbnt.fashionstore.dto.cart.CheckoutPreviewRequest;
+import com.minhnbnt.fashionstore.dto.cart.CheckoutPreviewResponse;
+import com.minhnbnt.fashionstore.dto.cart.ShopCheckoutPreview;
 import com.minhnbnt.fashionstore.features.cart.controller.CartController;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -136,7 +139,32 @@ class CartControllerTest {
     }
 
     @Test
+    void previewReturnsPerShopQuote() throws Exception {
+        var buyerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var variantId = UUID.randomUUID();
+        var shopQuote = new ShopCheckoutPreview(shopId, 1, 100000L, 30000L, 30000L, false, 400000L, 130000L);
+        when(carts.previewCheckout(buyerId, new CheckoutPreviewRequest(List.of(variantId))))
+            .thenReturn(new CheckoutPreviewResponse(List.of(shopQuote), 100000L, 30000L, 130000L));
+
+        mockMvc.perform(post("/api/cart/checkout/preview")
+                .with(jwt().jwt(builder -> builder.subject(buyerId.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"variantIds\": [\"" + variantId + "\"]}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.shops[0].shopId").value(shopId.toString()))
+            .andExpect(jsonPath("$.shops[0].shippingFee").value(30000L))
+            .andExpect(jsonPath("$.shops[0].amountToFreeShip").value(400000L))
+            .andExpect(jsonPath("$.total").value(130000L));
+    }
+
+    @Test
     void cartEndpointsRequireAuthentication() throws Exception {
+        mockMvc.perform(post("/api/cart/checkout/preview")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+            .andExpect(status().isUnauthorized());
+
         mockMvc.perform(get("/api/cart"))
             .andExpect(status().isUnauthorized());
 

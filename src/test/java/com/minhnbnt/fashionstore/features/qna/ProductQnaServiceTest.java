@@ -177,7 +177,7 @@ class ProductQnaServiceTest {
         var variantId = detail.variants().getFirst().id();
         var orderId = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         ).id();
         orders.confirm(ownerId, orderId);
         orders.ship(ownerId, orderId);
@@ -386,7 +386,7 @@ class ProductQnaServiceTest {
         var variantId = detail.variants().getFirst().id();
         var orderId = orders.checkout(
             buyer,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         ).id();
         orders.confirm(ownerId, orderId);
         orders.ship(ownerId, orderId);
@@ -478,8 +478,7 @@ class ProductQnaServiceTest {
                 List.of(new CheckoutItemRequest(purchased.variantId(), 1)),
                 "An",
                 "0901",
-                "Ha Noi",
-                0L
+                "Ha Noi"
             )
         ).id();
         orders.confirm(ownerId, orderId);
@@ -496,8 +495,7 @@ class ProductQnaServiceTest {
                 List.of(new CheckoutItemRequest(purchased.variantId(), 1)),
                 "Binh",
                 "0902",
-                "Ha Noi",
-                0L
+                "Ha Noi"
             )
         ).id();
         orders.confirm(ownerId, unconfirmedOrderId);

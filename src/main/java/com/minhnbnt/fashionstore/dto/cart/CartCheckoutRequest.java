@@ -1,7 +1,6 @@
 package com.minhnbnt.fashionstore.dto.cart;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
@@ -24,11 +23,6 @@ public record CartCheckoutRequest(
     @NotBlank
     @Size(max = 1000)
     String shippingAddress,
-
-    @Schema(description = "Phi ship VND ap cho moi don, null = 0", nullable = true)
-    @Nullable
-    @Min(0)
-    Long shippingFee,
 
     @Schema(
         description = "Chi thanh toan cac variant nay, null/rong = toan bo gio",

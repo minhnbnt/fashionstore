@@ -99,7 +99,7 @@ class OrderTrackingRepositoryTest {
 
         var created = orderService.checkout(
             buyerId,
-            new CheckoutRequest(shop.id(), List.of(new CheckoutItemRequest(variantId, 1)), "An", "090", "HN", 0L)
+            new CheckoutRequest(shop.id(), List.of(new CheckoutItemRequest(variantId, 1)), "An", "090", "HN")
         );
         orderService.confirm(ownerId, created.id());
         orderService.ship(ownerId, created.id());

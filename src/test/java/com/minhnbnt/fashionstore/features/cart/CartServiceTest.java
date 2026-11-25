@@ -6,6 +6,7 @@ import com.minhnbnt.fashionstore.dto.cart.CartCheckoutRequest;
 import com.minhnbnt.fashionstore.dto.cart.CartItemRequest;
 import com.minhnbnt.fashionstore.dto.cart.CartItemResponse;
 import com.minhnbnt.fashionstore.dto.cart.CheckoutBlockedItem;
+import com.minhnbnt.fashionstore.dto.cart.CheckoutPreviewRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
 import com.minhnbnt.fashionstore.dto.catalog.UpdateProductRequest;
@@ -129,11 +130,11 @@ class CartServiceTest {
     }
 
     private static CartCheckoutRequest shipping() {
-        return new CartCheckoutRequest("An", "0901", "Ha Noi", 0L, null);
+        return new CartCheckoutRequest("An", "0901", "Ha Noi", null);
     }
 
     private static CartCheckoutRequest shipping(List<UUID> variantIds) {
-        return new CartCheckoutRequest("An", "0901", "Ha Noi", 0L, variantIds);
+        return new CartCheckoutRequest("An", "0901", "Ha Noi", variantIds);
     }
 
     @Test
@@ -205,6 +206,75 @@ class CartServiceTest {
         assertThat(placed).extracting(order -> order.shopId()).containsExactlyInAnyOrder(shopA, shopB);
         assertThat(placed).extracting(order -> order.status()).containsOnly("PENDING");
         assertThat(carts.getCart(buyerId).items()).isEmpty();
+    }
+
+    @Test
+    void checkoutChargesShippingPerShopOrder() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopA = approvedShop(ownerId, "shop-cart-fee1");
+        var shopB = approvedShop(ownerId, "shop-cart-fee2");
+        var variantA = variantInShop(ownerId, shopA, "ao-cart-fee1", "SKU-CART-FEE1", 10);
+        var variantB = variantInShop(ownerId, shopB, "ao-cart-fee2", "SKU-CART-FEE2", 10);
+        carts.addItem(buyerId, new CartItemRequest(variantA, 1));
+        carts.addItem(buyerId, new CartItemRequest(variantB, 5));
+
+        var placed = carts.checkout(buyerId, shipping());
+
+        var feeByShop = placed.stream()
+            .collect(java.util.stream.Collectors.toMap(order -> order.shopId(), order -> order.shippingFee()));
+        assertThat(feeByShop).containsEntry(shopA, 30000L).containsEntry(shopB, 0L);
+    }
+
+    @Test
+    void previewQuotesShippingPerShopWithoutPlacingOrders() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopA = approvedShop(ownerId, "shop-cart-pv1");
+        var shopB = approvedShop(ownerId, "shop-cart-pv2");
+        var variantA = variantInShop(ownerId, shopA, "ao-cart-pv1", "SKU-CART-PV1", 10);
+        var variantB = variantInShop(ownerId, shopB, "ao-cart-pv2", "SKU-CART-PV2", 10);
+        carts.addItem(buyerId, new CartItemRequest(variantA, 1));
+        carts.addItem(buyerId, new CartItemRequest(variantB, 5));
+
+        var preview = carts.previewCheckout(buyerId, new CheckoutPreviewRequest(null));
+
+        assertThat(preview.shops()).hasSize(2);
+        var quoteA = preview.shops().stream().filter(s -> s.shopId().equals(shopA)).findFirst().orElseThrow();
+        assertThat(quoteA.itemCount()).isEqualTo(1);
+        assertThat(quoteA.subtotal()).isEqualTo(100000L);
+        assertThat(quoteA.shippingFee()).isEqualTo(30000L);
+        assertThat(quoteA.freeShipApplied()).isFalse();
+        assertThat(quoteA.amountToFreeShip()).isEqualTo(400000L);
+        assertThat(quoteA.total()).isEqualTo(130000L);
+
+        var quoteB = preview.shops().stream().filter(s -> s.shopId().equals(shopB)).findFirst().orElseThrow();
+        assertThat(quoteB.shippingFee()).isZero();
+        assertThat(quoteB.originalShippingFee()).isEqualTo(30000L);
+        assertThat(quoteB.freeShipApplied()).isTrue();
+
+        assertThat(preview.subtotal()).isEqualTo(600000L);
+        assertThat(preview.shippingFee()).isEqualTo(30000L);
+        assertThat(preview.total()).isEqualTo(630000L);
+        assertThat(carts.getCart(buyerId).items()).hasSize(2);
+    }
+
+    @Test
+    void previewOnlyQuotesSelectedItems() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopA = approvedShop(ownerId, "shop-cart-pv3");
+        var shopB = approvedShop(ownerId, "shop-cart-pv4");
+        var variantA = variantInShop(ownerId, shopA, "ao-cart-pv3", "SKU-CART-PV3", 10);
+        var variantB = variantInShop(ownerId, shopB, "ao-cart-pv4", "SKU-CART-PV4", 10);
+        carts.addItem(buyerId, new CartItemRequest(variantA, 2));
+        carts.addItem(buyerId, new CartItemRequest(variantB, 1));
+
+        var preview = carts.previewCheckout(buyerId, new CheckoutPreviewRequest(List.of(variantA)));
+
+        assertThat(preview.shops()).extracting(s -> s.shopId()).containsExactly(shopA);
+        assertThat(preview.subtotal()).isEqualTo(200000L);
+        assertThat(preview.total()).isEqualTo(230000L);
     }
 
     @Test
