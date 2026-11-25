@@ -110,7 +110,7 @@ class AdminOrderServiceTest {
 
     private OrderResponse placeOrder(UUID buyerId, UUID shopId, UUID variantId, int quantity) {
         var request = new CheckoutRequest(
-            shopId, List.of(new CheckoutItemRequest(variantId, quantity)), "Nguyen An", "0901234567", "Ha Noi", 0L
+            shopId, List.of(new CheckoutItemRequest(variantId, quantity)), "Nguyen An", "0901234567", "Ha Noi"
         );
         return orders.checkout(buyerId, request);
     }
@@ -184,7 +184,7 @@ class AdminOrderServiceTest {
         assertThat(found.buyerEmail()).isEqualTo("u-" + buyerId + "@t.local");
         assertThat(found.itemCount()).isEqualTo(2);
         assertThat(found.firstItemName()).isEqualTo("Ao mon-search-code-ao");
-        assertThat(found.total()).isEqualTo(200000L);
+        assertThat(found.total()).isEqualTo(230000L); // 2 x 100k + ship 30k
         assertThat(found.alert()).isNull();
     }
 

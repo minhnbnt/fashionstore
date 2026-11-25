@@ -3,6 +3,8 @@ package com.minhnbnt.fashionstore.features.cart.controller;
 import com.minhnbnt.fashionstore.dto.cart.CartCheckoutRequest;
 import com.minhnbnt.fashionstore.dto.cart.CartItemRequest;
 import com.minhnbnt.fashionstore.dto.cart.CartResponse;
+import com.minhnbnt.fashionstore.dto.cart.CheckoutPreviewRequest;
+import com.minhnbnt.fashionstore.dto.cart.CheckoutPreviewResponse;
 import com.minhnbnt.fashionstore.dto.cart.ReorderResponse;
 import com.minhnbnt.fashionstore.dto.cart.UpdateCartItemRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
@@ -117,12 +119,34 @@ public class CartController {
         return carts.clear(buyerId);
     }
 
+    @PostMapping("/checkout/preview")
+    @Operation(
+        summary = "Xem truoc thanh toan",
+        description = "Tinh tien tung don se tao (moi shop 1 don): tien hang theo gia hien tai, phi ship do server "
+            + "tinh theo cau hinh san (phi co ban + phi moi mon vuot muc, mien phi khi tien hang don dat nguong). "
+            + "Khong dat don, khong giu hang; mon het hang/ngung ban chi bi chan khi checkout."
+    )
+    @ApiResponse(responseCode = "200", description = "Tien tung don va tong cong")
+    @ApiResponse(responseCode = "400", description = "Co variant duoc chon khong nam trong gio")
+    @ApiResponse(responseCode = "401", description = "Thieu hoac sai JWT")
+    @SecurityRequirement(name = "bearerAuth")
+    public CheckoutPreviewResponse previewCheckout(
+        @AuthenticationPrincipal Jwt jwt,
+        @Valid @RequestBody CheckoutPreviewRequest request
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var buyerId = UUID.fromString(subject);
+
+        return carts.previewCheckout(buyerId, request);
+    }
+
     @PostMapping("/checkout")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(
         summary = "Checkout ca gio",
         description = "Kiem tra het truoc khi dat: hong cho nao thi khong dat don nao va tra ve tung item loi. "
-            + "Dat thi tach 1 don 1 shop, dia chi giao hang chup lai vao tung don."
+            + "Dat thi tach 1 don 1 shop, dia chi giao hang chup lai vao tung don. "
+            + "Phi ship tung don do server tinh, giong het /checkout/preview."
     )
     @ApiResponse(responseCode = "201", description = "Danh sach don vua dat, moi shop 1 don")
     @ApiResponse(responseCode = "400", description = "Gio rong hoac body khong hop le")

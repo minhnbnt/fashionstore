@@ -249,13 +249,14 @@ class AdminServicesTest {
 
         orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 2)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 2)), "An", "0901", "Ha Noi")
         );
         var after = stats.get();
 
         assertThat(after.totalOrders()).isEqualTo(before.totalOrders() + 1);
         assertThat(after.pendingOrders()).isEqualTo(before.pendingOrders() + 1);
-        assertThat(after.grossMerchandiseValue()).isEqualTo(before.grossMerchandiseValue() + 200000L);
+        // GMV admin cộng orders.total: 2 x 100k + ship 30k do server tính
+        assertThat(after.grossMerchandiseValue()).isEqualTo(before.grossMerchandiseValue() + 230000L);
         assertThat(after.collectedRevenue()).isEqualTo(before.collectedRevenue());
 
         var today = after.dailyTrend().get(AdminStatsService.TREND_DAYS - 1);

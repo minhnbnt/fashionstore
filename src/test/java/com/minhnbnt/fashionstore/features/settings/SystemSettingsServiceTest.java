@@ -28,18 +28,22 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class SystemSettingsServiceTest {
 
     private static final SystemSettings DEFAULTS =
-        new SystemSettings("nét", "1900 0000", "support@fashionstore.local", 500000, 2, 15, 7, 0, 10000000);
+        new SystemSettings(
+            "nét", "1900 0000", "support@fashionstore.local", 500000, 2, 30000, 0, 15, 7, 0, 10000000
+        );
 
-    private static final Map<String, String> DEFAULT_ROWS = Map.of(
-        "site.name", "nét",
-        "site.hotline", "1900 0000",
-        "site.support_email", "support@fashionstore.local",
-        "shipping.free_threshold", "500000",
-        "shipping.base_items", "2",
-        "order.payment_hold_minutes", "15",
-        "order.auto_complete_days", "7",
-        "order.cod_min_total", "0",
-        "order.cod_max_total", "10000000"
+    private static final Map<String, String> DEFAULT_ROWS = Map.ofEntries(
+        Map.entry("site.name", "nét"),
+        Map.entry("site.hotline", "1900 0000"),
+        Map.entry("site.support_email", "support@fashionstore.local"),
+        Map.entry("shipping.free_threshold", "500000"),
+        Map.entry("shipping.base_items", "2"),
+        Map.entry("shipping.base_fee", "30000"),
+        Map.entry("shipping.extra_item_fee", "0"),
+        Map.entry("order.payment_hold_minutes", "15"),
+        Map.entry("order.auto_complete_days", "7"),
+        Map.entry("order.cod_min_total", "0"),
+        Map.entry("order.cod_max_total", "10000000")
     );
 
     @Autowired
@@ -73,7 +77,26 @@ class SystemSettingsServiceTest {
         @Nullable Long codMin,
         @Nullable Long codMax
     ) {
-        return new UpdateSettingsRequest(null, null, null, freeShippingThreshold, null, null, null, codMin, codMax);
+        return new UpdateSettingsRequest(
+            null, null, null, freeShippingThreshold, null, null, null, null, null, codMin, codMax
+        );
+    }
+
+    @Test
+    void shippingFeeSettingsAreUpdatedAndAudited() {
+        settings.update(
+            adminId,
+            new UpdateSettingsRequest(null, null, null, null, null, 25000L, 4000L, null, null, null, null)
+        );
+
+        var current = settings.current();
+        assertThat(current.shippingBaseFee()).isEqualTo(25000);
+        assertThat(current.shippingExtraItemFee()).isEqualTo(4000);
+
+        var keys = audits.page(ConfigAuditEntity.SETTING, 0, 20).items().stream()
+            .map(row -> row.entityKey())
+            .toList();
+        assertThat(keys).containsExactlyInAnyOrder("shipping.base_fee", "shipping.extra_item_fee");
     }
 
     @Test

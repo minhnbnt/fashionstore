@@ -126,8 +126,7 @@ class CartReorderServiceTest {
                 ),
                 "An",
                 "0901",
-                "Ha Noi",
-                0L
+                "Ha Noi"
             )
         );
         // After checkout: vClean=8, vCap=2, vHidden=9.
@@ -207,7 +206,7 @@ class CartReorderServiceTest {
         var vOut = catalog.getDetail(pOut.id()).variants().getFirst().id();
         var order = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(vOut, 1)), "An", "0901", "HN", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(vOut, 1)), "An", "0901", "HN")
         );
 
         var res = carts.reorder(buyerId, order.id());

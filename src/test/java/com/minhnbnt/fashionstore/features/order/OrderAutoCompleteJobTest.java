@@ -91,7 +91,7 @@ class OrderAutoCompleteJobTest {
 
         var dueOrder = orders.checkout(
             buyerId,
-            new CheckoutRequest(shop.id(), List.of(new CheckoutItemRequest(variantId, 1)), "An", "090", "HN", 0L)
+            new CheckoutRequest(shop.id(), List.of(new CheckoutItemRequest(variantId, 1)), "An", "090", "HN")
         );
         orders.confirm(ownerId, dueOrder.id());
         orders.ship(ownerId, dueOrder.id(), null);
@@ -99,7 +99,7 @@ class OrderAutoCompleteJobTest {
 
         var blockedOrder = orders.checkout(
             buyerId,
-            new CheckoutRequest(shop.id(), List.of(new CheckoutItemRequest(variantId, 1)), "An", "090", "HN", 0L)
+            new CheckoutRequest(shop.id(), List.of(new CheckoutItemRequest(variantId, 1)), "An", "090", "HN")
         );
         orders.confirm(ownerId, blockedOrder.id());
         orders.ship(ownerId, blockedOrder.id(), null);
@@ -108,7 +108,7 @@ class OrderAutoCompleteJobTest {
 
         var rejectedThenDue = orders.checkout(
             buyerId,
-            new CheckoutRequest(shop.id(), List.of(new CheckoutItemRequest(variantId, 1)), "An", "090", "HN", 0L)
+            new CheckoutRequest(shop.id(), List.of(new CheckoutItemRequest(variantId, 1)), "An", "090", "HN")
         );
         orders.confirm(ownerId, rejectedThenDue.id());
         orders.ship(ownerId, rejectedThenDue.id(), null);

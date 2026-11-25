@@ -9,6 +9,8 @@ public record SystemSettings(
     String supportEmail,
     long freeShippingThreshold,
     int baseItems,
+    long shippingBaseFee,
+    long shippingExtraItemFee,
     int paymentHoldMinutes,
     int autoCompleteDays,
     long codMinTotal,

@@ -713,7 +713,7 @@ class CatalogServiceTest {
         var buyerId = mirroredUser();
         orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901234567", "Hanoi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901234567", "Hanoi")
         );
 
         // Attempting to delete product with active order must fail with 409
@@ -916,7 +916,7 @@ class CatalogServiceTest {
             new CheckoutRequest(
                 shopId,
                 List.of(new CheckoutItemRequest(p2VariantId, 1)),
-                "Bình", "0912345678", "Hanoi", 0L
+                "Bình", "0912345678", "Hanoi"
             )
         );
 
@@ -1125,7 +1125,7 @@ class CatalogServiceTest {
             new CheckoutRequest(
                 shopId,
                 List.of(new CheckoutItemRequest(p1.variants().getFirst().id(), 2)),
-                "Bình", "0912345678", "Hanoi", 0L
+                "Bình", "0912345678", "Hanoi"
             )
         );
         orders.confirm(ownerId, order.id());

@@ -18,6 +18,12 @@ public record SystemSettingsResponse(
     @Schema(description = "Số sản phẩm tối đa tính theo phí cơ bản", example = "2")
     int baseItems,
 
+    @Schema(description = "Phí ship cơ bản mỗi đơn, VND", example = "30000")
+    long shippingBaseFee,
+
+    @Schema(description = "Phí cộng thêm mỗi món vượt số món cơ bản, VND", example = "5000")
+    long shippingExtraItemFee,
+
     @Schema(description = "Số phút giữ đơn chờ thanh toán online", example = "15")
     int paymentHoldMinutes,
 

@@ -95,7 +95,7 @@ class OrderAutoCancelAtomicityTest {
 
         var created = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 3)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 3)), "An", "0901", "Ha Noi")
         );
         assertThat(catalog.findVariantById(variantId).orElseThrow().getStockQuantity()).isEqualTo(7);
 

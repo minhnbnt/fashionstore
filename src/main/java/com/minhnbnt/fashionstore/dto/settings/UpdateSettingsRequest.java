@@ -28,6 +28,14 @@ public record UpdateSettingsRequest(
     @Min(1) @Max(20)
     @Nullable Integer baseItems,
 
+    @Schema(description = "Phí ship cơ bản mỗi đơn, VND, bỏ trống = không đổi", example = "30000")
+    @Min(0)
+    @Nullable Long shippingBaseFee,
+
+    @Schema(description = "Phí cộng thêm mỗi món vượt số món cơ bản, VND, bỏ trống = không đổi", example = "5000")
+    @Min(0)
+    @Nullable Long shippingExtraItemFee,
+
     @Schema(description = "Số phút giữ đơn chờ thanh toán online (5-1440), bỏ trống = không đổi", example = "15")
     @Min(5) @Max(1440)
     @Nullable Integer paymentHoldMinutes,

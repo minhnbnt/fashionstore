@@ -28,6 +28,7 @@ import com.minhnbnt.fashionstore.features.order.repository.OrderStatusHistoryRep
 import com.minhnbnt.fashionstore.features.order.repository.OrderTrackingEventRepository;
 import com.minhnbnt.fashionstore.features.order.repository.ReturnRequestRepository;
 import com.minhnbnt.fashionstore.features.settings.SystemSettingsService;
+import com.minhnbnt.fashionstore.features.shipping.ShippingFeeService;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.AdminCancelReason;
@@ -102,6 +103,8 @@ public class OrderService {
 
     private final SystemSettingsService systemSettings;
 
+    private final ShippingFeeService shipping;
+
     private final Clock clock;
 
     private final OrderSlaPolicy sla;
@@ -123,16 +126,9 @@ public class OrderService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order must have at least one item");
         }
 
-        var shippingFee = 0L;
-        if (request.shippingFee() != null) {
-            shippingFee = request.shippingFee();
-        }
-        if (shippingFee < 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Shipping fee must not be negative");
-        }
-
         var snapshots = new ArrayList<OrderItemSnapshot>();
         var subtotal = 0L;
+        var itemCount = 0;
 
         for (var item : request.items()) {
             var variant = productStock.findVariantById(item.variantId()).orElse(null);
@@ -154,6 +150,7 @@ public class OrderService {
 
             var lineTotal = variant.getPrice() * item.quantity();
             subtotal += lineTotal;
+            itemCount += item.quantity();
 
             var label = variant.getSize() + " / " + variant.getColor();
             snapshots.add(new OrderItemSnapshot(
@@ -176,6 +173,9 @@ public class OrderService {
                 }
             }
         }
+
+        // Phí ship do server tính theo cấu hình sàn, không nhận từ client.
+        var shippingFee = shipping.quote(subtotal, itemCount).fee();
 
         var order = Order.create(
             generateCode(),

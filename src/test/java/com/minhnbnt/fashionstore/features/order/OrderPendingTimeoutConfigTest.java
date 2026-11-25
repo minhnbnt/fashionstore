@@ -89,7 +89,7 @@ class OrderPendingTimeoutConfigTest {
 
         var created = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         );
         jdbc.sql("UPDATE orders SET created_at = NOW() - INTERVAL '2 hours' WHERE id = ?")
             .param(created.id())
@@ -114,7 +114,7 @@ class OrderPendingTimeoutConfigTest {
 
         var created = orders.checkout(
             buyerId,
-            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi", 0L)
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
         );
         jdbc.sql("UPDATE orders SET created_at = NOW() - INTERVAL '2 hours' WHERE id = ?")
             .param(created.id())
