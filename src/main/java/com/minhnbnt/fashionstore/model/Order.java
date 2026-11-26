@@ -275,7 +275,9 @@ public class Order implements Persistable<UUID> {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only shipping orders can be delivered");
         }
         status = OrderStatus.DELIVERED;
-        paymentStatus = PaymentStatus.COLLECTED;
+        if (paymentStatus != PaymentStatus.PAID) {
+            paymentStatus = PaymentStatus.COLLECTED;
+        }
         deliveredAt = Instant.now();
         updatedAt = Instant.now();
     }

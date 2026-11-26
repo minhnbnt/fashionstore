@@ -627,6 +627,7 @@ public class OrderService {
             buyerId,
             "Khách hàng xác nhận đã nhận được hàng"
         ));
+        revenue.releaseSettlementForOrder(saved.getId());
 
         return toResponse(saved, orderItems);
     }
@@ -1203,6 +1204,7 @@ public class OrderService {
             null,
             "Hệ thống tự động xác nhận hoàn thành sau " + days + " ngày giao hàng"
         ));
+        revenue.releaseSettlementForOrder(saved.getId());
 
         audit.record(
             saved.getShopId(),

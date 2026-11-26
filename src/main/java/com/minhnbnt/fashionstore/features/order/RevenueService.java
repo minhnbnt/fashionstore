@@ -1,21 +1,26 @@
 package com.minhnbnt.fashionstore.features.order;
 
+import com.minhnbnt.fashionstore.dto.common.PageResponse;
 import com.minhnbnt.fashionstore.dto.order.CreateWithdrawalRequest;
 import com.minhnbnt.fashionstore.dto.order.DailyRevenueResponse;
 import com.minhnbnt.fashionstore.dto.order.RevenueSummaryResponse;
 import com.minhnbnt.fashionstore.dto.order.SettlementResponse;
 import com.minhnbnt.fashionstore.dto.order.TopProductRevenueResponse;
 import com.minhnbnt.fashionstore.dto.order.WithdrawalResponse;
+import com.minhnbnt.fashionstore.dto.payment.AdminWithdrawalResponse;
 import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.SellerSettlementRepository;
 import com.minhnbnt.fashionstore.features.order.repository.SellerWithdrawalRepository;
+import com.minhnbnt.fashionstore.features.settings.ConfigAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.model.ConfigAuditEntity;
 import com.minhnbnt.fashionstore.model.SellerSettlement;
 import com.minhnbnt.fashionstore.model.SellerWithdrawal;
 import com.minhnbnt.fashionstore.model.SettlementStatus;
 import com.minhnbnt.fashionstore.model.ShopPermission;
+import com.minhnbnt.fashionstore.model.WithdrawalStatus;
 import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -25,8 +30,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -47,14 +56,52 @@ public class RevenueService {
 
     private final ShopAuditService audit;
 
+    private final ConfigAuditService configAudit;
+
     @Transactional
     public void createSettlementForOrder(UUID shopId, UUID orderId, long grossAmount) {
         var existing = settlements.findByOrderId(orderId).orElse(null);
         if (existing != null) {
             return;
         }
-        var platformFee = 0L;
+        var platformFee = SellerSettlement.calculatePlatformFee(grossAmount);
         settlements.save(SellerSettlement.create(shopId, orderId, grossAmount, platformFee));
+    }
+
+    @Transactional
+    public void releaseSettlementForOrder(UUID orderId) {
+        var settlement = findLockedSettlementByOrderId(orderId).orElse(null);
+        if (settlement == null || settlement.getStatus() != SettlementStatus.HOLDING) {
+            return;
+        }
+        settlement.release();
+        settlements.save(settlement);
+    }
+
+    @Transactional
+    public void cancelSettlementForOrder(UUID orderId) {
+        var settlement = findLockedSettlementByOrderId(orderId).orElse(null);
+        if (settlement == null || settlement.getStatus() != SettlementStatus.HOLDING) {
+            return;
+        }
+        settlement.cancel();
+        settlements.save(settlement);
+    }
+
+    @Transactional
+    public void adjustSettlementOnReturn(UUID orderId, long refundAmount) {
+        var settlement = findLockedSettlementByOrderId(orderId).orElse(null);
+        if (settlement == null || settlement.getStatus() != SettlementStatus.HOLDING) {
+            return;
+        }
+        if (refundAmount >= settlement.getGrossAmount()) {
+            settlement.cancel();
+        } else if (refundAmount > 0L) {
+            settlement.adjustAndRelease(settlement.getGrossAmount() - refundAmount);
+        } else {
+            settlement.release();
+        }
+        settlements.save(settlement);
     }
 
     @Transactional(readOnly = true)
@@ -62,7 +109,10 @@ public class RevenueService {
         access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         var row = orders.sumDeliveredRevenue(shopId);
-        var walletBalance = settlements.sumAvailableBalance(shopId);
+        var walletBalance = Math.max(
+            0L,
+            settlements.sumAvailableBalance(shopId) - withdrawals.sumActiveWithdrawals(shopId)
+        );
         var holdingBalance = settlements.sumHoldingBalance(shopId);
 
         return new RevenueSummaryResponse(
@@ -147,7 +197,10 @@ public class RevenueService {
     ) {
         access.requireShopPermission(userId, request.shopId(), ShopPermission.REVENUE_WITHDRAW);
 
-        var available = settlements.sumAvailableBalance(request.shopId());
+        var available = Math.max(
+            0L,
+            settlements.sumAvailableBalance(request.shopId()) - withdrawals.sumActiveWithdrawals(request.shopId())
+        );
         if (request.amount() > available) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient available balance");
         }
@@ -209,6 +262,137 @@ public class RevenueService {
             .toList();
     }
 
+    @Transactional(readOnly = true)
+    public PageResponse<AdminWithdrawalResponse> listAdminWithdrawals(
+        @Nullable String status,
+        int page,
+        int size
+    ) {
+        var safePage = Math.max(0, page);
+        var safeSize = Math.clamp(size, 1, 100);
+        var offset = (long) safePage * safeSize;
+
+        List<SellerWithdrawal> list;
+        long total;
+        if (status != null && !status.isBlank()) {
+            WithdrawalStatus parsedStatus;
+            try {
+                parsedStatus = WithdrawalStatus.valueOf(status.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ex) {
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Invalid withdrawal status: " + status
+                );
+            }
+            list = withdrawals.findByStatusPaged(parsedStatus.name(), safeSize, offset);
+            total = withdrawals.countByStatus(parsedStatus.name());
+        } else {
+            list = withdrawals.findAllPaged(safeSize, offset);
+            total = withdrawals.count();
+        }
+
+        var shopIds = new LinkedHashSet<UUID>();
+        for (var w : list) {
+            shopIds.add(w.getShopId());
+        }
+        var summaries = shops.findShopSummariesByIds(shopIds);
+
+        var responses = list.stream()
+            .map(w -> {
+                var summary = summaries.get(w.getShopId());
+                String shopName;
+                if (summary != null) {
+                    shopName = summary.name();
+                } else {
+                    shopName = resolveShopName(w.getShopId());
+                }
+                return toAdminWithdrawalResponse(w, shopName);
+            })
+            .toList();
+
+        return new PageResponse<>(responses, total, safePage, safeSize);
+    }
+
+    @Transactional
+    public AdminWithdrawalResponse approveWithdrawal(@NonNull UUID adminId, @NonNull UUID withdrawalId) {
+        var withdrawal = requireLockedWithdrawal(withdrawalId);
+        if (withdrawal.getStatus() != WithdrawalStatus.REQUESTED) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Only requested withdrawals can be approved"
+            );
+        }
+
+        var oldSnapshot = toWithdrawalAuditSnapshot(withdrawal);
+        withdrawal.complete();
+        var saved = withdrawals.save(withdrawal);
+
+        configAudit.record(
+            ConfigAuditEntity.PAYMENT_TRANSACTION,
+            saved.getId().toString(),
+            "WITHDRAWAL_APPROVE",
+            oldSnapshot,
+            toWithdrawalAuditSnapshot(saved),
+            adminId
+        );
+
+        return toAdminWithdrawalResponse(saved, resolveShopName(saved.getShopId()));
+    }
+
+    @Transactional
+    public AdminWithdrawalResponse rejectWithdrawal(@NonNull UUID adminId, @NonNull UUID withdrawalId) {
+        var withdrawal = requireLockedWithdrawal(withdrawalId);
+        if (withdrawal.getStatus() != WithdrawalStatus.REQUESTED) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Only requested withdrawals can be rejected"
+            );
+        }
+
+        var oldSnapshot = toWithdrawalAuditSnapshot(withdrawal);
+        withdrawal.reject();
+        var saved = withdrawals.save(withdrawal);
+
+        configAudit.record(
+            ConfigAuditEntity.PAYMENT_TRANSACTION,
+            saved.getId().toString(),
+            "WITHDRAWAL_REJECT",
+            oldSnapshot,
+            toWithdrawalAuditSnapshot(saved),
+            adminId
+        );
+
+        return toAdminWithdrawalResponse(saved, resolveShopName(saved.getShopId()));
+    }
+
+    private Optional<SellerSettlement> findLockedSettlementByOrderId(UUID orderId) {
+        var locked = settlements.findLockedByOrderId(orderId);
+        if (locked != null && locked.isPresent()) {
+            return locked;
+        }
+        return settlements.findByOrderId(orderId);
+    }
+
+    private SellerWithdrawal requireLockedWithdrawal(UUID withdrawalId) {
+        var locked = withdrawals.findLockedById(withdrawalId);
+        if (locked != null && locked.isPresent()) {
+            return locked.get();
+        }
+        var found = withdrawals.findById(withdrawalId).orElse(null);
+        if (found == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Withdrawal not found");
+        }
+        return found;
+    }
+
+    private String resolveShopName(UUID shopId) {
+        var name = shops.getShopName(shopId);
+        if (name == null || name.isBlank()) {
+            return "Cửa hàng";
+        }
+        return name;
+    }
+
     private static WithdrawalResponse toWithdrawalResponse(SellerWithdrawal w) {
         return new WithdrawalResponse(
             w.getId(),
@@ -221,5 +405,33 @@ public class RevenueService {
             w.getCreatedAt(),
             w.getProcessedAt()
         );
+    }
+
+    private static AdminWithdrawalResponse toAdminWithdrawalResponse(SellerWithdrawal w, String shopName) {
+        return new AdminWithdrawalResponse(
+            w.getId(),
+            w.getShopId(),
+            shopName,
+            w.getAmount(),
+            w.getBankName(),
+            w.getBankAccount(),
+            w.getBankHolder(),
+            w.getStatus().name(),
+            w.getCreatedAt(),
+            w.getProcessedAt()
+        );
+    }
+
+    private static Map<String, @Nullable Object> toWithdrawalAuditSnapshot(SellerWithdrawal w) {
+        var map = new LinkedHashMap<String, @Nullable Object>();
+        map.put("id", w.getId().toString());
+        map.put("shopId", w.getShopId().toString());
+        map.put("amount", w.getAmount());
+        map.put("bankName", w.getBankName());
+        map.put("bankAccount", w.getBankAccount());
+        map.put("bankHolder", w.getBankHolder());
+        map.put("status", w.getStatus().name());
+        map.put("processedAt", w.getProcessedAt());
+        return map;
     }
 }

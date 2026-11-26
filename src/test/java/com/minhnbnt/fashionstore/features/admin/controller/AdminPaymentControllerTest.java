@@ -1,10 +1,13 @@
 package com.minhnbnt.fashionstore.features.admin.controller;
 
 import com.minhnbnt.fashionstore.config.SecurityConfig;
+import com.minhnbnt.fashionstore.dto.common.PageResponse;
+import com.minhnbnt.fashionstore.dto.payment.AdminWithdrawalResponse;
 import com.minhnbnt.fashionstore.dto.payment.PaymentGatewayResponse;
 import com.minhnbnt.fashionstore.dto.payment.PaymentMethodOption;
 import com.minhnbnt.fashionstore.dto.payment.PaymentMethodsResponse;
 import com.minhnbnt.fashionstore.dto.payment.UpdatePaymentGatewayRequest;
+import com.minhnbnt.fashionstore.features.order.RevenueService;
 import com.minhnbnt.fashionstore.features.payment.PaymentGatewayService;
 import com.minhnbnt.fashionstore.features.payment.controller.PublicPaymentController;
 import com.minhnbnt.fashionstore.model.PaymentMethod;
@@ -28,6 +31,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -44,6 +48,9 @@ class AdminPaymentControllerTest {
 
     @MockitoBean
     private PaymentGatewayService gateways;
+
+    @MockitoBean
+    private RevenueService revenue;
 
     private static RequestPostProcessor admin(UUID adminId) {
         return jwt()
@@ -136,5 +143,74 @@ class AdminPaymentControllerTest {
             .andExpect(jsonPath("$.methods[0].code").value("COD"))
             .andExpect(jsonPath("$.methods[1].code").value("VIETQR"))
             .andExpect(jsonPath("$.codMaxTotal").value(10000000));
+    }
+
+    @Test
+    void listApproveAndRejectWithdrawalsDelegateToRevenueService() throws Exception {
+        var adminId = UUID.randomUUID();
+        var withdrawalId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var now = Instant.parse("2026-11-26T00:00:00Z");
+        var requested = new AdminWithdrawalResponse(
+            withdrawalId,
+            shopId,
+            "Shop Alpha",
+            100_000L,
+            "Vietcombank",
+            "999888777",
+            "NGUYEN VAN A",
+            "REQUESTED",
+            now,
+            null
+        );
+        var completed = new AdminWithdrawalResponse(
+            withdrawalId,
+            shopId,
+            "Shop Alpha",
+            100_000L,
+            "Vietcombank",
+            "999888777",
+            "NGUYEN VAN A",
+            "COMPLETED",
+            now,
+            now
+        );
+        var rejected = new AdminWithdrawalResponse(
+            withdrawalId,
+            shopId,
+            "Shop Alpha",
+            100_000L,
+            "Vietcombank",
+            "999888777",
+            "NGUYEN VAN A",
+            "REJECTED",
+            now,
+            now
+        );
+
+        when(revenue.listAdminWithdrawals("REQUESTED", 0, 20))
+            .thenReturn(new PageResponse<>(List.of(requested), 1L, 0, 20));
+        when(revenue.approveWithdrawal(adminId, withdrawalId)).thenReturn(completed);
+        when(revenue.rejectWithdrawal(adminId, withdrawalId)).thenReturn(rejected);
+
+        mockMvc.perform(get("/api/admin/payments/withdrawals")
+                .param("status", "REQUESTED")
+                .param("page", "0")
+                .param("size", "20")
+                .with(admin(adminId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].id").value(withdrawalId.toString()))
+            .andExpect(jsonPath("$.items[0].shopName").value("Shop Alpha"))
+            .andExpect(jsonPath("$.items[0].status").value("REQUESTED"));
+
+        mockMvc.perform(patch("/api/admin/payments/withdrawals/{id}/approve", withdrawalId)
+                .with(admin(adminId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("COMPLETED"));
+
+        mockMvc.perform(patch("/api/admin/payments/withdrawals/{id}/reject", withdrawalId)
+                .with(admin(adminId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("REJECTED"));
     }
 }

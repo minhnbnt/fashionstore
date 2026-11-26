@@ -1,29 +1,44 @@
 package com.minhnbnt.fashionstore.features.order;
 
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
+import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
 import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
+import com.minhnbnt.fashionstore.dto.order.CheckoutItemRequest;
+import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
+import com.minhnbnt.fashionstore.dto.order.CreateWithdrawalRequest;
+import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
+import com.minhnbnt.fashionstore.features.order.repository.SellerSettlementRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductRepository;
+import com.minhnbnt.fashionstore.features.payment.PaymentFlowService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.Order;
 import com.minhnbnt.fashionstore.model.OrderItem;
+import com.minhnbnt.fashionstore.model.PaymentMethod;
 import com.minhnbnt.fashionstore.model.Product;
+import com.minhnbnt.fashionstore.model.SettlementStatus;
+import com.minhnbnt.fashionstore.test.ProductTestFixtures;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
@@ -36,6 +51,18 @@ class RevenueServiceIntegrationTest {
 
     @Autowired
     private RevenueService revenue;
+
+    @Autowired
+    private OrderService orderService;
+
+    @Autowired
+    private PaymentFlowService paymentFlow;
+
+    @Autowired
+    private CatalogService catalog;
+
+    @Autowired
+    private SellerSettlementRepository settlements;
 
     @Autowired
     private UserService users;
@@ -198,5 +225,166 @@ class RevenueServiceIntegrationTest {
         assertThat(summary.totalRevenue()).isEqualTo(0L);
         assertThat(summary.totalOrders()).isEqualTo(0L);
         assertThat(summary.avgOrderValue()).isEqualTo(0L);
+    }
+
+    private UUID variantInShop(UUID ownerId, UUID shopId, String slug, String sku, long price, int stock) {
+        var created = catalog.createProduct(
+            ownerId,
+            shopId,
+            ProductTestFixtures.request(
+                "Ao " + slug,
+                slug,
+                null,
+                null,
+                List.of(new CreateVariantRequest(sku, "M", "Den", price, null, stock, true))
+            )
+        );
+        return catalog.getDetail(created.id()).variants().getFirst().id();
+    }
+
+    @Test
+    void settlementStaysHoldingAfterDeliverAndReleasesWith5PercentFeeOnlyWhenBuyerConfirmsReceipt() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var suffix = UUID.randomUUID().toString().substring(0, 8);
+        var shopId = approvedShop(ownerId, "rev-escrow-" + suffix);
+        var variantId = variantInShop(ownerId, shopId, "ao-escrow-" + suffix, "SKU-ESC-" + suffix, 200_000L, 10);
+
+        var created = orderService.checkout(
+            buyerId,
+            new CheckoutRequest(
+                shopId,
+                List.of(new CheckoutItemRequest(variantId, 1)),
+                "An",
+                "0901234567",
+                "Ha Noi",
+                PaymentMethod.COD
+            )
+        );
+        orderService.confirm(ownerId, created.id());
+        orderService.ship(ownerId, created.id());
+        orderService.deliver(ownerId, created.id());
+
+        var afterDeliverSummary = revenue.getSummary(ownerId, shopId);
+        assertThat(afterDeliverSummary.holdingBalance()).isEqualTo(190_000L);
+        assertThat(afterDeliverSummary.walletBalance()).isEqualTo(0L);
+
+        var settlementBeforeReceipt = settlements.findByOrderId(created.id()).orElseThrow();
+        assertThat(settlementBeforeReceipt.getGrossAmount()).isEqualTo(200_000L);
+        assertThat(settlementBeforeReceipt.getPlatformFee()).isEqualTo(10_000L);
+        assertThat(settlementBeforeReceipt.getNetAmount()).isEqualTo(190_000L);
+        assertThat(settlementBeforeReceipt.getStatus()).isEqualTo(SettlementStatus.HOLDING);
+
+        orderService.confirmReceipt(buyerId, created.id());
+
+        var afterReceiptSummary = revenue.getSummary(ownerId, shopId);
+        assertThat(afterReceiptSummary.holdingBalance()).isEqualTo(0L);
+        assertThat(afterReceiptSummary.walletBalance()).isEqualTo(190_000L);
+
+        var settlementAfterReceipt = settlements.findByOrderId(created.id()).orElseThrow();
+        assertThat(settlementAfterReceipt.getStatus()).isEqualTo(SettlementStatus.RELEASED);
+        assertThat(settlementAfterReceipt.getReleasedAt()).isNotNull();
+    }
+
+    @Test
+    void deliverOnPaidVietQrOrderPreservesPaidStatus() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var suffix = UUID.randomUUID().toString().substring(0, 8);
+        var shopId = approvedShop(ownerId, "rev-vqr-del-" + suffix);
+        var variantId = variantInShop(ownerId, shopId, "ao-vqr-del-" + suffix, "SKU-VQRD-" + suffix, 200_000L, 10);
+
+        var created = orderService.checkout(
+            buyerId,
+            new CheckoutRequest(
+                shopId,
+                List.of(new CheckoutItemRequest(variantId, 1)),
+                "An",
+                "0901234567",
+                "Ha Noi",
+                PaymentMethod.VIETQR
+            )
+        );
+        var txnRef = Objects.requireNonNull(created.paymentTxnRef());
+        paymentFlow.processIncomingTransfer("CK " + txnRef, created.total(), "FT-VQRD", "{}");
+
+        orderService.confirm(ownerId, created.id());
+        orderService.ship(ownerId, created.id());
+        var delivered = orderService.deliver(ownerId, created.id());
+
+        assertThat(delivered.status()).isEqualTo("DELIVERED");
+        assertThat(delivered.paymentStatus()).isEqualTo("PAID");
+
+        var summaryWhileDelivered = revenue.getSummary(ownerId, shopId);
+        assertThat(summaryWhileDelivered.holdingBalance()).isEqualTo(190_000L);
+        assertThat(summaryWhileDelivered.walletBalance()).isEqualTo(0L);
+
+        orderService.confirmReceipt(buyerId, created.id());
+        var summaryAfterReceipt = revenue.getSummary(ownerId, shopId);
+        assertThat(summaryAfterReceipt.holdingBalance()).isEqualTo(0L);
+        assertThat(summaryAfterReceipt.walletBalance()).isEqualTo(190_000L);
+    }
+
+    @Test
+    void creatingWithdrawalImmediatelyDeductsAvailableWalletBalanceAndRejectingRestoresIt() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var adminId = mirroredUser();
+        var suffix = UUID.randomUUID().toString().substring(0, 8);
+        var shopId = approvedShop(ownerId, "rev-withdraw-" + suffix);
+        var variantId = variantInShop(ownerId, shopId, "ao-withdraw-" + suffix, "SKU-WD-" + suffix, 200_000L, 10);
+
+        var created = orderService.checkout(
+            buyerId,
+            new CheckoutRequest(
+                shopId,
+                List.of(new CheckoutItemRequest(variantId, 1)),
+                "An",
+                "0901234567",
+                "Ha Noi",
+                PaymentMethod.COD
+            )
+        );
+        orderService.confirm(ownerId, created.id());
+        orderService.ship(ownerId, created.id());
+        orderService.deliver(ownerId, created.id());
+        orderService.confirmReceipt(buyerId, created.id());
+
+        assertThat(revenue.getSummary(ownerId, shopId).walletBalance()).isEqualTo(190_000L);
+
+        var w1 = revenue.createWithdrawal(
+            ownerId,
+            new CreateWithdrawalRequest(shopId, 100_000L, "Vietcombank", "999888777", "NGUYEN VAN AN")
+        );
+        assertThat(w1.status()).isEqualTo("REQUESTED");
+        assertThat(revenue.getSummary(ownerId, shopId).walletBalance()).isEqualTo(90_000L);
+
+        assertThatThrownBy(() -> revenue.createWithdrawal(
+            ownerId,
+            new CreateWithdrawalRequest(shopId, 100_000L, "Vietcombank", "999888777", "NGUYEN VAN AN")
+        ))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        var adminPage = revenue.listAdminWithdrawals("REQUESTED", 0, 20);
+        assertThat(adminPage.items()).extracting(w -> w.id()).contains(w1.id());
+
+        var rejected = revenue.rejectWithdrawal(adminId, w1.id());
+        assertThat(rejected.status()).isEqualTo("REJECTED");
+        assertThat(revenue.getSummary(ownerId, shopId).walletBalance()).isEqualTo(190_000L);
+
+        var w2 = revenue.createWithdrawal(
+            ownerId,
+            new CreateWithdrawalRequest(shopId, 100_000L, "Vietcombank", "999888777", "NGUYEN VAN AN")
+        );
+        var approved = revenue.approveWithdrawal(adminId, w2.id());
+        assertThat(approved.status()).isEqualTo("COMPLETED");
+        assertThat(revenue.getSummary(ownerId, shopId).walletBalance()).isEqualTo(90_000L);
+
+        assertThatThrownBy(() -> revenue.approveWithdrawal(adminId, w2.id()))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+            .isEqualTo(HttpStatus.CONFLICT);
     }
 }
