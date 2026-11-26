@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public record CartCheckoutRequest(
@@ -34,7 +35,14 @@ public record CartCheckoutRequest(
 
     @Schema(description = "Phương thức thanh toán (mặc định COD)", example = "COD", nullable = true)
     @Nullable
-    PaymentMethod paymentMethod
+    PaymentMethod paymentMethod,
+
+    @Schema(
+        description = "Mã giảm giá áp dụng theo từng shop (shopId -> voucherCode)",
+        nullable = true
+    )
+    @Nullable
+    Map<UUID, String> shopVouchers
 ) {
 
     public CartCheckoutRequest(
@@ -43,7 +51,17 @@ public record CartCheckoutRequest(
         String shippingAddress,
         @Nullable List<UUID> variantIds
     ) {
-        this(shippingName, shippingPhone, shippingAddress, variantIds, PaymentMethod.COD);
+        this(shippingName, shippingPhone, shippingAddress, variantIds, PaymentMethod.COD, null);
+    }
+
+    public CartCheckoutRequest(
+        String shippingName,
+        String shippingPhone,
+        String shippingAddress,
+        @Nullable List<UUID> variantIds,
+        @Nullable PaymentMethod paymentMethod
+    ) {
+        this(shippingName, shippingPhone, shippingAddress, variantIds, paymentMethod, null);
     }
 
     public PaymentMethod resolvedPaymentMethod() {

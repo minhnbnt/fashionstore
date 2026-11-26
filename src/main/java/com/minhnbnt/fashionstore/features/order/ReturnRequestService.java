@@ -186,6 +186,15 @@ public class ReturnRequestService {
         }
         access.requireShopPermission(userId, req.getShopId(), ShopPermission.RETURN_PROCESS);
 
+        var order = findOrderOrNull(req.getOrderId());
+        var requestedRefund = request.refundAmount();
+        if (order != null && requestedRefund != null && requestedRefund > order.netMerchandiseTotal()) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Refund amount cannot exceed net merchandise total"
+            );
+        }
+
         req.approve(request.resolution(), request.refundAmount(), request.sellerNote());
         var saved = returns.save(req);
         var approveDetail = "Chấp thuận yêu cầu trả hàng | Phương án: " + request.resolution()
@@ -195,7 +204,6 @@ public class ReturnRequestService {
         }
         audit.record(saved.getShopId(), userId, "RETURN_APPROVE", "RETURN", saved.getId(), approveDetail);
 
-        var order = findOrderOrNull(saved.getOrderId());
         var label = orderLabel(order);
         notifications.create(
             Set.of(saved.getBuyerId()),
@@ -288,7 +296,7 @@ public class ReturnRequestService {
             if (saved.getRefundAmount() != null && saved.getRefundAmount() > 0) {
                 refundAmount = saved.getRefundAmount();
             } else if ("REFUND".equalsIgnoreCase(resolution)) {
-                refundAmount = order.getSubtotal();
+                refundAmount = order.netMerchandiseTotal();
             }
 
             revenue.adjustSettlementOnReturn(order.getId(), refundAmount);

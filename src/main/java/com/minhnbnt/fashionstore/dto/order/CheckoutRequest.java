@@ -39,7 +39,11 @@ public record CheckoutRequest(
 
     @Schema(description = "Phương thức thanh toán (mặc định COD)", example = "COD", nullable = true)
     @Nullable
-    PaymentMethod paymentMethod
+    PaymentMethod paymentMethod,
+
+    @Schema(description = "Mã giảm giá của shop áp dụng cho đơn này", nullable = true, example = "SUMMER50K")
+    @Nullable
+    String voucherCode
 ) {
 
     public CheckoutRequest(
@@ -49,7 +53,18 @@ public record CheckoutRequest(
         String shippingPhone,
         String shippingAddress
     ) {
-        this(shopId, items, shippingName, shippingPhone, shippingAddress, PaymentMethod.COD);
+        this(shopId, items, shippingName, shippingPhone, shippingAddress, PaymentMethod.COD, null);
+    }
+
+    public CheckoutRequest(
+        UUID shopId,
+        List<CheckoutItemRequest> items,
+        String shippingName,
+        String shippingPhone,
+        String shippingAddress,
+        @Nullable PaymentMethod paymentMethod
+    ) {
+        this(shopId, items, shippingName, shippingPhone, shippingAddress, paymentMethod, null);
     }
 
     public PaymentMethod resolvedPaymentMethod() {

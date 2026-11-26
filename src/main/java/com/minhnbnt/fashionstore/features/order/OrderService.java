@@ -20,6 +20,7 @@ import com.minhnbnt.fashionstore.dto.order.OrderResponse;
 import com.minhnbnt.fashionstore.dto.order.OrderTrackingEventResponse;
 import com.minhnbnt.fashionstore.dto.order.ShipOrderRequest;
 import com.minhnbnt.fashionstore.dto.payment.VietQrSessionResponse;
+import com.minhnbnt.fashionstore.dto.voucher.VoucherLineItem;
 import com.minhnbnt.fashionstore.features.catalog.ProductStockService;
 import com.minhnbnt.fashionstore.features.order.repository.OrderAdminQueryRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
@@ -34,6 +35,7 @@ import com.minhnbnt.fashionstore.features.settings.SystemSettingsService;
 import com.minhnbnt.fashionstore.features.shipping.ShippingFeeService;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.features.voucher.service.VoucherService;
 import com.minhnbnt.fashionstore.model.AdminCancelReason;
 import com.minhnbnt.fashionstore.model.BuyerCancelReason;
 import com.minhnbnt.fashionstore.model.Order;
@@ -120,6 +122,8 @@ public class OrderService {
 
     private final PaymentTransactionService paymentTransactions;
 
+    private final VoucherService vouchers;
+
     // Single source of truth for the pending-order confirmation timeout. Both the
     // seller-facing confirm() deadline check and the background auto-cancel job read this.
     @Value("${fashionstore.order.pending-timeout-hours:24}")
@@ -178,7 +182,7 @@ public class OrderService {
         @NonNull CheckoutRequest request,
         @NonNull Instant expiresAt
     ) {
-        var prepared = prepareCheckout(request, PaymentMethod.VIETQR);
+        var prepared = prepareCheckout(buyerId, request, PaymentMethod.VIETQR);
 
         var order = Order.createVietQr(
             generateCode(),
@@ -186,6 +190,9 @@ public class OrderService {
             buyerId,
             prepared.subtotal(),
             prepared.shippingFee(),
+            prepared.voucherId(),
+            prepared.voucherCode(),
+            prepared.discountAmount(),
             request.shippingName(),
             request.shippingPhone(),
             request.shippingAddress(),
@@ -200,14 +207,17 @@ public class OrderService {
     }
 
     private OrderResponse checkoutCod(UUID buyerId, CheckoutRequest request) {
-        var prepared = prepareCheckout(request, PaymentMethod.COD);
+        var prepared = prepareCheckout(buyerId, request, PaymentMethod.COD);
 
-        var order = Order.create(
+        var order = Order.createCod(
             generateCode(),
             request.shopId(),
             buyerId,
             prepared.subtotal(),
             prepared.shippingFee(),
+            prepared.voucherId(),
+            prepared.voucherCode(),
+            prepared.discountAmount(),
             request.shippingName(),
             request.shippingPhone(),
             request.shippingAddress()
@@ -230,10 +240,17 @@ public class OrderService {
         return toResponse(order, createdItems);
     }
 
-    private record PreparedCheckout(List<OrderItemSnapshot> snapshots, long subtotal, long shippingFee) {
+    private record PreparedCheckout(
+        List<OrderItemSnapshot> snapshots,
+        long subtotal,
+        long shippingFee,
+        @Nullable UUID voucherId,
+        @Nullable String voucherCode,
+        long discountAmount
+    ) {
     }
 
-    private PreparedCheckout prepareCheckout(CheckoutRequest request, PaymentMethod method) {
+    private PreparedCheckout prepareCheckout(UUID buyerId, CheckoutRequest request, PaymentMethod method) {
         if (!shops.isShopApproved(request.shopId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Shop is not approved for selling");
         }
@@ -280,9 +297,32 @@ public class OrderService {
             ));
         }
 
+        UUID voucherId = null;
+        String voucherCode = null;
+        var discountAmount = 0L;
+        var rawVoucherCode = request.voucherCode();
+        if (rawVoucherCode != null && !rawVoucherCode.isBlank()) {
+            var voucherLines = new ArrayList<VoucherLineItem>(snapshots.size());
+            for (var snapshot : snapshots) {
+                voucherLines.add(new VoucherLineItem(
+                    snapshot.productId(),
+                    snapshot.unitPrice() * snapshot.quantity()
+                ));
+            }
+            var applied = vouchers.redeemForOrder(
+                request.shopId(),
+                buyerId,
+                rawVoucherCode,
+                voucherLines
+            );
+            voucherId = applied.voucherId();
+            voucherCode = applied.voucherCode();
+            discountAmount = applied.discountAmount();
+        }
+
         // Phí ship do server tính theo cấu hình sàn, không nhận từ client.
         var shippingFee = shipping.quote(subtotal, itemCount).fee();
-        var total = subtotal + shippingFee;
+        var total = subtotal + shippingFee - discountAmount;
         paymentGateways.requireAvailable(method, total);
 
         for (var snapshot : snapshots) {
@@ -295,7 +335,7 @@ public class OrderService {
             }
         }
 
-        return new PreparedCheckout(snapshots, subtotal, shippingFee);
+        return new PreparedCheckout(snapshots, subtotal, shippingFee, voucherId, voucherCode, discountAmount);
     }
 
     private List<OrderItem> persistOrderItemsAndMovements(
@@ -457,7 +497,7 @@ public class OrderService {
                 saved.getBuyerId(),
                 "Đã thanh toán qua VietQR (" + txnRef + ")"
             ));
-            revenue.createSettlementForOrder(saved.getShopId(), saved.getId(), saved.getSubtotal());
+            revenue.createSettlementForOrder(saved.getShopId(), saved.getId(), saved.netMerchandiseTotal());
 
             notifications.create(
                 shops.findActiveUserIdsByShop(saved.getShopId()),
@@ -1100,7 +1140,7 @@ public class OrderService {
         var from = order.getStatus();
         order.deliver();
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.DELIVERED, userId));
-        revenue.createSettlementForOrder(order.getShopId(), order.getId(), order.getSubtotal());
+        revenue.createSettlementForOrder(order.getShopId(), order.getId(), order.netMerchandiseTotal());
 
         var orderItems = items.findByOrderId(order.getId());
         var saved = orders.save(order);
@@ -1421,6 +1461,9 @@ public class OrderService {
      * ở bất kỳ trạng thái nào trước khi giao.
      */
     private void restockOrderItems(Order order, List<OrderItem> orderItems) {
+        if (order.getVoucherId() != null) {
+            vouchers.releaseVoucherUsage(order.getVoucherId());
+        }
         for (var item : orderItems) {
             if (item.getVariantId() == null) {
                 continue;
@@ -1662,7 +1705,10 @@ public class OrderService {
             order.getCreatedAt(),
             null,
             null,
-            order.getPaymentExpiresAt()
+            order.getPaymentExpiresAt(),
+            order.getVoucherId(),
+            order.getVoucherCode(),
+            order.getDiscountAmount()
         );
     }
 

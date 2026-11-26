@@ -132,7 +132,18 @@ public record OrderResponse(
 
     @Nullable
     @Schema(description = "Thời điểm hết hạn giữ đơn chờ thanh toán VietQR", nullable = true)
-    Instant paymentExpiresAt
+    Instant paymentExpiresAt,
+
+    @Nullable
+    @Schema(description = "ID mã giảm giá của shop đã áp dụng", nullable = true)
+    UUID voucherId,
+
+    @Nullable
+    @Schema(description = "Mã giảm giá của shop đã áp dụng", nullable = true, example = "SUMMER50K")
+    String voucherCode,
+
+    @Schema(description = "Số tiền được giảm từ voucher của shop, VND", example = "50000")
+    long discountAmount
 ) {
 
     public OrderResponse(
@@ -200,7 +211,85 @@ public record OrderResponse(
             createdAt,
             null,
             null,
-            null
+            null,
+            null,
+            null,
+            0L
+        );
+    }
+
+    public OrderResponse(
+        UUID id,
+        String code,
+        UUID shopId,
+        String shopName,
+        @Nullable String shopSlug,
+        UUID buyerId,
+        String status,
+        String paymentStatus,
+        String paymentMethod,
+        long subtotal,
+        long shippingFee,
+        long total,
+        String shippingName,
+        String shippingPhone,
+        String shippingAddress,
+        @Nullable String shippingCarrier,
+        @Nullable String trackingCode,
+        @Nullable String note,
+        @Nullable String cancelReason,
+        @Nullable String cancelNote,
+        @Nullable String cancelledBy,
+        @Nullable Instant confirmedAt,
+        @Nullable Instant shippedAt,
+        @Nullable Instant deliveredAt,
+        @Nullable Instant receivedAt,
+        @Nullable Instant autoCompleteAt,
+        @Nullable Instant cancelledAt,
+        @Nullable String returnStatus,
+        List<OrderItemResponse> items,
+        Instant createdAt,
+        @Nullable String paymentTxnRef,
+        @Nullable String paymentQrUrl,
+        @Nullable Instant paymentExpiresAt
+    ) {
+        this(
+            id,
+            code,
+            shopId,
+            shopName,
+            shopSlug,
+            buyerId,
+            status,
+            paymentStatus,
+            paymentMethod,
+            subtotal,
+            shippingFee,
+            total,
+            shippingName,
+            shippingPhone,
+            shippingAddress,
+            shippingCarrier,
+            trackingCode,
+            note,
+            cancelReason,
+            cancelNote,
+            cancelledBy,
+            confirmedAt,
+            shippedAt,
+            deliveredAt,
+            receivedAt,
+            autoCompleteAt,
+            cancelledAt,
+            returnStatus,
+            items,
+            createdAt,
+            paymentTxnRef,
+            paymentQrUrl,
+            paymentExpiresAt,
+            null,
+            null,
+            0L
         );
     }
 
@@ -242,7 +331,10 @@ public record OrderResponse(
             createdAt,
             txnRef,
             qrUrl,
-            expiresAt
+            expiresAt,
+            voucherId,
+            voucherCode,
+            discountAmount
         );
     }
 }

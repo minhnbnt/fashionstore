@@ -39,6 +39,12 @@ public class Order implements Persistable<UUID> {
 
     private long shippingFee;
 
+    private @Nullable UUID voucherId;
+
+    private @Nullable String voucherCode;
+
+    private long discountAmount;
+
     private long total;
 
     private String shippingName;
@@ -96,6 +102,9 @@ public class Order implements Persistable<UUID> {
             buyerId,
             subtotal,
             shippingFee,
+            null,
+            null,
+            0L,
             shippingName,
             shippingPhone,
             shippingAddress
@@ -112,6 +121,34 @@ public class Order implements Persistable<UUID> {
         String shippingPhone,
         String shippingAddress
     ) {
+        return createCod(
+            code,
+            shopId,
+            buyerId,
+            subtotal,
+            shippingFee,
+            null,
+            null,
+            0L,
+            shippingName,
+            shippingPhone,
+            shippingAddress
+        );
+    }
+
+    public static Order createCod(
+        String code,
+        UUID shopId,
+        UUID buyerId,
+        long subtotal,
+        long shippingFee,
+        @Nullable UUID voucherId,
+        @Nullable String voucherCode,
+        long discountAmount,
+        String shippingName,
+        String shippingPhone,
+        String shippingAddress
+    ) {
         var now = Instant.now();
         return new Order(
             UUID.randomUUID(),
@@ -123,7 +160,10 @@ public class Order implements Persistable<UUID> {
             PaymentStatus.UNPAID,
             subtotal,
             shippingFee,
-            subtotal + shippingFee,
+            voucherId,
+            voucherCode,
+            discountAmount,
+            subtotal + shippingFee - discountAmount,
             shippingName,
             shippingPhone,
             shippingAddress,
@@ -157,6 +197,36 @@ public class Order implements Persistable<UUID> {
         String shippingAddress,
         Instant paymentExpiresAt
     ) {
+        return createVietQr(
+            code,
+            shopId,
+            buyerId,
+            subtotal,
+            shippingFee,
+            null,
+            null,
+            0L,
+            shippingName,
+            shippingPhone,
+            shippingAddress,
+            paymentExpiresAt
+        );
+    }
+
+    public static Order createVietQr(
+        String code,
+        UUID shopId,
+        UUID buyerId,
+        long subtotal,
+        long shippingFee,
+        @Nullable UUID voucherId,
+        @Nullable String voucherCode,
+        long discountAmount,
+        String shippingName,
+        String shippingPhone,
+        String shippingAddress,
+        Instant paymentExpiresAt
+    ) {
         var now = Instant.now();
         return new Order(
             UUID.randomUUID(),
@@ -168,7 +238,10 @@ public class Order implements Persistable<UUID> {
             PaymentStatus.UNPAID,
             subtotal,
             shippingFee,
-            subtotal + shippingFee,
+            voucherId,
+            voucherCode,
+            discountAmount,
+            subtotal + shippingFee - discountAmount,
             shippingName,
             shippingPhone,
             shippingAddress,
@@ -189,6 +262,10 @@ public class Order implements Persistable<UUID> {
             now,
             true
         );
+    }
+
+    public long netMerchandiseTotal() {
+        return Math.max(0L, subtotal - discountAmount);
     }
 
     public void markPaid() {

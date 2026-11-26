@@ -249,7 +249,7 @@ class PaymentRefundFlowTest {
         returnRequests.approve(
             ownerId,
             createdRet.id(),
-            new ApproveReturnRequest("REFUND", order.total(), "Kho HN nhận hàng hoàn")
+            new ApproveReturnRequest("REFUND", order.subtotal(), "Kho HN nhận hàng hoàn")
         );
         var completedRet = returnRequests.complete(ownerId, createdRet.id(), "Đã nhận đủ hàng hoàn");
 
@@ -280,7 +280,7 @@ class PaymentRefundFlowTest {
 
         var session = paymentFlow.getSessionForViewer(buyerId, false, txnRef);
         assertThat(session.refundStatus()).isEqualTo("PENDING");
-        assertThat(session.refundAmount()).isEqualTo(order.total());
+        assertThat(session.refundAmount()).isEqualTo(order.subtotal());
         assertThat(session.refundReason()).contains("Hoàn tiền đổi trả đơn #" + order.code());
     }
 
