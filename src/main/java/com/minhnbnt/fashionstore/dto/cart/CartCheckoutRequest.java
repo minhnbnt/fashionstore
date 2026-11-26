@@ -1,5 +1,6 @@
 package com.minhnbnt.fashionstore.dto.cart;
 
+import com.minhnbnt.fashionstore.model.PaymentMethod;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -29,6 +30,26 @@ public record CartCheckoutRequest(
         nullable = true
     )
     @Nullable
-    List<UUID> variantIds
+    List<UUID> variantIds,
+
+    @Schema(description = "Phương thức thanh toán (mặc định COD)", example = "COD", nullable = true)
+    @Nullable
+    PaymentMethod paymentMethod
 ) {
+
+    public CartCheckoutRequest(
+        String shippingName,
+        String shippingPhone,
+        String shippingAddress,
+        @Nullable List<UUID> variantIds
+    ) {
+        this(shippingName, shippingPhone, shippingAddress, variantIds, PaymentMethod.COD);
+    }
+
+    public PaymentMethod resolvedPaymentMethod() {
+        if (paymentMethod == null) {
+            return PaymentMethod.COD;
+        }
+        return paymentMethod;
+    }
 }

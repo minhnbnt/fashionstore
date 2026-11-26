@@ -27,6 +27,8 @@ import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderStatusHistoryRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderTrackingEventRepository;
 import com.minhnbnt.fashionstore.features.order.repository.ReturnRequestRepository;
+import com.minhnbnt.fashionstore.features.payment.PaymentGatewayService;
+import com.minhnbnt.fashionstore.features.payment.PaymentTransactionService;
 import com.minhnbnt.fashionstore.features.settings.SystemSettingsService;
 import com.minhnbnt.fashionstore.features.shipping.ShippingFeeService;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
@@ -40,6 +42,7 @@ import com.minhnbnt.fashionstore.model.OrderStatus;
 import com.minhnbnt.fashionstore.model.OrderStatusHistory;
 import com.minhnbnt.fashionstore.model.OrderTrackingEvent;
 import com.minhnbnt.fashionstore.model.OrderTrackingStatus;
+import com.minhnbnt.fashionstore.model.PaymentMethod;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.model.ReturnStatus;
 import com.minhnbnt.fashionstore.model.ShopPermission;
@@ -111,13 +114,112 @@ public class OrderService {
 
     private final NotificationService notifications;
 
+    private final PaymentGatewayService paymentGateways;
+
+    private final PaymentTransactionService paymentTransactions;
+
     // Single source of truth for the pending-order confirmation timeout. Both the
     // seller-facing confirm() deadline check and the background auto-cancel job read this.
     @Value("${fashionstore.order.pending-timeout-hours:24}")
     private long pendingTimeoutHours;
 
+    public record VietQrDraftOrder(Order order, OrderResponse response) {
+    }
+
+    public Instant nextPaymentExpiresAt() {
+        var holdMinutes = Math.max(1, systemSettings.current().paymentHoldMinutes());
+        return clock.instant().plus(holdMinutes, ChronoUnit.MINUTES);
+    }
+
     @Transactional
     public OrderResponse checkout(@NonNull UUID buyerId, @NonNull CheckoutRequest request) {
+        var method = request.resolvedPaymentMethod();
+        if (method == PaymentMethod.VIETQR) {
+            var expiresAt = nextPaymentExpiresAt();
+            var draft = checkoutVietQrDraft(buyerId, request, expiresAt);
+            var tx = paymentTransactions.createSession(buyerId, List.of(draft.order()), expiresAt);
+            return draft.response().withPaymentSession(tx.getTxnRef(), tx.getQrImageUrl(), tx.getExpiresAt());
+        }
+
+        return checkoutCod(buyerId, request);
+    }
+
+    @Transactional
+    public VietQrDraftOrder checkoutVietQrDraft(@NonNull UUID buyerId, @NonNull CheckoutRequest request) {
+        return checkoutVietQrDraft(buyerId, request, nextPaymentExpiresAt());
+    }
+
+    @Transactional
+    public VietQrDraftOrder checkoutDraftVietQr(
+        @NonNull UUID buyerId,
+        @NonNull CheckoutRequest request,
+        @NonNull Instant expiresAt
+    ) {
+        return checkoutVietQrDraft(buyerId, request, expiresAt);
+    }
+
+    @Transactional
+    public VietQrDraftOrder checkoutVietQrDraft(
+        @NonNull UUID buyerId,
+        @NonNull CheckoutRequest request,
+        @NonNull Instant expiresAt
+    ) {
+        var prepared = prepareCheckout(request, PaymentMethod.VIETQR);
+
+        var order = Order.createVietQr(
+            generateCode(),
+            request.shopId(),
+            buyerId,
+            prepared.subtotal(),
+            prepared.shippingFee(),
+            request.shippingName(),
+            request.shippingPhone(),
+            request.shippingAddress(),
+            expiresAt
+        );
+        orders.save(order);
+
+        var createdItems = persistOrderItemsAndMovements(order, request.shopId(), prepared.snapshots());
+        histories.save(OrderStatusHistory.record(order.getId(), null, OrderStatus.AWAITING_PAYMENT, buyerId));
+
+        return new VietQrDraftOrder(order, toResponse(order, createdItems));
+    }
+
+    private OrderResponse checkoutCod(UUID buyerId, CheckoutRequest request) {
+        var prepared = prepareCheckout(request, PaymentMethod.COD);
+
+        var order = Order.create(
+            generateCode(),
+            request.shopId(),
+            buyerId,
+            prepared.subtotal(),
+            prepared.shippingFee(),
+            request.shippingName(),
+            request.shippingPhone(),
+            request.shippingAddress()
+        );
+        orders.save(order);
+
+        var createdItems = persistOrderItemsAndMovements(order, request.shopId(), prepared.snapshots());
+        histories.save(OrderStatusHistory.record(order.getId(), null, OrderStatus.PENDING, buyerId));
+
+        notifications.create(
+            shops.findActiveUserIdsByShop(order.getShopId()),
+            NotificationCategory.SELLING,
+            "ORDER_PLACED",
+            "Có đơn hàng mới #" + order.getCode(),
+            "Khách hàng vừa đặt đơn #" + order.getCode() + " tại shop của bạn.",
+            "/shop?shopId=" + order.getShopId() + "&tab=orders&orderId=" + order.getId(),
+            order.getId()
+        );
+
+        return toResponse(order, createdItems);
+    }
+
+    private record PreparedCheckout(List<OrderItemSnapshot> snapshots, long subtotal, long shippingFee) {
+    }
+
+    private PreparedCheckout prepareCheckout(CheckoutRequest request, PaymentMethod method) {
         if (!shops.isShopApproved(request.shopId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Shop is not approved for selling");
         }
@@ -164,6 +266,11 @@ public class OrderService {
             ));
         }
 
+        // Phí ship do server tính theo cấu hình sàn, không nhận từ client.
+        var shippingFee = shipping.quote(subtotal, itemCount).fee();
+        var total = subtotal + shippingFee;
+        paymentGateways.requireAvailable(method, total);
+
         for (var snapshot : snapshots) {
             if (snapshot.variantId() != null) {
                 if (!productStock.decrementVariantStock(snapshot.variantId(), snapshot.quantity())) {
@@ -174,26 +281,19 @@ public class OrderService {
             }
         }
 
-        // Phí ship do server tính theo cấu hình sàn, không nhận từ client.
-        var shippingFee = shipping.quote(subtotal, itemCount).fee();
+        return new PreparedCheckout(snapshots, subtotal, shippingFee);
+    }
 
-        var order = Order.create(
-            generateCode(),
-            request.shopId(),
-            buyerId,
-            subtotal,
-            shippingFee,
-            request.shippingName(),
-            request.shippingPhone(),
-            request.shippingAddress()
-        );
-        orders.save(order);
-
+    private List<OrderItem> persistOrderItemsAndMovements(
+        Order order,
+        UUID shopId,
+        List<OrderItemSnapshot> snapshots
+    ) {
         for (var snapshot : snapshots) {
             if (snapshot.variantId() != null) {
                 productStock.recordStockMovement(
                     snapshot.variantId(),
-                    request.shopId(),
+                    shopId,
                     snapshot.quantity(),
                     "ORDER_CREATED",
                     order.getId()
@@ -214,20 +314,7 @@ public class OrderService {
             ))
             .toList();
         items.saveAll(createdItems);
-
-        histories.save(OrderStatusHistory.record(order.getId(), null, OrderStatus.PENDING, buyerId));
-
-        notifications.create(
-            shops.findActiveUserIdsByShop(order.getShopId()),
-            NotificationCategory.SELLING,
-            "ORDER_PLACED",
-            "Có đơn hàng mới #" + order.getCode(),
-            "Khách hàng vừa đặt đơn #" + order.getCode() + " tại shop của bạn.",
-            "/shop?shopId=" + order.getShopId() + "&tab=orders&orderId=" + order.getId(),
-            order.getId()
-        );
-
-        return toResponse(order, createdItems);
+        return createdItems;
     }
 
     @Transactional(readOnly = true)
@@ -237,7 +324,7 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public long countByShop(@NonNull UUID shopId) {
-        return orders.countByShopId(shopId);
+        return orders.countPlacedByShopId(shopId);
     }
 
     @Transactional(readOnly = true)
@@ -363,7 +450,7 @@ public class OrderService {
     public List<OrderResponse> listSellerOrders(@NonNull UUID userId) {
         var allOrders = new ArrayList<Order>();
         for (var shopId : orderReadableShopIds(userId)) {
-            allOrders.addAll(orders.findByShopIdOrderByCreatedAtDesc(shopId));
+            allOrders.addAll(orders.findPlacedByShopIdOrderByCreatedAtDesc(shopId));
         }
         allOrders.sort((left, right) -> right.getCreatedAt().compareTo(left.getCreatedAt()));
         return toResponses(allOrders);
@@ -565,7 +652,7 @@ public class OrderService {
 
         var matched = new ArrayList<Order>();
         for (var sId : shopIds) {
-            for (var order : orders.findByShopIdOrderByCreatedAtDesc(sId)) {
+            for (var order : orders.findPlacedByShopIdOrderByCreatedAtDesc(sId)) {
                 if (statusFilter != null && !statusFilter.isBlank()) {
                     if (!order.getStatus().name().equalsIgnoreCase(statusFilter)) {
                         continue;
@@ -1325,7 +1412,10 @@ public class OrderService {
             order.getCancelledAt(),
             returnStatus,
             itemResponses,
-            order.getCreatedAt()
+            order.getCreatedAt(),
+            null,
+            null,
+            order.getPaymentExpiresAt()
         );
     }
 

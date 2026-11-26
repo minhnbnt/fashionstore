@@ -19,6 +19,12 @@ public interface OrderRepository extends CrudRepository<Order, UUID> {
 
     List<Order> findByShopIdOrderByCreatedAtDesc(UUID shopId);
 
+    @Query("SELECT * FROM orders WHERE shop_id = :shopId AND placed_at IS NOT NULL ORDER BY created_at DESC")
+    List<Order> findPlacedByShopIdOrderByCreatedAtDesc(UUID shopId);
+
+    @Query("SELECT * FROM orders WHERE shop_id = :shopId AND placed_at IS NOT NULL ORDER BY created_at DESC")
+    List<Order> findByShopIdAndPlacedAtIsNotNullOrderByCreatedAtDesc(UUID shopId);
+
     List<Order> findByStatusAndCreatedAtBefore(OrderStatus status, Instant cutoff);
 
     /**
@@ -30,6 +36,12 @@ public interface OrderRepository extends CrudRepository<Order, UUID> {
     long countByBuyerId(UUID buyerId);
 
     long countByShopId(UUID shopId);
+
+    @Query("SELECT COUNT(*) FROM orders WHERE shop_id = :shopId AND placed_at IS NOT NULL")
+    long countPlacedByShopId(UUID shopId);
+
+    @Query("SELECT COUNT(*) FROM orders WHERE shop_id = :shopId AND placed_at IS NOT NULL")
+    long countByShopIdAndPlacedAtIsNotNull(UUID shopId);
 
     public record RevenueSummaryRow(long totalRevenue, long totalOrders, long avgOrderValue) {
     }

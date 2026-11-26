@@ -1,8 +1,11 @@
 package com.minhnbnt.fashionstore.model;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -136,5 +139,97 @@ class OrderTest {
                 var statusEx = (ResponseStatusException) ex;
                 assertThat(statusEx.getStatusCode().value()).isEqualTo(409);
             });
+    }
+
+    @Test
+    void createVietQrStartsAwaitingPaymentWithExpiryAndNullPlacedAt() {
+        var expiresAt = Instant.now().plus(15, ChronoUnit.MINUTES);
+        var order = Order.createVietQr(
+            "ORD-VQR01",
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            150_000L,
+            30_000L,
+            "An",
+            "0901234567",
+            "Ha Noi",
+            expiresAt
+        );
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.AWAITING_PAYMENT);
+        assertThat(order.getPaymentMethod()).isEqualTo("VIETQR");
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.UNPAID);
+        assertThat(order.getTotal()).isEqualTo(180_000L);
+        assertThat(order.getPlacedAt()).isNull();
+        assertThat(order.getPaymentExpiresAt()).isEqualTo(expiresAt);
+    }
+
+    @Test
+    void markPaidTransitionsAwaitingPaymentToPendingPaidAndSetsPlacedAt() {
+        var expiresAt = Instant.now().plus(15, ChronoUnit.MINUTES);
+        var order = Order.createVietQr(
+            "ORD-VQR02",
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            150_000L,
+            30_000L,
+            "An",
+            "0901234567",
+            "Ha Noi",
+            expiresAt
+        );
+        var paidAt = Instant.now();
+
+        order.markPaid(paidAt);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
+        assertThat(order.getPlacedAt()).isEqualTo(paidAt);
+
+        assertThatThrownBy(() -> order.markPaid(paidAt))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+            .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void expirePaymentTransitionsAwaitingPaymentToCancelledFailedBySystem() {
+        var expiresAt = Instant.now().plus(15, ChronoUnit.MINUTES);
+        var order = Order.createVietQr(
+            "ORD-VQR03",
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            150_000L,
+            30_000L,
+            "An",
+            "0901234567",
+            "Ha Noi",
+            expiresAt
+        );
+        var now = Instant.now();
+
+        order.expirePayment(now);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(order.getCancelReason()).isEqualTo("PAYMENT_EXPIRED");
+        assertThat(order.getCancelledBy()).isEqualTo(OrderCanceller.SYSTEM);
+        assertThat(order.getCancelledAt()).isEqualTo(now);
+
+        assertThatThrownBy(() -> pendingOrder().expirePayment(now))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+            .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void markRefundPendingAndMarkRefundedUpdatePaymentStatus() {
+        var order = pendingOrder();
+
+        order.markRefundPending();
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUND_PENDING);
+
+        order.markRefunded();
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
     }
 }

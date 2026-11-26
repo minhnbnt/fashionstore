@@ -114,6 +114,7 @@ public class ShopStatsRepository {
                     AND status != 'CANCELLED' THEN 1 END), 0) AS yesterday_orders
             FROM orders
             WHERE shop_id = :shopId
+              AND placed_at IS NOT NULL
             """;
 
         return jdbc.sql(sql)
@@ -147,6 +148,7 @@ public class ShopStatsRepository {
                         OR delivered_at <= shipped_at + INTERVAL '7 days') THEN 1 END) AS on_time_orders
             FROM orders
             WHERE shop_id = :shopId
+              AND placed_at IS NOT NULL
             """;
 
         record OrderMetrics(long total, long cancelled, long delivered, long onTime) {}
@@ -206,6 +208,7 @@ public class ShopStatsRepository {
                 COUNT(id) AS orders
             FROM orders
             WHERE shop_id = :shopId
+              AND placed_at IS NOT NULL
               AND status != 'CANCELLED'
               AND created_at >= :from
               AND created_at < :to
@@ -237,6 +240,7 @@ public class ShopStatsRepository {
             JOIN product p ON oi.product_id = p.id
             JOIN category c ON p.category_id = c.id
             WHERE o.shop_id = :shopId
+              AND o.placed_at IS NOT NULL
               AND o.status != 'CANCELLED'
             GROUP BY c.id, c.name
             ORDER BY revenue DESC
@@ -261,6 +265,7 @@ public class ShopStatsRepository {
                 COUNT(o.id) AS order_count
             FROM orders o
             WHERE o.shop_id = :shopId
+              AND o.placed_at IS NOT NULL
               AND o.status != 'CANCELLED'
             GROUP BY o.payment_method
             ORDER BY revenue DESC
@@ -284,6 +289,7 @@ public class ShopStatsRepository {
                 COUNT(o.id) AS order_count
             FROM orders o
             WHERE o.shop_id = :shopId
+              AND o.placed_at IS NOT NULL
               AND o.status != 'CANCELLED'
               AND o.created_at >= :from
               AND o.created_at < :to
@@ -318,6 +324,7 @@ public class ShopStatsRepository {
                 o.total AS total
             FROM orders o
             WHERE o.shop_id = :shopId
+              AND o.placed_at IS NOT NULL
               AND o.created_at >= :from
               AND o.created_at < :to
             ORDER BY o.created_at DESC
@@ -400,6 +407,7 @@ public class ShopStatsRepository {
                 GROUP BY order_id
             ) rr ON rr.order_id = o.id
             WHERE o.shop_id = :shopId
+              AND o.placed_at IS NOT NULL
               AND o.created_at >= :from
               AND o.created_at < :to
             """;
@@ -581,7 +589,7 @@ public class ShopStatsRepository {
                     COUNT(id) AS order_count,
                     SUM(total) AS total_spent
                 FROM orders
-                WHERE shop_id = :shopId AND status != 'CANCELLED'
+                WHERE shop_id = :shopId AND status != 'CANCELLED' AND placed_at IS NOT NULL
                 GROUP BY buyer_id
             )
             SELECT
@@ -614,6 +622,7 @@ public class ShopStatsRepository {
             FROM orders o
             JOIN user_profile u ON o.buyer_id = u.id
             WHERE o.shop_id = :shopId
+              AND o.placed_at IS NOT NULL
               AND o.status != 'CANCELLED'
             GROUP BY u.id, u.display_name
             ORDER BY total_spent DESC, order_count DESC

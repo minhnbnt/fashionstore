@@ -18,12 +18,16 @@ import com.minhnbnt.fashionstore.features.cart.repository.CartItemRepository;
 import com.minhnbnt.fashionstore.features.cart.repository.CartRepository;
 import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
+import com.minhnbnt.fashionstore.features.payment.PaymentGatewayService;
+import com.minhnbnt.fashionstore.features.payment.PaymentTransactionService;
 import com.minhnbnt.fashionstore.features.shipping.ShippingFeeService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.features.upload.S3UrlService;
 import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.model.Cart;
 import com.minhnbnt.fashionstore.model.CartItem;
+import com.minhnbnt.fashionstore.model.Order;
+import com.minhnbnt.fashionstore.model.PaymentMethod;
 import com.minhnbnt.fashionstore.model.ProductImage;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import lombok.NonNull;
@@ -61,6 +65,10 @@ public class CartService {
     private final S3UrlService s3Urls;
 
     private final ShippingFeeService shipping;
+
+    private final PaymentGatewayService paymentGateways;
+
+    private final PaymentTransactionService paymentTransactions;
 
     /** FK bảo đảm upload tồn tại; thiếu là lỗi dữ liệu, fail loud. */
     private String imageUrlOf(UUID uploadId) {
@@ -229,6 +237,7 @@ public class CartService {
         var checked = selectLines(lines, request.variantIds());
 
         var linesByShop = new LinkedHashMap<UUID, List<CheckoutItemRequest>>();
+        var totalsByShop = new LinkedHashMap<UUID, ShopLineTotals>();
         var problems = new ArrayList<CheckoutBlockedItem>();
 
         for (var item : checked) {
@@ -265,25 +274,65 @@ public class CartService {
                 linesByShop.put(variant.getShopId(), shopLines);
             }
             shopLines.add(new CheckoutItemRequest(item.getVariantId(), item.getQuantity()));
+
+            var lineTotals = new ShopLineTotals(variant.getPrice() * item.getQuantity(), item.getQuantity());
+            totalsByShop.merge(variant.getShopId(), lineTotals, ShopLineTotals::plus);
         }
 
         if (!problems.isEmpty()) {
             throw new CartCheckoutBlockedException(problems);
         }
 
+        var method = request.resolvedPaymentMethod();
         var placed = new ArrayList<OrderResponse>();
 
-        for (Map.Entry<UUID, List<CheckoutItemRequest>> entry : linesByShop.entrySet()) {
-            placed.add(orders.checkout(
-                buyerId,
-                new CheckoutRequest(
-                    entry.getKey(),
-                    entry.getValue(),
-                    request.shippingName(),
-                    request.shippingPhone(),
-                    request.shippingAddress()
-                )
-            ));
+        if (method == PaymentMethod.VIETQR) {
+            var expiresAt = orders.nextPaymentExpiresAt();
+            var createdOrders = new ArrayList<Order>();
+            var draftResponses = new ArrayList<OrderResponse>();
+
+            for (Map.Entry<UUID, List<CheckoutItemRequest>> entry : linesByShop.entrySet()) {
+                var draft = orders.checkoutVietQrDraft(
+                    buyerId,
+                    new CheckoutRequest(
+                        entry.getKey(),
+                        entry.getValue(),
+                        request.shippingName(),
+                        request.shippingPhone(),
+                        request.shippingAddress(),
+                        PaymentMethod.VIETQR
+                    ),
+                    expiresAt
+                );
+                createdOrders.add(draft.order());
+                draftResponses.add(draft.response());
+            }
+
+            var tx = paymentTransactions.createSession(buyerId, createdOrders, expiresAt);
+            for (var draftResponse : draftResponses) {
+                placed.add(draftResponse.withPaymentSession(tx.getTxnRef(), tx.getQrImageUrl(), tx.getExpiresAt()));
+            }
+        } else {
+            var combinedTotal = 0L;
+            for (var totals : totalsByShop.values()) {
+                var quote = shipping.quote(totals.subtotal(), totals.itemCount());
+                combinedTotal += totals.subtotal() + quote.fee();
+            }
+            paymentGateways.requireAvailable(PaymentMethod.COD, combinedTotal);
+
+            for (Map.Entry<UUID, List<CheckoutItemRequest>> entry : linesByShop.entrySet()) {
+                placed.add(orders.checkout(
+                    buyerId,
+                    new CheckoutRequest(
+                        entry.getKey(),
+                        entry.getValue(),
+                        request.shippingName(),
+                        request.shippingPhone(),
+                        request.shippingAddress(),
+                        PaymentMethod.COD
+                    )
+                ));
+            }
         }
 
         items.deleteAll(checked);

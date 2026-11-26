@@ -59,6 +59,10 @@ public class Order implements Persistable<UUID> {
 
     private @Nullable OrderCanceller cancelledBy;
 
+    private @Nullable Instant paymentExpiresAt;
+
+    private @Nullable Instant placedAt;
+
     private @Nullable Instant confirmedAt;
 
     private @Nullable Instant shippedAt;
@@ -78,13 +82,36 @@ public class Order implements Persistable<UUID> {
 
     public static Order create(
         String code,
-                               UUID shopId,
-                               UUID buyerId,
-                               long subtotal,
-                               long shippingFee,
-                               String shippingName,
-                               String shippingPhone,
-                               String shippingAddress) {
+        UUID shopId,
+        UUID buyerId,
+        long subtotal,
+        long shippingFee,
+        String shippingName,
+        String shippingPhone,
+        String shippingAddress
+    ) {
+        return createCod(
+            code,
+            shopId,
+            buyerId,
+            subtotal,
+            shippingFee,
+            shippingName,
+            shippingPhone,
+            shippingAddress
+        );
+    }
+
+    public static Order createCod(
+        String code,
+        UUID shopId,
+        UUID buyerId,
+        long subtotal,
+        long shippingFee,
+        String shippingName,
+        String shippingPhone,
+        String shippingAddress
+    ) {
         var now = Instant.now();
         return new Order(
             UUID.randomUUID(),
@@ -107,13 +134,107 @@ public class Order implements Persistable<UUID> {
             null,
             null,
             null,
+            now,
+            null,
             null,
             null,
             null,
             null,
             now,
             now,
-            true);
+            true
+        );
+    }
+
+    public static Order createVietQr(
+        String code,
+        UUID shopId,
+        UUID buyerId,
+        long subtotal,
+        long shippingFee,
+        String shippingName,
+        String shippingPhone,
+        String shippingAddress,
+        Instant paymentExpiresAt
+    ) {
+        var now = Instant.now();
+        return new Order(
+            UUID.randomUUID(),
+            code,
+            shopId,
+            buyerId,
+            OrderStatus.AWAITING_PAYMENT,
+            "VIETQR",
+            PaymentStatus.UNPAID,
+            subtotal,
+            shippingFee,
+            subtotal + shippingFee,
+            shippingName,
+            shippingPhone,
+            shippingAddress,
+            "",
+            null,
+            null,
+            null,
+            null,
+            null,
+            paymentExpiresAt,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            now,
+            now,
+            true
+        );
+    }
+
+    public void markPaid() {
+        markPaid(Instant.now());
+    }
+
+    public void markPaid(Instant now) {
+        if (status != OrderStatus.AWAITING_PAYMENT) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Only awaiting payment orders can be marked paid"
+            );
+        }
+        status = OrderStatus.PENDING;
+        paymentStatus = PaymentStatus.PAID;
+        placedAt = now;
+        updatedAt = now;
+    }
+
+    public void expirePayment() {
+        expirePayment(Instant.now());
+    }
+
+    public void expirePayment(Instant now) {
+        if (status != OrderStatus.AWAITING_PAYMENT) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Only awaiting payment orders can expire"
+            );
+        }
+        status = OrderStatus.CANCELLED;
+        paymentStatus = PaymentStatus.FAILED;
+        cancelReason = "PAYMENT_EXPIRED";
+        cancelledBy = OrderCanceller.SYSTEM;
+        cancelledAt = now;
+        updatedAt = now;
+    }
+
+    public void markRefundPending() {
+        paymentStatus = PaymentStatus.REFUND_PENDING;
+        updatedAt = Instant.now();
+    }
+
+    public void markRefunded() {
+        paymentStatus = PaymentStatus.REFUNDED;
+        updatedAt = Instant.now();
     }
 
     public void confirm() {

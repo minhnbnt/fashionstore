@@ -116,6 +116,133 @@ public record OrderResponse(
     List<OrderItemResponse> items,
 
     @Schema(description = "Thời điểm tạo đơn")
-    Instant createdAt
+    Instant createdAt,
+
+    @Nullable
+    @Schema(
+        description = "Mã tham chiếu giao dịch thanh toán VietQR (khi đặt bằng VIETQR)",
+        nullable = true,
+        example = "DHMQ1234567890"
+    )
+    String paymentTxnRef,
+
+    @Nullable
+    @Schema(description = "URL ảnh mã QR thanh toán VietQR", nullable = true)
+    String paymentQrUrl,
+
+    @Nullable
+    @Schema(description = "Thời điểm hết hạn giữ đơn chờ thanh toán VietQR", nullable = true)
+    Instant paymentExpiresAt
 ) {
+
+    public OrderResponse(
+        UUID id,
+        String code,
+        UUID shopId,
+        String shopName,
+        @Nullable String shopSlug,
+        UUID buyerId,
+        String status,
+        String paymentStatus,
+        String paymentMethod,
+        long subtotal,
+        long shippingFee,
+        long total,
+        String shippingName,
+        String shippingPhone,
+        String shippingAddress,
+        @Nullable String shippingCarrier,
+        @Nullable String trackingCode,
+        @Nullable String note,
+        @Nullable String cancelReason,
+        @Nullable String cancelNote,
+        @Nullable String cancelledBy,
+        @Nullable Instant confirmedAt,
+        @Nullable Instant shippedAt,
+        @Nullable Instant deliveredAt,
+        @Nullable Instant receivedAt,
+        @Nullable Instant autoCompleteAt,
+        @Nullable Instant cancelledAt,
+        @Nullable String returnStatus,
+        List<OrderItemResponse> items,
+        Instant createdAt
+    ) {
+        this(
+            id,
+            code,
+            shopId,
+            shopName,
+            shopSlug,
+            buyerId,
+            status,
+            paymentStatus,
+            paymentMethod,
+            subtotal,
+            shippingFee,
+            total,
+            shippingName,
+            shippingPhone,
+            shippingAddress,
+            shippingCarrier,
+            trackingCode,
+            note,
+            cancelReason,
+            cancelNote,
+            cancelledBy,
+            confirmedAt,
+            shippedAt,
+            deliveredAt,
+            receivedAt,
+            autoCompleteAt,
+            cancelledAt,
+            returnStatus,
+            items,
+            createdAt,
+            null,
+            null,
+            null
+        );
+    }
+
+    public OrderResponse withPaymentSession(
+        @Nullable String txnRef,
+        @Nullable String qrUrl,
+        @Nullable Instant expiresAt
+    ) {
+        return new OrderResponse(
+            id,
+            code,
+            shopId,
+            shopName,
+            shopSlug,
+            buyerId,
+            status,
+            paymentStatus,
+            paymentMethod,
+            subtotal,
+            shippingFee,
+            total,
+            shippingName,
+            shippingPhone,
+            shippingAddress,
+            shippingCarrier,
+            trackingCode,
+            note,
+            cancelReason,
+            cancelNote,
+            cancelledBy,
+            confirmedAt,
+            shippedAt,
+            deliveredAt,
+            receivedAt,
+            autoCompleteAt,
+            cancelledAt,
+            returnStatus,
+            items,
+            createdAt,
+            txnRef,
+            qrUrl,
+            expiresAt
+        );
+    }
 }

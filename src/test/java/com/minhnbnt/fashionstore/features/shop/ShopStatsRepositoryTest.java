@@ -139,9 +139,9 @@ class ShopStatsRepositoryTest {
                             UUID prodId, UUID varId, int qty, long lineTotal) {
         jdbc.sql("""
             INSERT INTO orders (id, code, shop_id, buyer_id, status, subtotal, shipping_fee, total,
-                                shipping_name, shipping_phone, shipping_address, created_at)
+                                shipping_name, shipping_phone, shipping_address, placed_at, created_at)
             VALUES (:id, :code, :shopId, :buyerId, :status, :total, 0, :total,
-                    'Test Buyer', '0901234567', '123 Test St', :createdAt)
+                    'Test Buyer', '0901234567', '123 Test St', :createdAt, :createdAt)
             """)
             .param("id", orderId)
             .param("code", "ORD-" + orderId.toString().substring(0, 8))
