@@ -99,6 +99,38 @@ public record CreateProductRequest(
     )
     @Nullable
     @Pattern(regexp = "ACTIVE|HIDDEN", message = "Status must be ACTIVE or HIDDEN")
-    String status
+    String status,
+
+    @Schema(description = "Danh sách upload id ảnh garment phẳng (tối đa 9 ảnh) cho Virtual Try-On", nullable = true)
+    @Nullable
+    @Size(max = 9, message = "Product cannot exceed 9 garment images")
+    List<UUID> garmentUploadIds
 ) {
+    public CreateProductRequest(
+        String name,
+        String slug,
+        @Nullable String description,
+        @Nullable UUID categoryId,
+        List<CreateVariantRequest> variants,
+        List<ImageItemRequest> images,
+        @Nullable UUID videoUploadId,
+        @Nullable UUID garmentUploadId,
+        @Nullable Boolean tryOnEnabled,
+        @Nullable String material,
+        @Nullable String origin,
+        @Nullable String careInstructions,
+        @Nullable String sizeGuide,
+        @Nullable Integer weightGrams,
+        @Nullable Integer lengthCm,
+        @Nullable Integer widthCm,
+        @Nullable Integer heightCm,
+        @Nullable String status
+    ) {
+        this(
+            name, slug, description, categoryId, variants, images,
+            videoUploadId, garmentUploadId, tryOnEnabled,
+            material, origin, careInstructions, sizeGuide,
+            weightGrams, lengthCm, widthCm, heightCm, status, null
+        );
+    }
 }

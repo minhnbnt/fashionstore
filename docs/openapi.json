@@ -26359,6 +26359,15 @@
             "format" : "int32",
             "description" : "Chiều cao đóng gói (cm)",
             "exclusiveMinimum" : 0
+          },
+          "garmentUploadIds" : {
+            "type" : [ "array", "null" ],
+            "description" : "Danh sách upload id ảnh garment phẳng cho Virtual Try-On (tối đa 9 ảnh)",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            },
+            "maxItems" : 9
           }
         }
       },
@@ -26409,6 +26418,28 @@
           "defaultVariant" : {
             "type" : [ "boolean", "null" ],
             "description" : "Đặt làm default, null = giữ nguyên"
+          }
+        }
+      },
+      "GarmentImageResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "url" : {
+            "type" : "string",
+            "description" : "URL public của ảnh garment"
+          },
+          "uploadId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "Id bản ghi upload gốc — FE echo lại khi cập nhật danh sách ảnh garment"
+          },
+          "sortOrder" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },
@@ -26541,6 +26572,13 @@
           "heightCm" : {
             "type" : [ "integer", "null" ],
             "format" : "int32"
+          },
+          "garments" : {
+            "type" : "array",
+            "description" : "Danh sách ảnh garment thử đồ ảo",
+            "items" : {
+              "$ref" : "#/components/schemas/GarmentImageResponse"
+            }
           }
         }
       },
@@ -28606,6 +28644,15 @@
             "description" : "Trạng thái mong muốn khi đăng bán: ACTIVE (Đang bán) hoặc HIDDEN (Tạm ẩn)",
             "example" : "ACTIVE",
             "pattern" : "ACTIVE|HIDDEN"
+          },
+          "garmentUploadIds" : {
+            "type" : [ "array", "null" ],
+            "description" : "Danh sách upload id ảnh garment phẳng (tối đa 9 ảnh) cho Virtual Try-On",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            },
+            "maxItems" : 9
           }
         },
         "required" : [ "images", "name", "slug", "variants" ]
@@ -34091,6 +34138,13 @@
           "heightCm" : {
             "type" : [ "integer", "null" ],
             "format" : "int32"
+          },
+          "garments" : {
+            "type" : "array",
+            "description" : "Danh sách ảnh garment thử đồ ảo",
+            "items" : {
+              "$ref" : "#/components/schemas/GarmentImageResponse"
+            }
           }
         }
       },

@@ -1,6 +1,7 @@
 package com.minhnbnt.fashionstore.features.catalog;
 
 import com.minhnbnt.fashionstore.dto.catalog.CategoryResponse;
+import com.minhnbnt.fashionstore.dto.catalog.GarmentImageResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ImageResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductSummaryResponse;
@@ -8,6 +9,7 @@ import com.minhnbnt.fashionstore.dto.catalog.VariantResponse;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductSearchRepository.Hit;
 import com.minhnbnt.fashionstore.model.Category;
 import com.minhnbnt.fashionstore.model.Product;
+import com.minhnbnt.fashionstore.model.ProductGarment;
 import com.minhnbnt.fashionstore.model.ProductImage;
 import com.minhnbnt.fashionstore.model.ProductVariant;
 import org.jspecify.annotations.Nullable;
@@ -28,6 +30,21 @@ public final class CatalogMapper {
         long reviewCount,
         @Nullable String videoUrl,
         @Nullable String garmentUrl
+    ) {
+        return toResponse(
+            product, variants, images, averageRating, reviewCount, videoUrl, garmentUrl, List.of()
+        );
+    }
+
+    public static ProductResponse toResponse(
+        Product product,
+        List<VariantResponse> variants,
+        List<ImageResponse> images,
+        @Nullable Double averageRating,
+        long reviewCount,
+        @Nullable String videoUrl,
+        @Nullable String garmentUrl,
+        List<GarmentImageResponse> garments
     ) {
         return new ProductResponse(
             product.getId(),
@@ -54,7 +71,17 @@ public final class CatalogMapper {
             product.getWeightGrams(),
             product.getLengthCm(),
             product.getWidthCm(),
-            product.getHeightCm()
+            product.getHeightCm(),
+            garments
+        );
+    }
+
+    public static GarmentImageResponse toGarmentImageResponse(ProductGarment garment, @Nullable String url) {
+        return new GarmentImageResponse(
+            garment.getId(),
+            Objects.requireNonNull(url, "upload row missing for garment " + garment.getId()),
+            garment.getUploadId(),
+            garment.getSortOrder()
         );
     }
 

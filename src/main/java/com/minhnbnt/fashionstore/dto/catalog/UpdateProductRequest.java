@@ -93,8 +93,40 @@ public record UpdateProductRequest(
     @Schema(description = "Chiều cao đóng gói (cm)", nullable = true)
     @Nullable
     @Positive(message = "Package height must be positive")
-    Integer heightCm
+    Integer heightCm,
+
+    @Schema(description = "Danh sách upload id ảnh garment phẳng cho Virtual Try-On (tối đa 9 ảnh)", nullable = true)
+    @Nullable
+    @Size(max = 9, message = "Product cannot exceed 9 garment images")
+    List<UUID> garmentUploadIds
 ) {
+    public UpdateProductRequest(
+        @Nullable String name,
+        @Nullable String description,
+        @Nullable UUID categoryId,
+        @Nullable String status,
+        @Nullable List<UpdateVariantRequest> variants,
+        @Nullable List<ImageItemRequest> images,
+        @Nullable UUID videoUploadId,
+        @Nullable UUID garmentUploadId,
+        @Nullable Boolean tryOnEnabled,
+        @Nullable String material,
+        @Nullable String origin,
+        @Nullable String careInstructions,
+        @Nullable String sizeGuide,
+        @Nullable Integer weightGrams,
+        @Nullable Integer lengthCm,
+        @Nullable Integer widthCm,
+        @Nullable Integer heightCm
+    ) {
+        this(
+            name, description, categoryId, status, variants,
+            images, videoUploadId, garmentUploadId, tryOnEnabled,
+            material, origin, careInstructions, sizeGuide,
+            weightGrams, lengthCm, widthCm, heightCm, null
+        );
+    }
+
     public UpdateProductRequest(
         @Nullable String name,
         @Nullable String description,
@@ -106,7 +138,7 @@ public record UpdateProductRequest(
             name, description, categoryId, status, variants,
             null, null, null, null,
             null, null, null, null,
-            null, null, null, null
+            null, null, null, null, null
         );
     }
 }

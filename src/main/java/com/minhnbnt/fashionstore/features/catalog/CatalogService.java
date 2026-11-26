@@ -6,6 +6,7 @@ import com.minhnbnt.fashionstore.dto.catalog.AttachImagesRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CategoryResponse;
 import com.minhnbnt.fashionstore.dto.catalog.CreateProductRequest;
 import com.minhnbnt.fashionstore.dto.catalog.CreateVariantRequest;
+import com.minhnbnt.fashionstore.dto.catalog.GarmentImageResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ImageResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductAuditLogResponse;
 import com.minhnbnt.fashionstore.dto.catalog.ProductResponse;
@@ -32,6 +33,7 @@ import com.minhnbnt.fashionstore.dto.review.RatingSummary;
 import com.minhnbnt.fashionstore.features.catalog.repository.CategoryRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductAdminQueryRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductAuditLogRepository;
+import com.minhnbnt.fashionstore.features.catalog.repository.ProductGarmentRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductImageRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductModerationHistoryRepository;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductReportRepository;
@@ -48,6 +50,7 @@ import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.infrastructure.media.VideoMetadataService;
 import com.minhnbnt.fashionstore.model.Product;
 import com.minhnbnt.fashionstore.model.ProductAuditLog;
+import com.minhnbnt.fashionstore.model.ProductGarment;
 import com.minhnbnt.fashionstore.model.ProductImage;
 import com.minhnbnt.fashionstore.model.ProductModerationHistory;
 import com.minhnbnt.fashionstore.model.ProductStatus;
@@ -99,6 +102,8 @@ public class CatalogService {
 
     private final ProductImageRepository images;
 
+    private final ProductGarmentRepository garments;
+
     private final CategoryRepository categories;
 
     private final ProductSearchRepository search;
@@ -149,13 +154,21 @@ public class CatalogService {
 
         requireCategoryExists(request.categoryId());
 
+        var effectiveGarmentIds = resolveGarmentUploadIds(request.garmentUploadIds(), request.garmentUploadId());
         if (Boolean.TRUE.equals(request.tryOnEnabled())) {
-            if (request.garmentUploadId() == null) {
+            if (effectiveGarmentIds.isEmpty()) {
                 throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Garment image is required when virtual try-on is enabled"
                 );
             }
+        }
+        for (var garmentId : effectiveGarmentIds) {
+            requireImageUpload(garmentId);
+        }
+        UUID primaryGarmentUploadId = null;
+        if (!effectiveGarmentIds.isEmpty()) {
+            primaryGarmentUploadId = effectiveGarmentIds.getFirst();
         }
 
         if (request.weightGrams() != null && request.weightGrams() <= 0) {
@@ -218,7 +231,7 @@ public class CatalogService {
             Objects.requireNonNullElse(request.description(), ""),
             initialStatus,
             request.videoUploadId(),
-            request.garmentUploadId(),
+            primaryGarmentUploadId,
             Boolean.TRUE.equals(request.tryOnEnabled()),
             request.material(),
             request.origin(),
@@ -289,6 +302,14 @@ public class CatalogService {
             images.saveAll(variantImages);
         }
 
+        if (!effectiveGarmentIds.isEmpty()) {
+            var garmentEntities = new ArrayList<ProductGarment>();
+            for (int i = 0; i < effectiveGarmentIds.size(); i++) {
+                garmentEntities.add(ProductGarment.create(product.getId(), effectiveGarmentIds.get(i), i));
+            }
+            garments.saveAll(garmentEntities);
+        }
+
         keywordScanner.scan(product.getId(), product.getName(), product.getDescription());
 
         var totalStock = 0;
@@ -352,11 +373,19 @@ public class CatalogService {
         if (request.tryOnEnabled() != null) {
             effectiveTryOn = request.tryOnEnabled();
         }
-        if (effectiveTryOn && request.garmentUploadId() == null) {
+        var effectiveGarmentIds = resolveGarmentUploadIds(request.garmentUploadIds(), request.garmentUploadId());
+        UUID primaryGarmentUploadId = null;
+        if (!effectiveGarmentIds.isEmpty()) {
+            primaryGarmentUploadId = effectiveGarmentIds.getFirst();
+        }
+        if (effectiveTryOn && primaryGarmentUploadId == null) {
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
                 "Garment image is required when virtual try-on is enabled"
             );
+        }
+        for (var garmentId : effectiveGarmentIds) {
+            requireImageUpload(garmentId);
         }
 
         var changes = new ArrayList<String>();
@@ -399,14 +428,14 @@ public class CatalogService {
             oldValues.put("videoUploadId", product.getVideoUploadId());
             newValues.put("videoUploadId", request.videoUploadId());
         }
-        if (!Objects.equals(request.garmentUploadId(), product.getGarmentUploadId())) {
-            if (request.garmentUploadId() == null) {
+        if (!Objects.equals(primaryGarmentUploadId, product.getGarmentUploadId())) {
+            if (primaryGarmentUploadId == null) {
                 changes.add("Xoá ảnh garment thử đồ ảo");
             } else {
                 changes.add("Cập nhật ảnh garment thử đồ ảo");
             }
             oldValues.put("garmentUploadId", product.getGarmentUploadId());
-            newValues.put("garmentUploadId", request.garmentUploadId());
+            newValues.put("garmentUploadId", primaryGarmentUploadId);
         }
         if (request.tryOnEnabled() != null && request.tryOnEnabled() != product.isTryOnEnabled()) {
             if (request.tryOnEnabled()) {
@@ -484,7 +513,7 @@ public class CatalogService {
             request.description(),
             request.categoryId(),
             request.videoUploadId(),
-            request.garmentUploadId(),
+            primaryGarmentUploadId,
             request.tryOnEnabled(),
             request.material(),
             request.origin(),
@@ -495,6 +524,15 @@ public class CatalogService {
             request.widthCm(),
             request.heightCm()
         );
+
+        garments.deleteByProductId(product.getId());
+        if (!effectiveGarmentIds.isEmpty()) {
+            var garmentEntities = new ArrayList<ProductGarment>();
+            for (int i = 0; i < effectiveGarmentIds.size(); i++) {
+                garmentEntities.add(ProductGarment.create(product.getId(), effectiveGarmentIds.get(i), i));
+            }
+            garments.saveAll(garmentEntities);
+        }
 
         if (request.status() != null) {
             applyStatus(product, request.status());
@@ -675,6 +713,11 @@ public class CatalogService {
             imagesByProduct.computeIfAbsent(image.getProductId(), k -> new ArrayList<>()).add(image);
         }
 
+        var garmentsByProduct = new HashMap<UUID, List<ProductGarment>>();
+        for (var garment : garments.findByProductIdInOrderBySortOrderAsc(visibleProducts.keySet())) {
+            garmentsByProduct.computeIfAbsent(garment.getProductId(), k -> new ArrayList<>()).add(garment);
+        }
+
         var ratings = reviews.ratingSummaries(visibleProducts.keySet());
 
         var imageIds = new HashSet<UUID>();
@@ -691,6 +734,11 @@ public class CatalogService {
                 imageIds.add(img.getUploadId());
             }
         }
+        for (var garmentList : garmentsByProduct.values()) {
+            for (var g : garmentList) {
+                imageIds.add(g.getUploadId());
+            }
+        }
         var urls = publicUrlsByUploadId(imageIds);
 
         var responses = new ArrayList<ProductResponse>();
@@ -698,6 +746,9 @@ public class CatalogService {
             var id = entry.getKey();
             var summary = ratings.getOrDefault(id, new RatingSummary(0, null));
             var product = entry.getValue();
+            var productGarments = garmentsByProduct.getOrDefault(id, List.of()).stream()
+                .map(g -> CatalogMapper.toGarmentImageResponse(g, urls.get(g.getUploadId())))
+                .toList();
             responses.add(CatalogMapper.toResponse(
                 product,
                 variantsByProduct.getOrDefault(id, List.of()).stream()
@@ -709,7 +760,8 @@ public class CatalogService {
                 summary.averageRating(),
                 summary.reviewCount(),
                 urls.get(product.getVideoUploadId()),
-                urls.get(product.getGarmentUploadId())
+                urls.get(product.getGarmentUploadId()),
+                productGarments
             ));
         }
         return responses;
@@ -1254,6 +1306,25 @@ public class CatalogService {
         }
     }
 
+    private static List<UUID> resolveGarmentUploadIds(
+        @Nullable List<UUID> garmentUploadIds,
+        @Nullable UUID singleGarmentUploadId
+    ) {
+        var result = new ArrayList<UUID>();
+        if (garmentUploadIds != null && !garmentUploadIds.isEmpty()) {
+            for (var id : garmentUploadIds) {
+                if (id != null) {
+                    result.add(id);
+                }
+            }
+            return result;
+        }
+        if (singleGarmentUploadId != null) {
+            result.add(singleGarmentUploadId);
+        }
+        return result;
+    }
+
     private ProductResponse toResponse(Product product) {
 
         var variantResponses = variants.findByProductIdOrderByCreatedAtAsc(product.getId()).stream()
@@ -1266,6 +1337,12 @@ public class CatalogService {
             .map(img -> CatalogMapper.toImageResponse(img, urls.get(img.getUploadId())))
             .toList();
 
+        var garmentList = garments.findByProductIdOrderBySortOrderAsc(product.getId());
+        var garmentUrls = publicUrlsByUploadId(garmentList.stream().map(ProductGarment::getUploadId).toList());
+        var garmentResponses = garmentList.stream()
+            .map(g -> CatalogMapper.toGarmentImageResponse(g, garmentUrls.get(g.getUploadId())))
+            .toList();
+
         var summary = reviews.ratingSummary(product.getId());
 
         return CatalogMapper.toResponse(
@@ -1275,7 +1352,8 @@ public class CatalogService {
             summary.averageRating(),
             summary.reviewCount(),
             mediaUrlOf(product.getVideoUploadId()),
-            mediaUrlOf(product.getGarmentUploadId())
+            mediaUrlOf(product.getGarmentUploadId()),
+            garmentResponses
         );
     }
 
