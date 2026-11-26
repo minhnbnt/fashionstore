@@ -5,7 +5,9 @@ import com.minhnbnt.fashionstore.dto.order.BuyerOrderTimelineResponse;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
 import com.minhnbnt.fashionstore.dto.order.OrderTrackingEventResponse;
+import com.minhnbnt.fashionstore.dto.payment.VietQrSessionResponse;
 import com.minhnbnt.fashionstore.features.order.OrderService;
+import com.minhnbnt.fashionstore.features.payment.PaymentFlowService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -14,6 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -37,6 +40,8 @@ import java.util.UUID;
 public class OrderController {
 
     private final OrderService orders;
+
+    private final ObjectProvider<PaymentFlowService> paymentFlow;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -160,5 +165,30 @@ public class OrderController {
         var buyerId = UUID.fromString(subject);
 
         return orders.getBuyerTracking(buyerId, id);
+    }
+
+    @PostMapping("/{id}/payments/vietqr")
+    @Operation(
+        operationId = "retryVietQrPayment",
+        summary = "Thanh toán lại đơn hàng qua VietQR",
+        description = "Trả về phiên VietQR đang chờ hoặc tạo phiên VietQR mới cho đơn hàng AWAITING_PAYMENT còn thời hạn."
+    )
+    @ApiResponse(responseCode = "200", description = "Thông tin phiên thanh toán VietQR")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "404", description = "Đơn không tồn tại hoặc không phải của bạn")
+    @ApiResponse(responseCode = "409", description = "Đơn không ở trạng thái chờ thanh toán hoặc đã hết thời hạn")
+    @SecurityRequirement(name = "bearerAuth")
+    public VietQrSessionResponse retryVietQrPayment(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id đơn") @PathVariable UUID id
+    ) {
+        var subject = Objects.requireNonNull(jwt.getSubject());
+        var buyerId = UUID.fromString(subject);
+
+        var flow = paymentFlow.getIfAvailable();
+        if (flow != null) {
+            return flow.retryForOrder(buyerId, id);
+        }
+        return orders.retryVietQrPayment(buyerId, id);
     }
 }

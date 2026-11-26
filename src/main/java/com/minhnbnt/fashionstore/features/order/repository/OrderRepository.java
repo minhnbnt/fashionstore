@@ -27,6 +27,16 @@ public interface OrderRepository extends CrudRepository<Order, UUID> {
 
     List<Order> findByStatusAndCreatedAtBefore(OrderStatus status, Instant cutoff);
 
+    @Query("""
+        SELECT *
+        FROM orders
+        WHERE status = 'AWAITING_PAYMENT'
+          AND payment_expires_at IS NOT NULL
+          AND payment_expires_at <= :now
+        ORDER BY payment_expires_at ASC, id ASC
+        """)
+    List<Order> findExpiredAwaitingPaymentOrders(Instant now);
+
     /**
      * SELECT ... FOR UPDATE: shop chuyển trạng thái và admin hủy can thiệp đi qua đây để không ghi đè nhau.
      */

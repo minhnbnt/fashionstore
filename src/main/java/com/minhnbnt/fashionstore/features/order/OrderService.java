@@ -19,6 +19,7 @@ import com.minhnbnt.fashionstore.dto.order.OrderItemResponse;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
 import com.minhnbnt.fashionstore.dto.order.OrderTrackingEventResponse;
 import com.minhnbnt.fashionstore.dto.order.ShipOrderRequest;
+import com.minhnbnt.fashionstore.dto.payment.VietQrSessionResponse;
 import com.minhnbnt.fashionstore.features.catalog.ProductStockService;
 import com.minhnbnt.fashionstore.features.order.repository.OrderAdminQueryRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
@@ -43,6 +44,7 @@ import com.minhnbnt.fashionstore.model.OrderStatusHistory;
 import com.minhnbnt.fashionstore.model.OrderTrackingEvent;
 import com.minhnbnt.fashionstore.model.OrderTrackingStatus;
 import com.minhnbnt.fashionstore.model.PaymentMethod;
+import com.minhnbnt.fashionstore.model.PaymentStatus;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.model.ReturnStatus;
 import com.minhnbnt.fashionstore.model.ShopPermission;
@@ -124,6 +126,18 @@ public class OrderService {
     private long pendingTimeoutHours;
 
     public record VietQrDraftOrder(Order order, OrderResponse response) {
+    }
+
+    public record VietQrOrderPaymentOutcome(
+        UUID orderId,
+        UUID shopId,
+        String orderCode,
+        long subtotal,
+        long total,
+        boolean activated,
+        boolean refundRequired,
+        @Nullable String refundReason
+    ) {
     }
 
     public Instant nextPaymentExpiresAt() {
@@ -367,6 +381,7 @@ public class OrderService {
         @Nullable BuyerCancelOrderRequest request
     ) {
         var order = requireLockedBuyerOrder(buyerId, orderId);
+        var fromStatus = order.getStatus();
         String notificationBody;
         if (request != null) {
             var reason = BuyerCancelReason.parse(request.reason());
@@ -384,7 +399,7 @@ public class OrderService {
             }
             histories.save(OrderStatusHistory.record(
                 order.getId(),
-                OrderStatus.PENDING,
+                fromStatus,
                 OrderStatus.CANCELLED,
                 buyerId,
                 historyNote
@@ -394,26 +409,196 @@ public class OrderService {
             order.cancel();
             histories.save(OrderStatusHistory.record(
                 order.getId(),
-                OrderStatus.PENDING,
+                fromStatus,
                 OrderStatus.CANCELLED,
                 buyerId
             ));
             notificationBody = "Khách hàng đã hủy đơn #" + order.getCode() + ".";
         }
 
-        notifications.create(
-            shops.findActiveUserIdsByShop(order.getShopId()),
-            NotificationCategory.SELLING,
-            "ORDER_CANCELLED",
-            "Đơn #" + order.getCode() + " đã bị hủy",
-            notificationBody,
-            "/shop?shopId=" + order.getShopId() + "&tab=orders&orderId=" + order.getId(),
-            order.getId()
-        );
+        paymentTransactions.expirePendingSessionsForOrder(order.getId(), clock.instant());
+
+        if (fromStatus != OrderStatus.AWAITING_PAYMENT) {
+            notifications.create(
+                shops.findActiveUserIdsByShop(order.getShopId()),
+                NotificationCategory.SELLING,
+                "ORDER_CANCELLED",
+                "Đơn #" + order.getCode() + " đã bị hủy",
+                notificationBody,
+                "/shop?shopId=" + order.getShopId() + "&tab=orders&orderId=" + order.getId(),
+                order.getId()
+            );
+        }
 
         var orderItems = items.findByOrderId(order.getId());
         restockOrderItems(order, orderItems);
         return toResponse(orders.save(order), orderItems);
+    }
+
+    @Transactional
+    public VietQrOrderPaymentOutcome applyVietQrPaymentSuccess(@NonNull UUID orderId, @NonNull String txnRef) {
+        var order = requireOrder(orderId);
+        var now = clock.instant();
+
+        if (order.getStatus() == OrderStatus.AWAITING_PAYMENT) {
+            order.markPaid(now);
+            var saved = orders.save(order);
+            histories.save(OrderStatusHistory.record(
+                saved.getId(),
+                OrderStatus.AWAITING_PAYMENT,
+                OrderStatus.PENDING,
+                saved.getBuyerId(),
+                "Đã thanh toán qua VietQR (" + txnRef + ")"
+            ));
+            revenue.createSettlementForOrder(saved.getShopId(), saved.getId(), saved.getSubtotal());
+
+            notifications.create(
+                shops.findActiveUserIdsByShop(saved.getShopId()),
+                NotificationCategory.SELLING,
+                "ORDER_PLACED",
+                "Có đơn hàng mới #" + saved.getCode(),
+                "Khách hàng vừa đặt đơn #" + saved.getCode() + " tại shop của bạn.",
+                "/shop?shopId=" + saved.getShopId() + "&tab=orders&orderId=" + saved.getId(),
+                saved.getId()
+            );
+
+            notifications.create(
+                Set.of(saved.getBuyerId()),
+                NotificationCategory.ORDER,
+                "PAYMENT_SUCCESS",
+                "Thanh toán đơn #" + saved.getCode() + " thành công",
+                "Đơn hàng #" + saved.getCode() + " đã được xác nhận thanh toán qua VietQR.",
+                "/account/orders/" + saved.getId(),
+                saved.getId()
+            );
+
+            return new VietQrOrderPaymentOutcome(
+                saved.getId(),
+                saved.getShopId(),
+                saved.getCode(),
+                saved.getSubtotal(),
+                saved.getTotal(),
+                true,
+                false,
+                null
+            );
+        }
+
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            order.markRefundPending();
+            var saved = orders.save(order);
+            var reason = "Thanh toán đến muộn sau khi đơn #" + saved.getCode() + " đã hủy";
+            histories.save(OrderStatusHistory.record(
+                saved.getId(),
+                OrderStatus.CANCELLED,
+                OrderStatus.CANCELLED,
+                null,
+                reason + " (" + txnRef + ")"
+            ));
+            return new VietQrOrderPaymentOutcome(
+                saved.getId(),
+                saved.getShopId(),
+                saved.getCode(),
+                saved.getSubtotal(),
+                saved.getTotal(),
+                false,
+                true,
+                reason
+            );
+        }
+
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            var reason = "Thanh toán trùng lặp cho đơn #" + order.getCode();
+            return new VietQrOrderPaymentOutcome(
+                order.getId(),
+                order.getShopId(),
+                order.getCode(),
+                order.getSubtotal(),
+                order.getTotal(),
+                false,
+                true,
+                reason
+            );
+        }
+
+        return new VietQrOrderPaymentOutcome(
+            order.getId(),
+            order.getShopId(),
+            order.getCode(),
+            order.getSubtotal(),
+            order.getTotal(),
+            false,
+            false,
+            null
+        );
+    }
+
+    @Transactional(noRollbackFor = ResponseStatusException.class)
+    public Order requireValidOrderForVietQrRetry(@NonNull UUID buyerId, @NonNull UUID orderId) {
+        var order = requireLockedBuyerOrder(buyerId, orderId);
+        if (order.getStatus() != OrderStatus.AWAITING_PAYMENT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Order is not awaiting payment");
+        }
+        var now = clock.instant();
+        var expiresAt = order.getPaymentExpiresAt();
+        if (expiresAt != null && !expiresAt.isAfter(now)) {
+            systemExpireAwaitingPaymentOrder(order.getId());
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment time has expired");
+        }
+        return order;
+    }
+
+    @Transactional(noRollbackFor = ResponseStatusException.class)
+    public VietQrSessionResponse retryVietQrPayment(@NonNull UUID buyerId, @NonNull UUID orderId) {
+        var order = requireValidOrderForVietQrRetry(buyerId, orderId);
+        var now = clock.instant();
+        var existingPending = paymentTransactions.findPendingSessionForOrder(order.getId(), now);
+        if (existingPending.isPresent()) {
+            return paymentTransactions.toSessionResponse(existingPending.get());
+        }
+        var expiresAt = order.getPaymentExpiresAt();
+        if (expiresAt == null) {
+            expiresAt = nextPaymentExpiresAt();
+        }
+        var created = paymentTransactions.createSession(buyerId, List.of(order), expiresAt);
+        return paymentTransactions.toSessionResponse(created);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Order> findExpiredAwaitingPaymentOrders() {
+        return orders.findExpiredAwaitingPaymentOrders(clock.instant());
+    }
+
+    @Transactional
+    public boolean systemExpireAwaitingPaymentOrder(@NonNull UUID orderId) {
+        var order = requireOrder(orderId);
+        if (order.getStatus() != OrderStatus.AWAITING_PAYMENT) {
+            return false;
+        }
+        var now = clock.instant();
+        order.expirePayment(now);
+        var orderItems = items.findByOrderId(order.getId());
+        restockOrderItems(order, orderItems);
+        var saved = orders.save(order);
+        histories.save(OrderStatusHistory.record(
+            saved.getId(),
+            OrderStatus.AWAITING_PAYMENT,
+            OrderStatus.CANCELLED,
+            null,
+            "Hết thời hạn thanh toán"
+        ));
+        paymentTransactions.expirePendingSessionsForOrder(saved.getId(), now);
+
+        notifications.create(
+            Set.of(saved.getBuyerId()),
+            NotificationCategory.ORDER,
+            "ORDER_CANCELLED",
+            "Đơn #" + saved.getCode() + " đã hết hạn thanh toán",
+            "Đơn #" + saved.getCode() + " đã tự động hủy do quá thời hạn thanh toán VietQR.",
+            "/account/orders/" + saved.getId(),
+            saved.getId()
+        );
+        return true;
     }
 
     @Transactional

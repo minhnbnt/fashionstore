@@ -285,8 +285,11 @@ public class Order implements Persistable<UUID> {
     }
 
     public void cancel(@Nullable String reason, @Nullable String note) {
-        if (status != OrderStatus.PENDING) {
+        if (status != OrderStatus.PENDING && status != OrderStatus.AWAITING_PAYMENT) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending orders can be cancelled");
+        }
+        if (status == OrderStatus.AWAITING_PAYMENT) {
+            paymentStatus = PaymentStatus.FAILED;
         }
         status = OrderStatus.CANCELLED;
         cancelReason = reason;

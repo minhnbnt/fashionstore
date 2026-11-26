@@ -88,6 +88,21 @@ public class PaymentTransactionService {
     }
 
     @Transactional(readOnly = true)
+    public Optional<PaymentTransaction> findByTxnRef(String txnRef) {
+        return transactions.findByTxnRef(txnRef);
+    }
+
+    @Transactional
+    public Optional<PaymentTransaction> findLockedByTxnRef(String txnRef) {
+        return transactions.findLockedByTxnRef(txnRef);
+    }
+
+    @Transactional
+    public PaymentTransaction save(PaymentTransaction tx) {
+        return transactions.save(tx);
+    }
+
+    @Transactional(readOnly = true)
     public Optional<PaymentTransaction> findPendingSessionForOrder(UUID orderId, Instant now) {
         var list = transactions.findTransactionsByOrderId(orderId);
         for (var tx : list) {
