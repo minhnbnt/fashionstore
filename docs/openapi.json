@@ -9,44 +9,23 @@
     "description" : "Generated server url"
   } ],
   "tags" : [ {
-    "name" : "Products",
-    "description" : "Xem hàng public"
-  }, {
     "name" : "Notifications",
     "description" : "Thông báo trong website cho người dùng"
-  }, {
-    "name" : "Admin - Pages",
-    "description" : "Quản lý trang tĩnh (giới thiệu, chính sách...): soạn Markdown, nháp/xuất bản. Cần role admin."
   }, {
     "name" : "Uploads",
     "description" : "Xin URL upload ảnh/video trực tiếp lên S3"
   }, {
-    "name" : "Admin - Banned Keywords",
-    "description" : "Từ khóa cấm để hệ thống tự gắn cờ sản phẩm. Cần role admin."
-  }, {
     "name" : "Seller - Staff & Roles",
     "description" : "Xác nhận và chấp nhận lời mời tham gia quản lý shop"
   }, {
-    "name" : "Seller Orders",
-    "description" : "Seller xử lý đơn của shop mình"
-  }, {
-    "name" : "Addresses",
-    "description" : "So dia chi giao hang cua buyer"
-  }, {
-    "name" : "Search",
-    "description" : "Tìm hàng bằng BM25 + lọc theo danh mục, biến thể, giá"
+    "name" : "Payments - VietQR",
+    "description" : "Tra cứu phiên thanh toán VietQR và giả lập chuyển khoản Sandbox."
   }, {
     "name" : "Seller - Statistics",
     "description" : "Thống kê và Báo cáo dành cho Shop"
   }, {
-    "name" : "Search",
-    "description" : "Tìm hàng giống ảnh query bằng vector Fashion-CLIP"
-  }, {
     "name" : "Categories",
     "description" : "Danh mục public, admin seed tay bằng SQL"
-  }, {
-    "name" : "Admin - Settings",
-    "description" : "Cấu hình chung của sàn và lịch sử thay đổi cấu hình. Cần role admin."
   }, {
     "name" : "Shop - Products",
     "description" : "Seller quản lý hàng của shop mình"
@@ -54,14 +33,8 @@
     "name" : "Seller - Products & Inventory",
     "description" : "Seller quản lý danh sách sản phẩm, tồn kho và xuất nhập dữ liệu"
   }, {
-    "name" : "Shops - Catalog",
-    "description" : "Xem sản phẩm và danh mục công khai của shop (kèm tìm kiếm nội bộ)"
-  }, {
     "name" : "Seller - Reviews",
     "description" : "Seller quản lý đánh giá của khách và phản hồi"
-  }, {
-    "name" : "Locations",
-    "description" : "Danh mục tỉnh/thành và xã/phường sau sáp nhập 2025. Công khai, không cần đăng nhập."
   }, {
     "name" : "Seller - Staff & Roles",
     "description" : "Quản lý nhân viên gian hàng, phân quyền và lịch sử thao tác"
@@ -72,23 +45,71 @@
     "name" : "Admin - Orders",
     "description" : "Giám sát đơn hàng toàn sàn, cảnh báo SLA, hủy can thiệp. Cần role admin."
   }, {
-    "name" : "Admin - Products",
-    "description" : "Kiểm duyệt sản phẩm toàn sàn, gỡ sản phẩm vi phạm. Cần role admin."
-  }, {
-    "name" : "Admin - FAQ",
-    "description" : "Quản lý câu hỏi thường gặp theo nhóm. Cần role admin."
+    "name" : "Public - Payments",
+    "description" : "Danh sách phương thức thanh toán khả dụng và webhook nhận biến động số dư VietQR."
   }, {
     "name" : "Orders",
     "description" : "Buyer checkout COD va theo doi don"
-  }, {
-    "name" : "Reviews",
-    "description" : "Danh gia cua buyer da nhan hang"
   }, {
     "name" : "Buyer - Returns",
     "description" : "Buyer yêu cầu đổi / trả hàng"
   }, {
     "name" : "Seller - Decoration",
     "description" : "Trình thiết kế và trang trí giao diện gian hàng (kéo-thả)"
+  }, {
+    "name" : "Admin - Users",
+    "description" : "Quản lý tài khoản khách hàng/seller. Cần role admin."
+  }, {
+    "name" : "Site content",
+    "description" : "Banner, popup, trang tĩnh, FAQ cho storefront. Không cần đăng nhập."
+  }, {
+    "name" : "Admin - Banners",
+    "description" : "Quản lý banner trang chủ theo vị trí + lịch chạy. Cần role admin."
+  }, {
+    "name" : "Admin - Shops",
+    "description" : "Duyệt shop mới và kiểm duyệt shop đang hoạt động. Cần role admin."
+  }, {
+    "name" : "Products",
+    "description" : "Xem hàng public"
+  }, {
+    "name" : "Admin - Pages",
+    "description" : "Quản lý trang tĩnh (giới thiệu, chính sách...): soạn Markdown, nháp/xuất bản. Cần role admin."
+  }, {
+    "name" : "Admin - Banned Keywords",
+    "description" : "Từ khóa cấm để hệ thống tự gắn cờ sản phẩm. Cần role admin."
+  }, {
+    "name" : "Seller Orders",
+    "description" : "Seller xử lý đơn của shop mình"
+  }, {
+    "name" : "Addresses",
+    "description" : "So dia chi giao hang cua buyer"
+  }, {
+    "name" : "Search",
+    "description" : "Tìm hàng bằng BM25 + lọc theo danh mục, biến thể, giá"
+  }, {
+    "name" : "Search",
+    "description" : "Tìm hàng giống ảnh query bằng vector Fashion-CLIP"
+  }, {
+    "name" : "Admin - Settings",
+    "description" : "Cấu hình chung của sàn và lịch sử thay đổi cấu hình. Cần role admin."
+  }, {
+    "name" : "Shops - Catalog",
+    "description" : "Xem sản phẩm và danh mục công khai của shop (kèm tìm kiếm nội bộ)"
+  }, {
+    "name" : "Admin - Payments",
+    "description" : "Quản trị cấu hình cổng thanh toán (COD, VietQR), đối soát hoàn tiền và duyệt rút tiền của Shop."
+  }, {
+    "name" : "Locations",
+    "description" : "Danh mục tỉnh/thành và xã/phường sau sáp nhập 2025. Công khai, không cần đăng nhập."
+  }, {
+    "name" : "Admin - Products",
+    "description" : "Kiểm duyệt sản phẩm toàn sàn, gỡ sản phẩm vi phạm. Cần role admin."
+  }, {
+    "name" : "Admin - FAQ",
+    "description" : "Quản lý câu hỏi thường gặp theo nhóm. Cần role admin."
+  }, {
+    "name" : "Reviews",
+    "description" : "Danh gia cua buyer da nhan hang"
   }, {
     "name" : "Seller - Q&A",
     "description" : "Shop quản lý và trả lời câu hỏi sản phẩm"
@@ -102,14 +123,8 @@
     "name" : "Cart",
     "description" : "Gio hang buyer va checkout nhieu shop mot lan"
   }, {
-    "name" : "Admin - Users",
-    "description" : "Quản lý tài khoản khách hàng/seller. Cần role admin."
-  }, {
     "name" : "Chat",
     "description" : "Tin nhắn trực tiếp giữa khách hàng và shop"
-  }, {
-    "name" : "Site content",
-    "description" : "Banner, popup, trang tĩnh, FAQ cho storefront. Không cần đăng nhập."
   }, {
     "name" : "Shops - Decoration",
     "description" : "Xem bố cục trang trí gian hàng public"
@@ -129,9 +144,6 @@
     "name" : "Seller - Returns",
     "description" : "Seller xử lý yêu cầu đổi trả của khách"
   }, {
-    "name" : "Admin - Banners",
-    "description" : "Quản lý banner trang chủ theo vị trí + lịch chạy. Cần role admin."
-  }, {
     "name" : "AI Chat",
     "description" : "Quản lý lịch sử và tin nhắn với trợ lý AI"
   }, {
@@ -146,9 +158,6 @@
   }, {
     "name" : "Seller - Revenue & Finance",
     "description" : "Quản lý doanh thu, giải ngân và rút tiền"
-  }, {
-    "name" : "Admin - Shops",
-    "description" : "Duyệt shop mới và kiểm duyệt shop đang hoạt động. Cần role admin."
   } ],
   "paths" : {
     "/api/users/me/avatar" : {
@@ -218,8 +227,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -228,8 +237,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -273,16 +282,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -293,8 +292,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -305,6 +304,16 @@
           },
           "404" : {
             "description" : "Resource not found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -465,8 +474,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -475,8 +484,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -558,8 +567,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -568,8 +577,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -675,8 +684,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -685,8 +694,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -986,8 +995,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -996,8 +1005,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -1385,8 +1394,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -1395,8 +1404,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -1587,8 +1596,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -1597,8 +1606,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -2601,8 +2610,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -2611,8 +2620,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -2894,6 +2903,16 @@
               }
             }
           },
+          "400" : {
+            "description" : "Invalid request data",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
           "409" : {
             "description" : "Data or state conflict",
             "content" : {
@@ -2903,9 +2922,113 @@
                 }
               }
             }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/admin/payment-gateways/{code}" : {
+      "put" : {
+        "tags" : [ "Admin - Payments" ],
+        "summary" : "Cập nhật cấu hình cổng thanh toán",
+        "description" : "Bật/tắt cổng COD hoặc VIETQR, cập nhật tài khoản ngân hàng nhận tiền của sàn, khóa bí mật Webhook và chế độ Demo Sandbox. Không cho phép tắt cổng cuối cùng đang bật.",
+        "operationId" : "updatePaymentGateway",
+        "parameters" : [ {
+          "name" : "code",
+          "in" : "path",
+          "description" : "Mã cổng thanh toán (COD hoặc VIETQR)",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "COD", "VIETQR" ]
+          },
+          "example" : "VIETQR"
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdatePaymentGatewayRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Cấu hình cổng thanh toán sau cập nhật",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PaymentGatewayResponse"
+                }
+              }
+            }
           },
           "400" : {
-            "description" : "Invalid request data",
+            "description" : "Mã BIN ngân hàng không hợp lệ hoặc dữ liệu sai định dạng",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PaymentGatewayResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Thiếu hoặc sai JWT",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PaymentGatewayResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Không phải admin",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PaymentGatewayResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Tắt cổng cuối cùng hoặc bật VIETQR khi thiếu cấu hình ngân hàng",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PaymentGatewayResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -2992,8 +3115,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -3002,8 +3125,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -3388,8 +3511,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -3398,8 +3521,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -3575,8 +3698,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -3585,8 +3708,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -3762,8 +3885,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -3772,8 +3895,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -3845,8 +3968,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -3855,8 +3978,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -3948,8 +4071,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -3958,8 +4081,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -4012,16 +4135,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -4032,8 +4145,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -4044,6 +4157,16 @@
           },
           "404" : {
             "description" : "Resource not found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -4123,8 +4246,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -4133,8 +4256,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -4216,8 +4339,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -4226,8 +4349,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -4314,8 +4437,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -4324,8 +4447,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -4467,8 +4590,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -4477,8 +4600,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -4886,8 +5009,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -4896,8 +5019,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -4960,8 +5083,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -4970,8 +5093,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -5062,8 +5185,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -5072,8 +5195,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -5260,8 +5383,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -5270,8 +5393,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -5695,8 +5818,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -5705,8 +5828,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -5904,8 +6027,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -5914,8 +6037,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -6119,8 +6242,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -6129,8 +6252,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -6468,8 +6591,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -6478,8 +6601,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -6677,8 +6800,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -6687,8 +6810,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -6760,8 +6883,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -6770,8 +6893,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -6896,8 +7019,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -6916,8 +7039,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -7027,6 +7150,100 @@
         } ]
       }
     },
+    "/api/public/payments/vietqr/webhook" : {
+      "post" : {
+        "tags" : [ "Public - Payments" ],
+        "summary" : "Webhook nhận biến động số dư VietQR",
+        "description" : "Xác thực khóa bí mật ở header Authorization (Apikey hoặc Bearer) và đối soát giao dịch chuyển khoản.",
+        "operationId" : "vietQrWebhook",
+        "parameters" : [ {
+          "name" : "Authorization",
+          "in" : "header",
+          "description" : "Header xác thực Webhook (Apikey <secret> hoặc Bearer <secret>)",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/VietQrWebhookRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Kết quả xử lý webhook",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VietQrWebhookResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Thiếu hoặc sai khóa bí mật Webhook",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VietQrWebhookResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid request data",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Data or state conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/public/banks/lookup-account" : {
       "post" : {
         "tags" : [ "Banks" ],
@@ -7079,8 +7296,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -7099,8 +7316,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -7216,8 +7433,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -7226,8 +7443,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -7425,16 +7642,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -7445,8 +7652,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -7457,6 +7664,16 @@
           },
           "403" : {
             "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -7814,6 +8031,118 @@
         } ]
       }
     },
+    "/api/payments/vietqr/{txnRef}/simulate" : {
+      "post" : {
+        "tags" : [ "Payments - VietQR" ],
+        "summary" : "Giả lập chuyển khoản VietQR (Sandbox)",
+        "description" : "Chỉ hoạt động khi cổng VietQR đang bật chế độ Demo Sandbox. Giả lập ngân hàng báo nhận tiền.",
+        "operationId" : "simulateVietQrTransfer",
+        "parameters" : [ {
+          "name" : "txnRef",
+          "in" : "path",
+          "description" : "Mã tham chiếu giao dịch VietQR",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          },
+          "example" : "DHMQ1234567890"
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SimulateVietQrRequest"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Trạng thái phiên thanh toán sau giả lập",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VietQrSessionResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Số tiền giả lập không hợp lệ",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VietQrSessionResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Thiếu hoặc sai JWT",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VietQrSessionResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Phiên thanh toán không tồn tại",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VietQrSessionResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Chế độ Demo Sandbox đang tắt",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VietQrSessionResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
     "/api/orders" : {
       "post" : {
         "tags" : [ "Orders" ],
@@ -8030,6 +8359,104 @@
         } ]
       }
     },
+    "/api/orders/{id}/payments/vietqr" : {
+      "post" : {
+        "tags" : [ "Orders" ],
+        "summary" : "Thanh toán lại đơn hàng qua VietQR",
+        "description" : "Trả về phiên VietQR đang chờ hoặc tạo phiên VietQR mới cho đơn hàng AWAITING_PAYMENT còn thời hạn.",
+        "operationId" : "retryVietQrPayment",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "description" : "id đơn",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Thông tin phiên thanh toán VietQR",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VietQrSessionResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Thiếu hoặc sai JWT",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VietQrSessionResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Đơn không tồn tại hoặc không phải của bạn",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VietQrSessionResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Đơn không ở trạng thái chờ thanh toán hoặc đã hết thời hạn",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VietQrSessionResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid request data",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
     "/api/invitations/{token}/accept" : {
       "post" : {
         "tags" : [ "Seller - Staff & Roles" ],
@@ -8165,8 +8592,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -8175,8 +8602,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -8285,8 +8712,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -8295,8 +8722,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -8689,8 +9116,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -8699,8 +9126,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -8782,8 +9209,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -8792,8 +9219,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -8846,16 +9273,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -8866,8 +9283,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -8878,6 +9295,16 @@
           },
           "404" : {
             "description" : "Resource not found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -8931,16 +9358,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -8951,8 +9368,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -8963,6 +9380,16 @@
           },
           "404" : {
             "description" : "Resource not found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -9043,8 +9470,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -9053,8 +9480,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -9241,8 +9668,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -9251,8 +9678,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -9429,8 +9856,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -9439,8 +9866,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -9743,8 +10170,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -9753,8 +10180,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -9942,8 +10369,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -9952,8 +10379,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -10130,8 +10557,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -10140,8 +10567,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -10461,8 +10888,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -10471,8 +10898,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -11659,8 +12086,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -11669,8 +12096,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -11757,8 +12184,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -11767,8 +12194,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -12474,8 +12901,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -12484,8 +12911,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -12559,8 +12986,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -12569,8 +12996,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -12624,8 +13051,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -12634,8 +13061,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -12980,8 +13407,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -12990,8 +13417,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -14017,6 +14444,330 @@
         } ]
       }
     },
+    "/api/admin/payments/withdrawals/{id}/reject" : {
+      "patch" : {
+        "tags" : [ "Admin - Payments" ],
+        "summary" : "Từ chối lệnh rút tiền của Shop",
+        "description" : "Chuyển lệnh rút tiền từ REQUESTED sang REJECTED và hoàn trả lại số dư khả dụng cho Shop.",
+        "operationId" : "rejectWithdrawal",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "description" : "ID lệnh rút tiền",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Lệnh rút tiền đã bị từ chối",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdminWithdrawalResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Thiếu hoặc sai JWT",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdminWithdrawalResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Không phải admin",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdminWithdrawalResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Không tìm thấy lệnh rút tiền",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdminWithdrawalResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Lệnh rút tiền không ở trạng thái REQUESTED",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdminWithdrawalResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid request data",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/admin/payments/withdrawals/{id}/approve" : {
+      "patch" : {
+        "tags" : [ "Admin - Payments" ],
+        "summary" : "Duyệt lệnh rút tiền của Shop",
+        "description" : "Chuyển lệnh rút tiền từ REQUESTED sang COMPLETED và ghi lịch sử đối soát.",
+        "operationId" : "approveWithdrawal",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "description" : "ID lệnh rút tiền",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Lệnh rút tiền đã được duyệt",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdminWithdrawalResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Thiếu hoặc sai JWT",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdminWithdrawalResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Không phải admin",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdminWithdrawalResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Không tìm thấy lệnh rút tiền",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdminWithdrawalResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Lệnh rút tiền không ở trạng thái REQUESTED",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdminWithdrawalResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid request data",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/admin/payments/transactions/{id}/refunded" : {
+      "patch" : {
+        "tags" : [ "Admin - Payments" ],
+        "summary" : "Xác nhận đã hoàn tiền cho giao dịch",
+        "description" : "Chuyển trạng thái hoàn tiền của giao dịch từ PENDING sang REFUNDED, đồng thời cập nhật trạng thái thanh toán của các đơn liên quan sang REFUNDED.",
+        "operationId" : "markTransactionRefunded",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "description" : "ID giao dịch thanh toán",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MarkRefundedRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Giao dịch đã được đánh dấu hoàn tiền",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PaymentTransactionResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Ghi chú đối soát không hợp lệ (5-500 ký tự)",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PaymentTransactionResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Thiếu hoặc sai JWT",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PaymentTransactionResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Không phải admin",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PaymentTransactionResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Không tìm thấy giao dịch",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PaymentTransactionResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Giao dịch không ở trạng thái chờ hoàn tiền (PENDING)",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PaymentTransactionResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
     "/api/admin/pages/{id}/unpublish" : {
       "patch" : {
         "tags" : [ "Admin - Pages" ],
@@ -14379,16 +15130,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -14399,8 +15140,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -14411,6 +15152,16 @@
           },
           "404" : {
             "description" : "Resource not found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -14471,8 +15222,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -14481,8 +15232,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -14549,16 +15300,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -14569,8 +15310,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -14581,6 +15322,16 @@
           },
           "403" : {
             "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -14685,8 +15436,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -14695,8 +15446,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -14738,16 +15489,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -14758,8 +15499,18 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "409" : {
+            "description" : "Data or state conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -14778,8 +15529,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -14839,16 +15590,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -14859,8 +15600,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -14871,6 +15612,16 @@
           },
           "403" : {
             "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -14919,16 +15670,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -14939,8 +15680,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -14951,6 +15692,16 @@
           },
           "404" : {
             "description" : "Resource not found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -15058,8 +15809,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -15068,8 +15819,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -15520,8 +16271,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -15530,8 +16281,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -15622,8 +16373,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -15632,8 +16383,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -15968,8 +16719,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -15978,8 +16729,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -16183,8 +16934,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -16193,8 +16944,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -16294,8 +17045,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -16304,8 +17055,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -16387,8 +17138,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -16397,8 +17148,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -16602,8 +17353,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -16612,8 +17363,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -16695,8 +17446,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -16705,8 +17456,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -16797,8 +17548,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -16807,8 +17558,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -16993,8 +17744,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -17003,8 +17754,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -17089,8 +17840,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -17099,8 +17850,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -17182,8 +17933,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -17192,8 +17943,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -17284,8 +18035,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -17294,8 +18045,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -17395,8 +18146,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -17405,8 +18156,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -17488,8 +18239,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -17498,8 +18249,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -17609,8 +18360,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -17619,8 +18370,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -17719,8 +18470,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -17729,8 +18480,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -18074,8 +18825,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -18084,8 +18835,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -18176,8 +18927,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -18186,8 +18937,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -18288,8 +19039,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -18298,8 +19049,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -18381,8 +19132,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -18391,8 +19142,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -18483,8 +19234,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -18493,8 +19244,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -18575,16 +19326,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -18595,8 +19336,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -18607,6 +19348,16 @@
           },
           "404" : {
             "description" : "Resource not found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -18692,8 +19443,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -18702,8 +19453,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -18775,8 +19526,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -18785,8 +19536,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19055,8 +19806,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19065,8 +19816,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19147,8 +19898,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19157,8 +19908,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19267,16 +20018,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -19287,8 +20028,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19299,6 +20040,16 @@
           },
           "404" : {
             "description" : "Resource not found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19397,8 +20148,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19407,8 +20158,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19461,16 +20212,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -19481,8 +20222,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19493,6 +20234,16 @@
           },
           "404" : {
             "description" : "Resource not found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19582,8 +20333,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19592,8 +20343,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19755,8 +20506,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19775,8 +20526,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19824,16 +20575,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -19844,8 +20585,18 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "409" : {
+            "description" : "Data or state conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19864,8 +20615,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19915,16 +20666,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -19935,8 +20676,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19947,6 +20688,16 @@
           },
           "404" : {
             "description" : "Resource not found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -19978,16 +20729,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -19998,8 +20739,18 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "409" : {
+            "description" : "Data or state conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20018,8 +20769,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20051,16 +20802,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -20071,8 +20812,18 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "409" : {
+            "description" : "Data or state conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20091,8 +20842,78 @@
               }
             }
           },
+          "401" : {
+            "description" : "Missing or invalid JWT",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/payment-methods" : {
+      "get" : {
+        "tags" : [ "Public - Payments" ],
+        "summary" : "Danh sách phương thức thanh toán khả dụng",
+        "description" : "Trả về các cổng thanh toán đang bật kèm hạn mức COD và số phút giữ đơn chờ thanh toán.",
+        "operationId" : "listPaymentMethods",
+        "responses" : {
+          "200" : {
+            "description" : "Danh sách phương thức thanh toán",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PaymentMethodsResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid request data",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Data or state conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
           "404" : {
             "description" : "Resource not found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20124,16 +20945,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -20144,8 +20955,18 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "409" : {
+            "description" : "Data or state conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20164,8 +20985,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20219,16 +21040,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -20239,8 +21050,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20251,6 +21062,16 @@
           },
           "403" : {
             "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20282,16 +21103,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -20302,8 +21113,18 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "409" : {
+            "description" : "Data or state conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20322,8 +21143,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20383,16 +21204,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -20403,8 +21214,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20415,6 +21226,16 @@
           },
           "403" : {
             "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20446,16 +21267,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -20466,8 +21277,18 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "409" : {
+            "description" : "Data or state conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20486,8 +21307,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20519,16 +21340,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -20539,8 +21350,18 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "409" : {
+            "description" : "Data or state conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20559,8 +21380,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20631,8 +21452,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20651,8 +21472,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20684,16 +21505,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -20704,8 +21515,18 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "409" : {
+            "description" : "Data or state conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20724,8 +21545,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20779,16 +21600,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -20799,8 +21610,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20811,6 +21622,16 @@
           },
           "403" : {
             "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20863,16 +21684,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -20883,8 +21694,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20895,6 +21706,16 @@
           },
           "403" : {
             "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20969,8 +21790,8 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -20989,8 +21810,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21000,6 +21821,99 @@
             }
           }
         }
+      }
+    },
+    "/api/payments/vietqr/{txnRef}" : {
+      "get" : {
+        "tags" : [ "Payments - VietQR" ],
+        "summary" : "Thông tin phiên thanh toán VietQR",
+        "description" : "Trả về thông tin mã QR, tài khoản ngân hàng nhận tiền, thời hạn và danh sách đơn hàng thuộc phiên.",
+        "operationId" : "getVietQrSession",
+        "parameters" : [ {
+          "name" : "txnRef",
+          "in" : "path",
+          "description" : "Mã tham chiếu giao dịch VietQR",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          },
+          "example" : "DHMQ1234567890"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Thông tin phiên thanh toán VietQR",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VietQrSessionResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Thiếu hoặc sai JWT",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VietQrSessionResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Phiên thanh toán không tồn tại hoặc không thuộc quyền xem",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/VietQrSessionResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Invalid request data",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Data or state conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
       }
     },
     "/api/orders/{id}" : {
@@ -21059,8 +21973,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21069,8 +21983,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21161,8 +22075,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21171,8 +22085,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21263,8 +22177,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21273,8 +22187,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21336,16 +22250,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -21356,8 +22260,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21368,6 +22272,16 @@
           },
           "404" : {
             "description" : "Resource not found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21419,16 +22333,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -21439,8 +22343,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21451,6 +22355,16 @@
           },
           "404" : {
             "description" : "Resource not found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21551,8 +22465,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21561,8 +22475,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21643,8 +22557,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21653,8 +22567,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21725,8 +22639,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21735,8 +22649,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21798,16 +22712,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -21818,8 +22722,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21830,6 +22734,16 @@
           },
           "404" : {
             "description" : "Resource not found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21864,16 +22778,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Invalid request data",
             "content" : {
@@ -21884,8 +22788,18 @@
               }
             }
           },
-          "401" : {
-            "description" : "Missing or invalid JWT",
+          "409" : {
+            "description" : "Data or state conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21904,8 +22818,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "401" : {
+            "description" : "Missing or invalid JWT",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21969,8 +22883,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -21979,8 +22893,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -22044,8 +22958,8 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -22054,8 +22968,8 @@
               }
             }
           },
-          "404" : {
-            "description" : "Resource not found",
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -22282,8 +23196,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -22292,8 +23206,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -22355,8 +23269,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -22365,8 +23279,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -22593,8 +23507,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -22603,8 +23517,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -22839,6 +23753,123 @@
               }
             }
           },
+          "400" : {
+            "description" : "Invalid request data",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Data or state conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/admin/payments/withdrawals" : {
+      "get" : {
+        "tags" : [ "Admin - Payments" ],
+        "summary" : "Danh sách yêu cầu rút tiền của các Shop",
+        "description" : "Phân trang và lọc danh sách lệnh rút tiền của các Shop theo trạng thái.",
+        "operationId" : "listAdminWithdrawals",
+        "parameters" : [ {
+          "name" : "status",
+          "in" : "query",
+          "description" : "Lọc theo trạng thái lệnh rút (REQUESTED, PROCESSING, COMPLETED, REJECTED)",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "description" : "Số trang (bắt đầu từ 0)",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "description" : "Số phần tử mỗi trang",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Trang danh sách lệnh rút tiền của Shop",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseAdminWithdrawalResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Trạng thái lọc không hợp lệ",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseAdminWithdrawalResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Thiếu hoặc sai JWT",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseAdminWithdrawalResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Không phải admin",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseAdminWithdrawalResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
           "409" : {
             "description" : "Data or state conflict",
             "content" : {
@@ -22849,8 +23880,235 @@
               }
             }
           },
+          "404" : {
+            "description" : "Resource not found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/admin/payments/transactions" : {
+      "get" : {
+        "tags" : [ "Admin - Payments" ],
+        "summary" : "Danh sách giao dịch thanh toán VietQR và đối soát hoàn tiền",
+        "description" : "Phân trang, lọc theo trạng thái giao dịch, trạng thái hoàn tiền và tìm kiếm theo mã giao dịch hoặc mã đơn hàng.",
+        "operationId" : "listPaymentTransactions",
+        "parameters" : [ {
+          "name" : "status",
+          "in" : "query",
+          "description" : "Lọc theo trạng thái giao dịch (PENDING, SUCCESS, UNDERPAID, FAILED, EXPIRED)",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "PENDING", "SUCCESS", "UNDERPAID", "FAILED", "EXPIRED" ]
+          }
+        }, {
+          "name" : "refundStatus",
+          "in" : "query",
+          "description" : "Lọc theo trạng thái hoàn tiền (NONE, PENDING, REFUNDED)",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "NONE", "PENDING", "REFUNDED" ]
+          }
+        }, {
+          "name" : "q",
+          "in" : "query",
+          "description" : "Tìm theo mã giao dịch (txnRef), mã ngân hàng hoặc mã đơn hàng",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "description" : "Số trang (bắt đầu từ 0)",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "description" : "Số phần tử mỗi trang",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Trang danh sách giao dịch thanh toán",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponsePaymentTransactionResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Tham số lọc không hợp lệ",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponsePaymentTransactionResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Thiếu hoặc sai JWT",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponsePaymentTransactionResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Không phải admin",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponsePaymentTransactionResponse"
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Data or state conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/admin/payment-gateways" : {
+      "get" : {
+        "tags" : [ "Admin - Payments" ],
+        "summary" : "Danh sách cấu hình cổng thanh toán",
+        "description" : "Trả về cấu hình hiện hành của COD và VIETQR. Trường webhookSecret chỉ báo đã đặt hay chưa.",
+        "operationId" : "listPaymentGateways",
+        "responses" : {
+          "200" : {
+            "description" : "Danh sách cấu hình cổng thanh toán",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/PaymentGatewayResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Thiếu hoặc sai JWT",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/PaymentGatewayResponse"
+                  }
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Không phải admin",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/PaymentGatewayResponse"
+                  }
+                }
+              },
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
           "400" : {
             "description" : "Invalid request data",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Data or state conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -22878,7 +24136,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "PENDING", "CONFIRMED", "SHIPPING", "DELIVERED", "CANCELLED" ]
+            "enum" : [ "AWAITING_PAYMENT", "PENDING", "CONFIRMED", "SHIPPING", "DELIVERED", "CANCELLED" ]
           },
           "example" : "PENDING"
         }, {
@@ -23115,8 +24373,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -23125,8 +24383,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -23538,8 +24796,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -23548,8 +24806,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -23642,8 +24900,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -23652,8 +24910,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -23878,8 +25136,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -23888,8 +25146,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -23954,8 +25212,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -23964,8 +25222,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -24040,8 +25298,8 @@
               }
             }
           },
-          "409" : {
-            "description" : "Data or state conflict",
+          "400" : {
+            "description" : "Invalid request data",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -24050,8 +25308,8 @@
               }
             }
           },
-          "400" : {
-            "description" : "Invalid request data",
+          "409" : {
+            "description" : "Data or state conflict",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -25578,6 +26836,116 @@
           }
         }
       },
+      "UpdatePaymentGatewayRequest" : {
+        "type" : "object",
+        "properties" : {
+          "enabled" : {
+            "type" : "boolean",
+            "description" : "Bật hoặc tắt cổng thanh toán; bỏ trống = giữ nguyên",
+            "example" : true
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "Tên hiển thị của cổng thanh toán; bỏ trống = giữ nguyên",
+            "example" : "Chuyển khoản ngân hàng (VietQR)",
+            "maxLength" : 120,
+            "minLength" : 0
+          },
+          "bankBin" : {
+            "type" : "string",
+            "description" : "Mã BIN ngân hàng nhận tiền (6 chữ số NAPAS); bỏ trống = giữ nguyên",
+            "example" : "970422",
+            "maxLength" : 20,
+            "minLength" : 0
+          },
+          "accountNumber" : {
+            "type" : "string",
+            "description" : "Số tài khoản ngân hàng nhận tiền; bỏ trống = giữ nguyên",
+            "example" : "0900123456789",
+            "maxLength" : 50,
+            "minLength" : 0
+          },
+          "accountName" : {
+            "type" : "string",
+            "description" : "Tên chủ tài khoản nhận tiền; bỏ trống = giữ nguyên",
+            "example" : "SAN TMDT FASHIONSTORE",
+            "maxLength" : 120,
+            "minLength" : 0
+          },
+          "webhookSecret" : {
+            "type" : "string",
+            "description" : "Khóa bí mật xác thực Webhook (write-only); null hoặc rỗng = giữ nguyên khóa cũ",
+            "example" : "demo-vietqr-secret-key",
+            "maxLength" : 200,
+            "minLength" : 0
+          },
+          "sandboxMode" : {
+            "type" : "boolean",
+            "description" : "Bật/tắt chế độ Demo Sandbox; bỏ trống = giữ nguyên",
+            "example" : true
+          }
+        }
+      },
+      "PaymentGatewayResponse" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "description" : "Mã cổng thanh toán",
+            "example" : "VIETQR"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "Tên hiển thị cổng thanh toán",
+            "example" : "Chuyển khoản ngân hàng (VietQR)"
+          },
+          "enabled" : {
+            "type" : "boolean",
+            "description" : "Cổng thanh toán đang bật hay tắt",
+            "example" : true
+          },
+          "bankBin" : {
+            "type" : "string",
+            "description" : "Mã BIN ngân hàng NAPAS (6 chữ số)",
+            "example" : "970422"
+          },
+          "bankCode" : {
+            "type" : "string",
+            "description" : "Mã viết tắt ngân hàng",
+            "example" : "MB"
+          },
+          "bankName" : {
+            "type" : "string",
+            "description" : "Tên ngân hàng nhận tiền của sàn",
+            "example" : "Ngân hàng TMCP Quân Đội"
+          },
+          "accountNumber" : {
+            "type" : "string",
+            "description" : "Số tài khoản ngân hàng nhận tiền của sàn",
+            "example" : "0900123456789"
+          },
+          "accountName" : {
+            "type" : "string",
+            "description" : "Tên chủ tài khoản ngân hàng của sàn",
+            "example" : "SAN TMDT FASHIONSTORE"
+          },
+          "webhookSecretSet" : {
+            "type" : "boolean",
+            "description" : "Đã thiết lập khóa bí mật xác thực Webhook hay chưa (write-only)",
+            "example" : true
+          },
+          "sandboxMode" : {
+            "type" : "boolean",
+            "description" : "Chế độ Demo Sandbox cho phép giả lập biến động số dư",
+            "example" : true
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Thời điểm cập nhật cấu hình gần nhất"
+          }
+        }
+      },
       "SitePageRequest" : {
         "type" : "object",
         "properties" : {
@@ -26952,6 +28320,68 @@
           }
         }
       },
+      "VietQrWebhookRequest" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "description" : "Mã định danh giao dịch từ cổng webhook",
+            "example" : "FT2633012345"
+          },
+          "referenceCode" : {
+            "type" : "string",
+            "description" : "Mã tham chiếu giao dịch ngân hàng",
+            "example" : "FT2633012345"
+          },
+          "content" : {
+            "type" : "string",
+            "description" : "Nội dung chuyển khoản (chuẩn SePay)",
+            "example" : "CHUYEN TIEN DHMQ1234567890"
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "Nội dung chuyển khoản (chuẩn Casso)",
+            "example" : "CHUYEN TIEN DHMQ1234567890"
+          },
+          "transferAmount" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Số tiền giao dịch (chuẩn SePay, VND)",
+            "example" : 360000
+          },
+          "amount" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Số tiền giao dịch (chuẩn Casso, VND)",
+            "example" : 360000
+          },
+          "transferType" : {
+            "type" : "string",
+            "description" : "Loại biến động số dư (in/out)",
+            "example" : "in"
+          }
+        }
+      },
+      "VietQrWebhookResponse" : {
+        "type" : "object",
+        "properties" : {
+          "success" : {
+            "type" : "boolean",
+            "description" : "Trạng thái tiếp nhận webhook",
+            "example" : true
+          },
+          "outcome" : {
+            "type" : "string",
+            "description" : "Kết quả xử lý giao dịch",
+            "example" : "SUCCESS"
+          },
+          "txnRef" : {
+            "type" : "string",
+            "description" : "Mã tham chiếu giao dịch khớp được",
+            "example" : "DHMQ1234567890"
+          }
+        }
+      },
       "LookupAccountRequest" : {
         "type" : "object",
         "description" : "Yêu cầu tra cứu tên chủ tài khoản ngân hàng qua Napas",
@@ -27104,6 +28534,156 @@
           }
         }
       },
+      "SimulateVietQrRequest" : {
+        "type" : "object",
+        "properties" : {
+          "amount" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Số tiền giả lập chuyển khoản (VND). Để trống sẽ mặc định chuyển đủ 100% số tiền của phiên.",
+            "example" : 360000
+          }
+        }
+      },
+      "VietQrOrderBrief" : {
+        "type" : "object",
+        "properties" : {
+          "orderId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID đơn hàng"
+          },
+          "orderCode" : {
+            "type" : "string",
+            "description" : "Mã đơn hàng hiển thị",
+            "example" : "ORD-20261126-0001"
+          },
+          "shopId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID cửa hàng"
+          },
+          "shopName" : {
+            "type" : "string",
+            "description" : "Tên cửa hàng",
+            "example" : "Highlight Studio"
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Tổng tiền đơn hàng (VND)",
+            "example" : 230000
+          },
+          "orderStatus" : {
+            "type" : "string",
+            "description" : "Trạng thái đơn hàng",
+            "example" : "AWAITING_PAYMENT"
+          },
+          "paymentStatus" : {
+            "type" : "string",
+            "description" : "Trạng thái thanh toán của đơn",
+            "example" : "UNPAID"
+          }
+        }
+      },
+      "VietQrSessionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "transactionId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID bản ghi giao dịch thanh toán"
+          },
+          "txnRef" : {
+            "type" : "string",
+            "description" : "Mã tham chiếu nội dung chuyển khoản duy nhất",
+            "example" : "DHMQ1234567890"
+          },
+          "status" : {
+            "type" : "string",
+            "description" : "Trạng thái giao dịch",
+            "example" : "PENDING"
+          },
+          "amount" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Tổng số tiền cần chuyển khoản (VND)",
+            "example" : 410000
+          },
+          "receivedAmount" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Số tiền ngân hàng thực nhận (VND)",
+            "example" : 0
+          },
+          "bankBin" : {
+            "type" : "string",
+            "description" : "Mã BIN ngân hàng NAPAS",
+            "example" : "970422"
+          },
+          "bankCode" : {
+            "type" : "string",
+            "description" : "Mã viết tắt ngân hàng",
+            "example" : "MB"
+          },
+          "bankName" : {
+            "type" : "string",
+            "description" : "Tên đầy đủ của ngân hàng",
+            "example" : "Ngân hàng TMCP Quân đội (MB Bank)"
+          },
+          "accountNumber" : {
+            "type" : "string",
+            "description" : "Số tài khoản ngân hàng nhận tiền của sàn",
+            "example" : "0900123456789"
+          },
+          "accountName" : {
+            "type" : "string",
+            "description" : "Tên chủ tài khoản ngân hàng của sàn",
+            "example" : "SAN TMDT FASHIONSTORE"
+          },
+          "qrImageUrl" : {
+            "type" : "string",
+            "description" : "URL ảnh mã QR chuẩn VietQR"
+          },
+          "expiresAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Thời điểm hết hạn phiên thanh toán"
+          },
+          "paidAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Thời điểm xác nhận thanh toán thành công"
+          },
+          "sandboxMode" : {
+            "type" : "boolean",
+            "description" : "Chế độ Demo Sandbox có đang bật hay không",
+            "example" : true
+          },
+          "refundStatus" : {
+            "type" : "string",
+            "description" : "Trạng thái hoàn tiền",
+            "example" : "NONE"
+          },
+          "refundAmount" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Số tiền cần hoàn hoặc đã hoàn (VND)",
+            "example" : 0
+          },
+          "refundReason" : {
+            "type" : "string",
+            "description" : "Lý do hoàn tiền"
+          },
+          "orders" : {
+            "type" : "array",
+            "description" : "Danh sách các đơn hàng thuộc phiên thanh toán",
+            "items" : {
+              "$ref" : "#/components/schemas/VietQrOrderBrief"
+            }
+          }
+        }
+      },
       "CheckoutItemRequest" : {
         "type" : "object",
         "properties" : {
@@ -27154,6 +28734,12 @@
             "example" : "Ha Noi",
             "maxLength" : 1000,
             "minLength" : 0
+          },
+          "paymentMethod" : {
+            "type" : [ "string", "null" ],
+            "description" : "Phương thức thanh toán (mặc định COD)",
+            "enum" : [ "COD", "VIETQR" ],
+            "example" : "COD"
           }
         },
         "required" : [ "items", "shippingAddress", "shippingName", "shippingPhone", "shopId" ]
@@ -27365,6 +28951,20 @@
             "type" : "string",
             "format" : "date-time",
             "description" : "Thời điểm tạo đơn"
+          },
+          "paymentTxnRef" : {
+            "type" : [ "string", "null" ],
+            "description" : "Mã tham chiếu giao dịch thanh toán VietQR (khi đặt bằng VIETQR)",
+            "example" : "DHMQ1234567890"
+          },
+          "paymentQrUrl" : {
+            "type" : [ "string", "null" ],
+            "description" : "URL ảnh mã QR thanh toán VietQR"
+          },
+          "paymentExpiresAt" : {
+            "type" : [ "string", "null" ],
+            "format" : "date-time",
+            "description" : "Thời điểm hết hạn giữ đơn chờ thanh toán VietQR"
           }
         }
       },
@@ -27664,6 +29264,12 @@
               "type" : "string",
               "format" : "uuid"
             }
+          },
+          "paymentMethod" : {
+            "type" : [ "string", "null" ],
+            "description" : "Phương thức thanh toán (mặc định COD)",
+            "enum" : [ "COD", "VIETQR" ],
+            "example" : "COD"
           }
         },
         "required" : [ "shippingAddress", "shippingName", "shippingPhone" ]
@@ -28438,6 +30044,176 @@
           }
         },
         "required" : [ "reason", "violationType" ]
+      },
+      "AdminWithdrawalResponse" : {
+        "type" : "object",
+        "description" : "Thông tin lệnh rút tiền của Shop trên trang quản trị",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID lệnh rút tiền"
+          },
+          "shopId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID cửa hàng"
+          },
+          "shopName" : {
+            "type" : "string",
+            "description" : "Tên cửa hàng"
+          },
+          "amount" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Số tiền rút (VND)"
+          },
+          "bankName" : {
+            "type" : "string",
+            "description" : "Tên ngân hàng nhận tiền"
+          },
+          "bankAccount" : {
+            "type" : "string",
+            "description" : "Số tài khoản ngân hàng"
+          },
+          "bankHolder" : {
+            "type" : "string",
+            "description" : "Tên chủ tài khoản"
+          },
+          "status" : {
+            "type" : "string",
+            "description" : "Trạng thái lệnh rút: REQUESTED, PROCESSING, COMPLETED, REJECTED"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Thời điểm tạo yêu cầu rút tiền"
+          },
+          "processedAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Thời điểm xử lý yêu cầu rút tiền"
+          }
+        }
+      },
+      "MarkRefundedRequest" : {
+        "type" : "object",
+        "description" : "Yêu cầu xác nhận đã hoàn tiền cho giao dịch",
+        "properties" : {
+          "note" : {
+            "type" : "string",
+            "description" : "Ghi chú đối soát hoàn tiền (từ 5 đến 500 ký tự)",
+            "example" : "Đã chuyển khoản hoàn tiền qua MB Bank mã FT998877",
+            "maxLength" : 500,
+            "minLength" : 5
+          }
+        },
+        "required" : [ "note" ]
+      },
+      "PaymentTransactionResponse" : {
+        "type" : "object",
+        "description" : "Thông tin giao dịch thanh toán VietQR và đối soát hoàn tiền trên trang quản trị",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID giao dịch thanh toán"
+          },
+          "buyerId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "ID người mua"
+          },
+          "buyerEmail" : {
+            "type" : "string",
+            "description" : "Email người mua"
+          },
+          "provider" : {
+            "type" : "string",
+            "description" : "Nhà cung cấp cổng thanh toán",
+            "example" : "VIETQR"
+          },
+          "txnRef" : {
+            "type" : "string",
+            "description" : "Mã tham chiếu giao dịch (nội dung chuyển khoản)",
+            "example" : "DHMQ4F9A1C8E2B"
+          },
+          "amount" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Số tiền cần thanh toán (VND)"
+          },
+          "receivedAmount" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Số tiền thực nhận từ ngân hàng (VND)"
+          },
+          "status" : {
+            "type" : "string",
+            "description" : "Trạng thái giao dịch: PENDING, SUCCESS, UNDERPAID, FAILED, EXPIRED"
+          },
+          "bankCode" : {
+            "type" : "string",
+            "description" : "Mã viết tắt ngân hàng nhận tiền",
+            "example" : "MB"
+          },
+          "accountNumber" : {
+            "type" : "string",
+            "description" : "Số tài khoản ngân hàng nhận tiền"
+          },
+          "bankTransactionId" : {
+            "type" : "string",
+            "description" : "Mã giao dịch phía ngân hàng"
+          },
+          "transferContent" : {
+            "type" : "string",
+            "description" : "Nội dung chuyển khoản thực tế từ ngân hàng"
+          },
+          "paidAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Thời điểm thanh toán thành công"
+          },
+          "expiresAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Thời điểm hết hạn phiên thanh toán"
+          },
+          "refundStatus" : {
+            "type" : "string",
+            "description" : "Trạng thái hoàn tiền: NONE, PENDING, REFUNDED"
+          },
+          "refundAmount" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Số tiền cần hoàn hoặc đã hoàn (VND)"
+          },
+          "refundReason" : {
+            "type" : "string",
+            "description" : "Lý do cần hoàn tiền"
+          },
+          "refundedAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Thời điểm Admin xác nhận đã hoàn tiền"
+          },
+          "refundNote" : {
+            "type" : "string",
+            "description" : "Ghi chú đối soát hoàn tiền của Admin"
+          },
+          "orders" : {
+            "type" : "array",
+            "description" : "Danh sách đơn hàng liên kết với giao dịch",
+            "items" : {
+              "$ref" : "#/components/schemas/VietQrOrderBrief"
+            }
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "Thời điểm tạo giao dịch"
+          }
+        }
       },
       "AdminCancelOrderRequest" : {
         "type" : "object",
@@ -29938,6 +31714,66 @@
           }
         }
       },
+      "PaymentMethodOption" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "description" : "Mã phương thức thanh toán",
+            "example" : "VIETQR"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "Tên hiển thị phương thức thanh toán",
+            "example" : "Chuyển khoản ngân hàng (VietQR)"
+          },
+          "bankCode" : {
+            "type" : "string",
+            "description" : "Mã ngân hàng nhận tiền (chỉ áp dụng cho VIETQR)",
+            "example" : "MB"
+          },
+          "bankName" : {
+            "type" : "string",
+            "description" : "Tên ngân hàng nhận tiền (chỉ áp dụng cho VIETQR)",
+            "example" : "Ngân hàng TMCP Quân đội (MB Bank)"
+          },
+          "sandboxMode" : {
+            "type" : "boolean",
+            "description" : "Cổng đang bật chế độ Demo Sandbox hay không",
+            "example" : true
+          }
+        }
+      },
+      "PaymentMethodsResponse" : {
+        "type" : "object",
+        "properties" : {
+          "methods" : {
+            "type" : "array",
+            "description" : "Danh sách các phương thức thanh toán đang bật",
+            "items" : {
+              "$ref" : "#/components/schemas/PaymentMethodOption"
+            }
+          },
+          "codMinTotal" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Tổng tiền đơn tối thiểu được phép dùng COD, VND",
+            "example" : 0
+          },
+          "codMaxTotal" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Tổng tiền đơn tối đa được phép dùng COD, VND; 0 = không giới hạn",
+            "example" : 10000000
+          },
+          "paymentHoldMinutes" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Số phút giữ đơn chờ thanh toán trực tuyến trước khi tự động hủy",
+            "example" : 15
+          }
+        }
+      },
       "PublicPageLinkResponse" : {
         "type" : "object",
         "properties" : {
@@ -30935,6 +32771,60 @@
           "createdAt" : {
             "type" : "string",
             "format" : "date-time"
+          }
+        }
+      },
+      "PageResponseAdminWithdrawalResponse" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "description" : "Phần tử của trang hiện tại",
+            "items" : {
+              "$ref" : "#/components/schemas/AdminWithdrawalResponse"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Tổng số phần tử khớp bộ lọc, không tính phân trang"
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Trang hiện tại, đếm từ 0"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Số phần tử mỗi trang"
+          }
+        }
+      },
+      "PageResponsePaymentTransactionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "description" : "Phần tử của trang hiện tại",
+            "items" : {
+              "$ref" : "#/components/schemas/PaymentTransactionResponse"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Tổng số phần tử khớp bộ lọc, không tính phân trang"
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Trang hiện tại, đếm từ 0"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Số phần tử mỗi trang"
           }
         }
       },
