@@ -365,9 +365,14 @@ public class ShopStatsRepository {
                     WHERE pv.product_id = p.id), 0) AS current_stock
             FROM product p
             JOIN category c ON p.category_id = c.id
-            LEFT JOIN order_item oi ON oi.product_id = p.id
-            LEFT JOIN orders o ON oi.order_id = o.id AND o.status != 'CANCELLED'
-                AND o.created_at >= :from AND o.created_at < :to
+            LEFT JOIN (
+                order_item oi
+                JOIN orders o ON oi.order_id = o.id
+                    AND o.status != 'CANCELLED'
+                    AND o.placed_at IS NOT NULL
+                    AND o.created_at >= :from
+                    AND o.created_at < :to
+            ) ON oi.product_id = p.id
             WHERE p.shop_id = :shopId
             GROUP BY p.id, p.name, c.name
             ORDER BY total_revenue DESC, total_sold DESC
@@ -444,6 +449,7 @@ public class ShopStatsRepository {
             JOIN order_item oi ON oi.product_id = p.id
             JOIN orders o ON oi.order_id = o.id
             WHERE p.shop_id = :shopId
+              AND o.placed_at IS NOT NULL
               AND o.status != 'CANCELLED'
             GROUP BY p.id, p.name, p.view_count
             ORDER BY total_revenue DESC
@@ -479,8 +485,12 @@ public class ShopStatsRepository {
                 COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variant pv
                     WHERE pv.product_id = p.id), 0) AS current_stock
             FROM product p
-            LEFT JOIN order_item oi ON oi.product_id = p.id
-            LEFT JOIN orders o ON oi.order_id = o.id AND o.status != 'CANCELLED'
+            LEFT JOIN (
+                order_item oi
+                JOIN orders o ON oi.order_id = o.id
+                    AND o.status != 'CANCELLED'
+                    AND o.placed_at IS NOT NULL
+            ) ON oi.product_id = p.id
             WHERE p.shop_id = :shopId
               AND p.status = 'ACTIVE'
               AND p.view_count > 0
@@ -518,8 +528,12 @@ public class ShopStatsRepository {
                 COALESCE(SUM(pv.stock_quantity), 0) AS current_stock
             FROM product p
             JOIN product_variant pv ON pv.product_id = p.id
-            LEFT JOIN order_item oi ON oi.product_id = p.id
-            LEFT JOIN orders o ON oi.order_id = o.id AND o.status != 'CANCELLED'
+            LEFT JOIN (
+                order_item oi
+                JOIN orders o ON oi.order_id = o.id
+                    AND o.status != 'CANCELLED'
+                    AND o.placed_at IS NOT NULL
+            ) ON oi.product_id = p.id
             WHERE p.shop_id = :shopId
               AND p.status = 'ACTIVE'
             GROUP BY p.id, p.name, p.view_count
@@ -555,8 +569,12 @@ public class ShopStatsRepository {
                 COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variant pv
                     WHERE pv.product_id = p.id), 0) AS current_stock
             FROM product p
-            LEFT JOIN order_item oi ON oi.product_id = p.id
-            LEFT JOIN orders o ON oi.order_id = o.id AND o.status != 'CANCELLED'
+            LEFT JOIN (
+                order_item oi
+                JOIN orders o ON oi.order_id = o.id
+                    AND o.status != 'CANCELLED'
+                    AND o.placed_at IS NOT NULL
+            ) ON oi.product_id = p.id
             WHERE p.shop_id = :shopId
               AND p.status = 'ACTIVE'
               AND COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variant pv WHERE pv.product_id = p.id), 0) > 0

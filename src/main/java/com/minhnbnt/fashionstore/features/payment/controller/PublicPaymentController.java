@@ -56,7 +56,8 @@ public class PublicPaymentController {
     @Operation(
         operationId = "vietQrWebhook",
         summary = "Webhook nhận biến động số dư VietQR",
-        description = "Xác thực khóa bí mật ở header Authorization (Apikey hoặc Bearer) và đối soát giao dịch chuyển khoản."
+        description = "Xác thực khóa bí mật ở header Authorization (Apikey hoặc Bearer) "
+            + "và đối soát giao dịch chuyển khoản."
     )
     @ApiResponse(responseCode = "200", description = "Kết quả xử lý webhook")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai khóa bí mật Webhook")

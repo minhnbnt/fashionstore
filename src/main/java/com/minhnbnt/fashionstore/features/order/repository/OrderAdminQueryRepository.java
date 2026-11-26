@@ -63,6 +63,7 @@ public class OrderAdminQueryRepository {
                    coalesce(sum(total) FILTER (WHERE status <> 'CANCELLED'), 0) AS value
             FROM orders
             WHERE created_at >= :from
+              AND placed_at IS NOT NULL
             GROUP BY day
             """;
 

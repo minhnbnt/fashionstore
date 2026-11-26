@@ -39,7 +39,8 @@ public class PaymentController {
     @Operation(
         operationId = "getVietQrSession",
         summary = "Thông tin phiên thanh toán VietQR",
-        description = "Trả về thông tin mã QR, tài khoản ngân hàng nhận tiền, thời hạn và danh sách đơn hàng thuộc phiên."
+        description = "Trả về thông tin mã QR, tài khoản ngân hàng nhận tiền, "
+            + "thời hạn và danh sách đơn hàng thuộc phiên."
     )
     @ApiResponse(responseCode = "200", description = "Thông tin phiên thanh toán VietQR")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")

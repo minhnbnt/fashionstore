@@ -171,7 +171,8 @@ public class OrderController {
     @Operation(
         operationId = "retryVietQrPayment",
         summary = "Thanh toán lại đơn hàng qua VietQR",
-        description = "Trả về phiên VietQR đang chờ hoặc tạo phiên VietQR mới cho đơn hàng AWAITING_PAYMENT còn thời hạn."
+        description = "Trả về phiên VietQR đang chờ hoặc tạo phiên VietQR mới "
+            + "cho đơn hàng AWAITING_PAYMENT còn thời hạn."
     )
     @ApiResponse(responseCode = "200", description = "Thông tin phiên thanh toán VietQR")
     @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")

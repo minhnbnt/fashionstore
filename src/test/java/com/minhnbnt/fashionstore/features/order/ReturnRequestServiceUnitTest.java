@@ -414,7 +414,9 @@ class ReturnRequestServiceUnitTest {
         order.ship();
         order.deliver();
 
-        var item = OrderItem.snapshot(order.getId(), productId, variantId, "Ao So Mi", "M / Trang", "SKU-2", 200_000L, 1);
+        var item = OrderItem.snapshot(
+            order.getId(), productId, variantId, "Ao So Mi", "M / Trang", "SKU-2", 200_000L, 1
+        );
 
         var req = ReturnRequest.create(order.getId(), shopId, buyerId, "WRONG_ITEM", "Giao nham size");
         req.approve("EXCHANGE", 0L, "Doi sang size M");
