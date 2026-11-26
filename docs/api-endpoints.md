@@ -311,3 +311,20 @@ Chi tiết luồng này xem `docs/wishlist.md`.
 | [x] | 111 | GET | `/api/seller/shops/{shopId}/stats/customers/overview` | Tổng quan khách hàng: mới, quay lại, retention rate, AOV |
 | [x] | 112 | GET | `/api/seller/shops/{shopId}/stats/customers/top` | Top khách hàng chi tiêu nhiều nhất |
 | [x] | 113 | GET | `/api/seller/shops/{shopId}/stats/customers/follower-trend` | Tăng trưởng người theo dõi shop |
+
+## Flow 18 — Thanh toán Trực tuyến VietQR, Giữ tiền (Escrow) & Đối soát Hoàn tiền
+
+| Xong | # | Method | Path | Mô tả |
+|------|---|--------|------|-------|
+| [x] | 114 | GET | `/api/public/payment-methods` | Danh sách cổng thanh toán đang bật (`COD`, `VIETQR`) kèm giới hạn COD và thời gian giữ đơn |
+| [x] | 115 | GET | `/api/payments/vietqr/{txnRef}` | Buyer/Admin xem phiên thanh toán mã VietQR (ảnh QR, ngân hàng, số tiền, hạn thanh toán, các đơn gộp) |
+| [x] | 116 | POST | `/api/payments/vietqr/{txnRef}/simulate` | Giả lập ngân hàng báo nhận chuyển khoản VietQR (chỉ khi `sandboxMode = true`) |
+| [x] | 117 | POST | `/api/orders/{id}/payments/vietqr` | Buyer tạo/lấy lại phiên thanh toán VietQR cho đơn `AWAITING_PAYMENT` còn hạn |
+| [x] | 118 | POST | `/api/public/payments/vietqr/webhook` | Webhook biến động số dư (SePay/Casso) xác thực `webhookSecret` constant-time và đối chiếu số tiền |
+| [x] | 119 | GET | `/api/admin/payment-gateways` | Admin xem cấu hình các cổng thanh toán (`webhookSecret` write-only) |
+| [x] | 120 | PUT | `/api/admin/payment-gateways/{code}` | Admin cập nhật cấu hình cổng `COD`/`VIETQR` (kèm ghi `ConfigAuditService`) |
+| [x] | 121 | GET | `/api/admin/payments/transactions` | Admin tra cứu/lọc giao dịch VietQR và danh sách giao dịch chờ hoàn tiền (`refundStatus = PENDING`) |
+| [x] | 122 | PATCH | `/api/admin/payments/transactions/{id}/refunded` | Admin đánh dấu đã hoàn tiền cho khách (`REFUND_PENDING` → `REFUNDED`) kèm ghi chú đối soát |
+| [x] | 123 | GET | `/api/admin/payments/withdrawals` | Admin xem danh sách yêu cầu rút tiền (`SellerWithdrawal`) của các Shop |
+| [x] | 124 | PATCH | `/api/admin/payments/withdrawals/{id}/approve` | Admin duyệt đã chuyển khoản rút tiền cho Shop (`REQUESTED` → `COMPLETED`) |
+| [x] | 125 | PATCH | `/api/admin/payments/withdrawals/{id}/reject` | Admin từ chối lệnh rút tiền của Shop (`REQUESTED` → `REJECTED`, hoàn lại số dư ví khả dụng) |

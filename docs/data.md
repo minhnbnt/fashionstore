@@ -22,6 +22,7 @@
 - `V28__shop_invitations.sql`: Bảng `shop_invitations` (lưu lời mời nhân sự với `token` 64 hex, `expires_at` 7 ngày, partial unique index `(shop_id, lower(email))` khi `accepted_at IS NULL`). Bảng `shop_member` bổ sung cột `status VARCHAR(20) DEFAULT 'ACTIVE'` với constraint CHECK `status IN ('ACTIVE', 'DEACTIVATED')`.
 - `V37__upload_centralization.sql` + `V38`–`V44`: tập trung file vào bảng `upload` — backfill dedupe key từ 16 cột/mảng của 12 bảng, thay cột key bằng `*_upload_id` FK (avatar, KYC, product media/video/garment, banner/popup, chat, review, return evidence); queue pgmq `upload_gc` + trigger producer (chi tiết mục S3 / file).
 - `V48__shipping_fee_settings.sql`: thêm key `shipping.base_fee` (30000) + `shipping.extra_item_fee` (0) vào `system_setting`. Từ đây `orders.shipping_fee` do server tính (`ShippingFeeService`, công thức ở `docs/cart.md` #85a), client không gửi phí ship nữa.
+- `V49__vietqr_escrow_payment.sql`: thêm cấu hình cổng thanh toán `payment_gateway` (`COD`, `VIETQR`), phiên giao dịch `payment_transaction` + bảng liên kết `payment_transaction_order` hỗ trợ thanh toán gộp nhiều shop 1 mã VietQR, mở rộng `orders` (`AWAITING_PAYMENT`, `VIETQR`, `PAID`/`REFUND_PENDING`/`REFUNDED`, `payment_expires_at`, `placed_at`), và mở rộng `seller_settlement.status` thêm `CANCELLED` (cơ chế Escrow thu 5% phí sàn khi khách xác nhận nhận hàng).
 - Repository Spring Data JDBC: derived query sắp nhiều cột (`OrderByAAscBAsc`) làm AOT repository sinh code không compile được → viết `@Query` SQL tay.
 
 ## Search BM25 (pg_textsearch)
