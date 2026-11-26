@@ -6,11 +6,16 @@ import com.minhnbnt.fashionstore.dto.payment.AdminWithdrawalResponse;
 import com.minhnbnt.fashionstore.dto.payment.PaymentGatewayResponse;
 import com.minhnbnt.fashionstore.dto.payment.PaymentMethodOption;
 import com.minhnbnt.fashionstore.dto.payment.PaymentMethodsResponse;
+import com.minhnbnt.fashionstore.dto.payment.PaymentTransactionResponse;
 import com.minhnbnt.fashionstore.dto.payment.UpdatePaymentGatewayRequest;
+import com.minhnbnt.fashionstore.dto.payment.VietQrOrderBrief;
 import com.minhnbnt.fashionstore.features.order.RevenueService;
+import com.minhnbnt.fashionstore.features.payment.PaymentFlowService;
 import com.minhnbnt.fashionstore.features.payment.PaymentGatewayService;
 import com.minhnbnt.fashionstore.features.payment.controller.PublicPaymentController;
 import com.minhnbnt.fashionstore.model.PaymentMethod;
+import com.minhnbnt.fashionstore.model.PaymentTransactionStatus;
+import com.minhnbnt.fashionstore.model.RefundStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -51,6 +56,9 @@ class AdminPaymentControllerTest {
 
     @MockitoBean
     private RevenueService revenue;
+
+    @MockitoBean
+    private PaymentFlowService paymentFlow;
 
     private static RequestPostProcessor admin(UUID adminId) {
         return jwt()
@@ -212,5 +220,107 @@ class AdminPaymentControllerTest {
                 .with(admin(adminId)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("REJECTED"));
+    }
+
+    @Test
+    void listAndMarkPaymentTransactionsRefundedDelegateToPaymentFlowService() throws Exception {
+        var adminId = UUID.randomUUID();
+        var txId = UUID.randomUUID();
+        var buyerId = UUID.randomUUID();
+        var orderId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var now = Instant.parse("2026-11-26T00:00:00Z");
+
+        var pendingRefundTx = new PaymentTransactionResponse(
+            txId,
+            buyerId,
+            "buyer@t.local",
+            "VIETQR",
+            "DHMQ1122334455",
+            230_000L,
+            230_000L,
+            "SUCCESS",
+            "MB",
+            "0900123456789",
+            "FT123",
+            "CK DHMQ1122334455",
+            now,
+            now.plusSeconds(900),
+            "PENDING",
+            230_000L,
+            "Đơn hàng #ORD-1 bị hủy sau khi đã thanh toán",
+            null,
+            null,
+            List.of(new VietQrOrderBrief(orderId, "ORD-1", shopId, "Shop A", 230_000L, "CANCELLED", "REFUND_PENDING")),
+            now
+        );
+        var refundedTx = new PaymentTransactionResponse(
+            txId,
+            buyerId,
+            "buyer@t.local",
+            "VIETQR",
+            "DHMQ1122334455",
+            230_000L,
+            230_000L,
+            "SUCCESS",
+            "MB",
+            "0900123456789",
+            "FT123",
+            "CK DHMQ1122334455",
+            now,
+            now.plusSeconds(900),
+            "REFUNDED",
+            230_000L,
+            "Đơn hàng #ORD-1 bị hủy sau khi đã thanh toán",
+            now,
+            "Đã chuyển khoản hoàn tiền qua MB Bank",
+            List.of(new VietQrOrderBrief(orderId, "ORD-1", shopId, "Shop A", 230_000L, "CANCELLED", "REFUNDED")),
+            now
+        );
+
+        when(paymentFlow.searchTransactionsForAdmin(
+            PaymentTransactionStatus.SUCCESS,
+            RefundStatus.PENDING,
+            "DHMQ",
+            0,
+            20
+        )).thenReturn(new PageResponse<>(List.of(pendingRefundTx), 1L, 0, 20));
+
+        when(paymentFlow.markTransactionRefunded(adminId, txId, "Đã chuyển khoản hoàn tiền qua MB Bank"))
+            .thenReturn(refundedTx);
+
+        mockMvc.perform(get("/api/admin/payments/transactions")
+                .param("status", "SUCCESS")
+                .param("refundStatus", "PENDING")
+                .param("q", "DHMQ")
+                .param("page", "0")
+                .param("size", "20")
+                .with(admin(adminId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].id").value(txId.toString()))
+            .andExpect(jsonPath("$.items[0].txnRef").value("DHMQ1122334455"))
+            .andExpect(jsonPath("$.items[0].refundStatus").value("PENDING"));
+
+        mockMvc.perform(patch("/api/admin/payments/transactions/{id}/refunded", txId)
+                .with(admin(adminId))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "note": "Đã chuyển khoản hoàn tiền qua MB Bank"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.refundStatus").value("REFUNDED"))
+            .andExpect(jsonPath("$.refundNote").value("Đã chuyển khoản hoàn tiền qua MB Bank"));
+
+        mockMvc.perform(patch("/api/admin/payments/transactions/{id}/refunded", txId)
+                .with(admin(adminId))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "note": "abc"
+                    }
+                    """))
+            .andExpect(status().isBadRequest());
     }
 }

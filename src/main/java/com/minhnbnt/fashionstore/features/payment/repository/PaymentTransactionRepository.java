@@ -1,6 +1,7 @@
 package com.minhnbnt.fashionstore.features.payment.repository;
 
 import com.minhnbnt.fashionstore.dto.payment.VietQrOrderBrief;
+import com.minhnbnt.fashionstore.infrastructure.SqlLike;
 import com.minhnbnt.fashionstore.model.PaymentTransaction;
 import com.minhnbnt.fashionstore.model.PaymentTransactionStatus;
 import com.minhnbnt.fashionstore.model.RefundStatus;
@@ -14,7 +15,10 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -194,6 +198,74 @@ public class PaymentTransactionRepository {
             .param("id", id)
             .query(PaymentTransactionRepository::mapRow)
             .optional();
+    }
+
+    public List<PaymentTransaction> searchForAdmin(
+        @Nullable PaymentTransactionStatus status,
+        @Nullable RefundStatus refundStatus,
+        @Nullable String q,
+        int page,
+        int size
+    ) {
+        var where = adminWhereOf(status, refundStatus, q);
+        var sql = "SELECT pt.* FROM payment_transaction pt WHERE " + where.sql()
+            + " ORDER BY pt.created_at DESC, pt.id DESC LIMIT :limit OFFSET :offset";
+        return jdbc.sql(sql)
+            .params(where.params())
+            .param("limit", size)
+            .param("offset", (long) page * size)
+            .query(PaymentTransactionRepository::mapRow)
+            .list();
+    }
+
+    public long countForAdmin(
+        @Nullable PaymentTransactionStatus status,
+        @Nullable RefundStatus refundStatus,
+        @Nullable String q
+    ) {
+        var where = adminWhereOf(status, refundStatus, q);
+        var sql = "SELECT COUNT(*) FROM payment_transaction pt WHERE " + where.sql();
+        return jdbc.sql(sql)
+            .params(where.params())
+            .query(Long.class)
+            .single();
+    }
+
+    private record AdminFilterWhere(String sql, Map<String, Object> params) {
+    }
+
+    private static AdminFilterWhere adminWhereOf(
+        @Nullable PaymentTransactionStatus status,
+        @Nullable RefundStatus refundStatus,
+        @Nullable String q
+    ) {
+        var clauses = new ArrayList<String>();
+        var params = new HashMap<String, Object>();
+        clauses.add("TRUE");
+
+        if (status != null) {
+            clauses.add("pt.status = :status");
+            params.put("status", status.name());
+        }
+        if (refundStatus != null) {
+            clauses.add("pt.refund_status = :refundStatus");
+            params.put("refundStatus", refundStatus.name());
+        }
+        if (q != null && !q.isBlank()) {
+            clauses.add("""
+                (pt.txn_ref ILIKE :q
+                 OR coalesce(pt.bank_transaction_id, '') ILIKE :q
+                 OR EXISTS (
+                     SELECT 1
+                     FROM payment_transaction_order pto
+                     JOIN orders o ON o.id = pto.order_id
+                     WHERE pto.transaction_id = pt.id
+                       AND o.code ILIKE :q
+                 ))""");
+            params.put("q", SqlLike.contains(q));
+        }
+
+        return new AdminFilterWhere(String.join(" AND ", clauses), params);
     }
 
     private static PaymentTransaction mapRow(ResultSet rs, int rowNum) throws SQLException {

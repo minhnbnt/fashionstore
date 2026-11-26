@@ -382,6 +382,7 @@ public class OrderService {
     ) {
         var order = requireLockedBuyerOrder(buyerId, orderId);
         var fromStatus = order.getStatus();
+        var wasPaid = order.getPaymentStatus() == PaymentStatus.PAID;
         String notificationBody;
         if (request != null) {
             var reason = BuyerCancelReason.parse(request.reason());
@@ -416,6 +417,10 @@ public class OrderService {
             notificationBody = "Khách hàng đã hủy đơn #" + order.getCode() + ".";
         }
 
+        if (wasPaid) {
+            order.markRefundPending();
+        }
+
         paymentTransactions.expirePendingSessionsForOrder(order.getId(), clock.instant());
 
         if (fromStatus != OrderStatus.AWAITING_PAYMENT) {
@@ -432,7 +437,9 @@ public class OrderService {
 
         var orderItems = items.findByOrderId(order.getId());
         restockOrderItems(order, orderItems);
-        return toResponse(orders.save(order), orderItems);
+        var saved = orders.save(order);
+        handlePaidOrderCancellation(saved, wasPaid);
+        return toResponse(saved, orderItems);
     }
 
     @Transactional
@@ -652,13 +659,18 @@ public class OrderService {
         access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_CANCEL);
 
         var from = order.getStatus();
+        var wasPaid = order.getPaymentStatus() == PaymentStatus.PAID;
         var orderItems = items.findByOrderId(order.getId());
 
         order.cancelBySeller(request.reason(), request.note());
+        if (wasPaid) {
+            order.markRefundPending();
+        }
         restockOrderItems(order, orderItems);
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CANCELLED, userId));
 
         var saved = orders.save(order);
+        handlePaidOrderCancellation(saved, wasPaid);
         var cancelDetail = "Hủy đơn hàng #" + saved.getCode() + " | Lý do: " + request.reason();
         if (request.note() != null && !request.note().isBlank()) {
             cancelDetail = cancelDetail + " (" + request.note() + ")";
@@ -687,9 +699,13 @@ public class OrderService {
         }
 
         var from = order.getStatus();
+        var wasPaid = order.getPaymentStatus() == PaymentStatus.PAID;
         var orderItems = items.findByOrderId(order.getId());
 
         order.cancelBySystem("Hết thời hạn xác nhận đơn hàng (" + pendingTimeoutHours + " giờ)", null);
+        if (wasPaid) {
+            order.markRefundPending();
+        }
         restockOrderItems(order, orderItems);
         histories.save(OrderStatusHistory.record(
             order.getId(),
@@ -700,6 +716,7 @@ public class OrderService {
         ));
 
         var saved = orders.save(order);
+        handlePaidOrderCancellation(saved, wasPaid);
         var cancelDetail = "Hệ thống tự động hủy đơn hàng #" + saved.getCode()
             + " do quá hạn " + pendingTimeoutHours + " giờ chưa xác nhận | Khôi phục tồn kho cho "
             + orderItems.size() + " mặt hàng";
@@ -799,11 +816,16 @@ public class OrderService {
     ) {
         var order = requireOrder(orderId);
         var from = order.getStatus();
+        var wasPaid = order.getPaymentStatus() == PaymentStatus.PAID;
         var orderItems = items.findByOrderId(order.getId());
 
         order.cancelByAdmin(reason, note);
+        if (wasPaid) {
+            order.markRefundPending();
+        }
         restockOrderItems(order, orderItems);
-        orders.save(order);
+        var saved = orders.save(order);
+        handlePaidOrderCancellation(saved, wasPaid);
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CANCELLED, adminId, note));
 
         notifications.create(
@@ -817,6 +839,44 @@ public class OrderService {
         );
 
         return requireAdminOrder(orderId);
+    }
+
+    @Transactional
+    public void settleOrderRefund(@NonNull UUID adminId, @NonNull UUID orderId, @NonNull String note) {
+        var order = requireOrder(orderId);
+        if (order.getPaymentStatus() != PaymentStatus.REFUND_PENDING) {
+            return;
+        }
+        order.markRefunded();
+        var saved = orders.save(order);
+        histories.save(OrderStatusHistory.record(
+            saved.getId(),
+            saved.getStatus(),
+            saved.getStatus(),
+            adminId,
+            "Đã hoàn tiền: " + note
+        ));
+        notifications.create(
+            Set.of(saved.getBuyerId()),
+            NotificationCategory.ORDER,
+            "ORDER_REFUNDED",
+            "Đơn #" + saved.getCode() + " đã được hoàn tiền",
+            "Khoản hoàn tiền cho đơn #" + saved.getCode() + " đã được xử lý: " + note,
+            "/account/orders/" + saved.getId(),
+            saved.getId()
+        );
+    }
+
+    private void handlePaidOrderCancellation(Order order, boolean wasPaid) {
+        if (!wasPaid) {
+            return;
+        }
+        revenue.cancelSettlementForOrder(order.getId());
+        paymentTransactions.flagOrderRefund(
+            order.getId(),
+            order.getTotal(),
+            "Đơn hàng #" + order.getCode() + " bị hủy sau khi đã thanh toán"
+        );
     }
 
     @Transactional(readOnly = true)

@@ -5,11 +5,14 @@ import com.minhnbnt.fashionstore.dto.order.CreateReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.RejectReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.ReturnEvidenceResponse;
 import com.minhnbnt.fashionstore.dto.order.ReturnRequestResponse;
+import com.minhnbnt.fashionstore.features.catalog.ProductStockService;
 import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
 import com.minhnbnt.fashionstore.features.notification.NotificationService;
+import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.ReturnEvidenceRepository;
 import com.minhnbnt.fashionstore.features.order.repository.ReturnRequestRepository;
+import com.minhnbnt.fashionstore.features.payment.PaymentTransactionService;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.features.upload.S3UrlService;
@@ -59,6 +62,14 @@ public class ReturnRequestService {
     private final ReturnEvidenceRepository evidence;
 
     private final OrderRepository orders;
+
+    private final OrderItemRepository orderItems;
+
+    private final ProductStockService productStock;
+
+    private final RevenueService revenue;
+
+    private final PaymentTransactionService paymentTransactions;
 
     private final ShopService shops;
 
@@ -255,7 +266,44 @@ public class ReturnRequestService {
         }
         audit.record(saved.getShopId(), userId, "RETURN_COMPLETE", "RETURN", saved.getId(), completeDetail);
 
-        var order = findOrderOrNull(saved.getOrderId());
+        var order = findLockedOrderOrNull(saved.getOrderId());
+        if (order != null) {
+            var resolution = saved.getResolution();
+            if (resolution == null || !"PARTIAL_REFUND".equalsIgnoreCase(resolution)) {
+                for (var item : orderItems.findByOrderId(order.getId())) {
+                    if (item.getVariantId() != null) {
+                        productStock.incrementVariantStock(item.getVariantId(), item.getQuantity());
+                        productStock.recordStockMovement(
+                            item.getVariantId(),
+                            order.getShopId(),
+                            item.getQuantity(),
+                            "ORDER_RETURN",
+                            order.getId()
+                        );
+                    }
+                }
+            }
+
+            long refundAmount = 0L;
+            if (saved.getRefundAmount() != null && saved.getRefundAmount() > 0) {
+                refundAmount = saved.getRefundAmount();
+            } else if ("REFUND".equalsIgnoreCase(resolution)) {
+                refundAmount = order.getSubtotal();
+            }
+
+            revenue.adjustSettlementOnReturn(order.getId(), refundAmount);
+
+            if (refundAmount > 0) {
+                order.markRefundPending();
+                orders.save(order);
+                paymentTransactions.flagOrderRefund(
+                    order.getId(),
+                    refundAmount,
+                    "Hoàn tiền đổi trả đơn #" + order.getCode()
+                );
+            }
+        }
+
         var label = orderLabel(order);
         notifications.create(
             Set.of(saved.getBuyerId()),
@@ -295,6 +343,18 @@ public class ReturnRequestService {
         }
 
         return result;
+    }
+
+    private @Nullable Order findLockedOrderOrNull(UUID orderId) {
+        var locked = orders.findLockedById(orderId);
+        if (locked != null && locked.isPresent()) {
+            return locked.get();
+        }
+        var byId = orders.findById(orderId);
+        if (byId != null && byId.isPresent()) {
+            return byId.get();
+        }
+        return findOrderOrNull(orderId);
     }
 
     private @Nullable Order findOrderOrNull(UUID orderId) {

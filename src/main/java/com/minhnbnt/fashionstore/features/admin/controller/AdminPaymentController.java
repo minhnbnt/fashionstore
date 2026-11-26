@@ -2,11 +2,16 @@ package com.minhnbnt.fashionstore.features.admin.controller;
 
 import com.minhnbnt.fashionstore.dto.common.PageResponse;
 import com.minhnbnt.fashionstore.dto.payment.AdminWithdrawalResponse;
+import com.minhnbnt.fashionstore.dto.payment.MarkRefundedRequest;
 import com.minhnbnt.fashionstore.dto.payment.PaymentGatewayResponse;
+import com.minhnbnt.fashionstore.dto.payment.PaymentTransactionResponse;
 import com.minhnbnt.fashionstore.dto.payment.UpdatePaymentGatewayRequest;
 import com.minhnbnt.fashionstore.features.order.RevenueService;
+import com.minhnbnt.fashionstore.features.payment.PaymentFlowService;
 import com.minhnbnt.fashionstore.features.payment.PaymentGatewayService;
 import com.minhnbnt.fashionstore.model.PaymentMethod;
+import com.minhnbnt.fashionstore.model.PaymentTransactionStatus;
+import com.minhnbnt.fashionstore.model.RefundStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -42,6 +47,8 @@ public class AdminPaymentController {
     private final PaymentGatewayService gateways;
 
     private final RevenueService revenue;
+
+    private final PaymentFlowService paymentFlow;
 
     @GetMapping("/payment-gateways")
     @Operation(
@@ -139,6 +146,56 @@ public class AdminPaymentController {
         @PathVariable UUID id
     ) {
         return revenue.rejectWithdrawal(adminIdOf(jwt), id);
+    }
+
+    @GetMapping("/payments/transactions")
+    @Operation(
+        operationId = "listPaymentTransactions",
+        summary = "Danh sách giao dịch thanh toán VietQR và đối soát hoàn tiền",
+        description = "Phân trang, lọc theo trạng thái giao dịch, trạng thái hoàn tiền "
+            + "và tìm kiếm theo mã giao dịch hoặc mã đơn hàng."
+    )
+    @ApiResponse(responseCode = "200", description = "Trang danh sách giao dịch thanh toán")
+    @ApiResponse(responseCode = "400", description = "Tham số lọc không hợp lệ")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải admin")
+    @SecurityRequirement(name = "bearerAuth")
+    public PageResponse<PaymentTransactionResponse> listPaymentTransactions(
+        @Parameter(description = "Lọc theo trạng thái giao dịch (PENDING, SUCCESS, UNDERPAID, FAILED, EXPIRED)")
+        @RequestParam(required = false) @Nullable PaymentTransactionStatus status,
+        @Parameter(description = "Lọc theo trạng thái hoàn tiền (NONE, PENDING, REFUNDED)")
+        @RequestParam(required = false) @Nullable RefundStatus refundStatus,
+        @Parameter(description = "Tìm theo mã giao dịch (txnRef), mã ngân hàng hoặc mã đơn hàng")
+        @RequestParam(required = false) @Nullable String q,
+        @Parameter(description = "Số trang (bắt đầu từ 0)")
+        @RequestParam(defaultValue = "0") int page,
+        @Parameter(description = "Số phần tử mỗi trang")
+        @RequestParam(defaultValue = "20") int size
+    ) {
+        return paymentFlow.searchTransactionsForAdmin(status, refundStatus, q, page, size);
+    }
+
+    @PatchMapping("/payments/transactions/{id}/refunded")
+    @Operation(
+        operationId = "markTransactionRefunded",
+        summary = "Xác nhận đã hoàn tiền cho giao dịch",
+        description = "Chuyển trạng thái hoàn tiền của giao dịch từ PENDING sang REFUNDED, "
+            + "đồng thời cập nhật trạng thái thanh toán của các đơn liên quan sang REFUNDED."
+    )
+    @ApiResponse(responseCode = "200", description = "Giao dịch đã được đánh dấu hoàn tiền")
+    @ApiResponse(responseCode = "400", description = "Ghi chú đối soát không hợp lệ (5-500 ký tự)")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải admin")
+    @ApiResponse(responseCode = "404", description = "Không tìm thấy giao dịch")
+    @ApiResponse(responseCode = "409", description = "Giao dịch không ở trạng thái chờ hoàn tiền (PENDING)")
+    @SecurityRequirement(name = "bearerAuth")
+    public PaymentTransactionResponse markTransactionRefunded(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "ID giao dịch thanh toán")
+        @PathVariable UUID id,
+        @Valid @RequestBody MarkRefundedRequest request
+    ) {
+        return paymentFlow.markTransactionRefunded(adminIdOf(jwt), id, request.note());
     }
 
     private static UUID adminIdOf(Jwt jwt) {

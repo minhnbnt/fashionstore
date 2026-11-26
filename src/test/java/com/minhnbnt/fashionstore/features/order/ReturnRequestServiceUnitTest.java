@@ -3,16 +3,21 @@ package com.minhnbnt.fashionstore.features.order;
 import com.minhnbnt.fashionstore.dto.order.ApproveReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.CreateReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.RejectReturnRequest;
+import com.minhnbnt.fashionstore.features.catalog.ProductStockService;
 import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
 import com.minhnbnt.fashionstore.features.notification.NotificationService;
+import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.ReturnEvidenceRepository;
 import com.minhnbnt.fashionstore.features.order.repository.ReturnRequestRepository;
+import com.minhnbnt.fashionstore.features.payment.PaymentTransactionService;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.features.upload.S3UrlService;
 import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.model.Order;
+import com.minhnbnt.fashionstore.model.OrderItem;
+import com.minhnbnt.fashionstore.model.PaymentStatus;
 import com.minhnbnt.fashionstore.model.ReturnRequest;
 import com.minhnbnt.fashionstore.model.ShopPermission;
 import com.minhnbnt.fashionstore.model.Upload;
@@ -33,8 +38,11 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,6 +54,18 @@ class ReturnRequestServiceUnitTest {
 
     @Mock
     private OrderRepository orders;
+
+    @Mock
+    private OrderItemRepository orderItems;
+
+    @Mock
+    private ProductStockService productStock;
+
+    @Mock
+    private RevenueService revenue;
+
+    @Mock
+    private PaymentTransactionService paymentTransactions;
 
     @Mock
     private ShopService shops;
@@ -309,5 +329,107 @@ class ReturnRequestServiceUnitTest {
             eq("/account/orders/" + order.getId()),
             eq(rejectedEntity.getId())
         );
+    }
+
+    @Test
+    void completeFullRefundReturnRestocksInventoryAdjustsSettlementAndFlagsOrderRefundPending() {
+        var buyerId = UUID.randomUUID();
+        var sellerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var productId = UUID.randomUUID();
+        var variantId = UUID.randomUUID();
+
+        var order = Order.create("ORD-FULL-RET", shopId, buyerId, 200_000L, 30_000L, "An", "090", "HN");
+        order.confirm();
+        order.ship();
+        order.deliver();
+
+        var item = OrderItem.snapshot(order.getId(), productId, variantId, "Ao Khoac", "L / Den", "SKU-1", 100_000L, 2);
+
+        var req = ReturnRequest.create(order.getId(), shopId, buyerId, "DAMAGED", "Rach ao");
+        req.approve("REFUND", 230_000L, "Hoan du");
+
+        when(returns.findById(req.getId())).thenReturn(Optional.of(req));
+        when(returns.save(any(ReturnRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orders.findLockedById(order.getId())).thenReturn(Optional.of(order));
+        when(orderItems.findByOrderId(order.getId())).thenReturn(List.of(item));
+
+        var resp = returnService.complete(sellerId, req.getId(), "Da nhan hang hoan");
+
+        assertThat(resp.status()).isEqualTo("COMPLETED");
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUND_PENDING);
+        verify(productStock).incrementVariantStock(variantId, 2);
+        verify(productStock).recordStockMovement(variantId, shopId, 2, "ORDER_RETURN", order.getId());
+        verify(revenue).adjustSettlementOnReturn(order.getId(), 230_000L);
+        verify(orders).save(order);
+        verify(paymentTransactions).flagOrderRefund(
+            order.getId(),
+            230_000L,
+            "Hoàn tiền đổi trả đơn #" + order.getCode()
+        );
+    }
+
+    @Test
+    void completePartialRefundReturnSkipsRestockAdjustsSettlementAndFlagsOrderRefundPending() {
+        var buyerId = UUID.randomUUID();
+        var sellerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+
+        var order = Order.create("ORD-PART-RET", shopId, buyerId, 200_000L, 30_000L, "An", "090", "HN");
+        order.confirm();
+        order.ship();
+        order.deliver();
+
+        var req = ReturnRequest.create(order.getId(), shopId, buyerId, "DAMAGED", "Xước nhẹ");
+        req.approve("PARTIAL_REFUND", 50_000L, "Hoan 50k");
+
+        when(returns.findById(req.getId())).thenReturn(Optional.of(req));
+        when(returns.save(any(ReturnRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orders.findLockedById(order.getId())).thenReturn(Optional.of(order));
+
+        var resp = returnService.complete(sellerId, req.getId(), "Hoan mot phan");
+
+        assertThat(resp.status()).isEqualTo("COMPLETED");
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.REFUND_PENDING);
+        verify(productStock, never()).incrementVariantStock(any(), anyInt());
+        verify(revenue).adjustSettlementOnReturn(order.getId(), 50_000L);
+        verify(orders).save(order);
+        verify(paymentTransactions).flagOrderRefund(
+            order.getId(),
+            50_000L,
+            "Hoàn tiền đổi trả đơn #" + order.getCode()
+        );
+    }
+
+    @Test
+    void completeExchangeReturnRestocksInventoryReleasesSettlementAndDoesNotFlagRefund() {
+        var buyerId = UUID.randomUUID();
+        var sellerId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+        var productId = UUID.randomUUID();
+        var variantId = UUID.randomUUID();
+
+        var order = Order.create("ORD-EXCH-RET", shopId, buyerId, 200_000L, 30_000L, "An", "090", "HN");
+        order.confirm();
+        order.ship();
+        order.deliver();
+
+        var item = OrderItem.snapshot(order.getId(), productId, variantId, "Ao So Mi", "M / Trang", "SKU-2", 200_000L, 1);
+
+        var req = ReturnRequest.create(order.getId(), shopId, buyerId, "WRONG_ITEM", "Giao nham size");
+        req.approve("EXCHANGE", 0L, "Doi sang size M");
+
+        when(returns.findById(req.getId())).thenReturn(Optional.of(req));
+        when(returns.save(any(ReturnRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orders.findLockedById(order.getId())).thenReturn(Optional.of(order));
+        when(orderItems.findByOrderId(order.getId())).thenReturn(List.of(item));
+
+        var resp = returnService.complete(sellerId, req.getId(), "Da doi hang");
+
+        assertThat(resp.status()).isEqualTo("COMPLETED");
+        verify(productStock).incrementVariantStock(variantId, 1);
+        verify(productStock).recordStockMovement(variantId, shopId, 1, "ORDER_RETURN", order.getId());
+        verify(revenue).adjustSettlementOnReturn(order.getId(), 0L);
+        verify(paymentTransactions, never()).flagOrderRefund(any(), anyLong(), anyString());
     }
 }

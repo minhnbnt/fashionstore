@@ -1,9 +1,15 @@
 package com.minhnbnt.fashionstore.features.payment;
 
+import com.minhnbnt.fashionstore.dto.common.PageResponse;
+import com.minhnbnt.fashionstore.dto.payment.PaymentTransactionResponse;
 import com.minhnbnt.fashionstore.dto.payment.VietQrSessionResponse;
+import com.minhnbnt.fashionstore.features.identity.IdentityDirectoryService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
-import com.minhnbnt.fashionstore.features.order.RevenueService;
+import com.minhnbnt.fashionstore.features.settings.ConfigAuditService;
+import com.minhnbnt.fashionstore.model.ConfigAuditEntity;
+import com.minhnbnt.fashionstore.model.PaymentTransaction;
 import com.minhnbnt.fashionstore.model.PaymentTransactionStatus;
+import com.minhnbnt.fashionstore.model.RefundStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -25,9 +31,11 @@ public class PaymentFlowService {
 
     private final OrderService orderService;
 
-    private final RevenueService revenue;
-
     private final PaymentGatewayService paymentGateways;
+
+    private final IdentityDirectoryService identityDirectory;
+
+    private final ConfigAuditService configAudit;
 
     private final Clock clock;
 
@@ -87,9 +95,6 @@ public class PaymentFlowService {
         tx.markSuccess(transferAmount, bankTransactionId, transferContent, rawPayload, now);
         for (var orderId : orderIds) {
             var outcome = orderService.applyVietQrPaymentSuccess(orderId, tx.getTxnRef());
-            if (outcome.activated()) {
-                revenue.createSettlementForOrder(outcome.shopId(), outcome.orderId(), outcome.subtotal());
-            }
             if (outcome.refundRequired() && outcome.refundReason() != null) {
                 tx.addRefund(outcome.total(), outcome.refundReason(), now);
             }
@@ -160,5 +165,85 @@ public class PaymentFlowService {
             }
         }
         return count;
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<PaymentTransactionResponse> searchTransactionsForAdmin(
+        @Nullable PaymentTransactionStatus status,
+        @Nullable RefundStatus refundStatus,
+        @Nullable String q,
+        int page,
+        int size
+    ) {
+        var safePage = Math.max(0, page);
+        var safeSize = Math.clamp(size, 1, 100);
+        var found = paymentTransactions.searchForAdmin(status, refundStatus, q, safePage, safeSize);
+        var total = paymentTransactions.countForAdmin(status, refundStatus, q);
+        var items = found.stream()
+            .map(this::toTransactionResponse)
+            .toList();
+        return new PageResponse<>(items, total, safePage, safeSize);
+    }
+
+    @Transactional
+    public PaymentTransactionResponse markTransactionRefunded(
+        UUID adminId,
+        UUID transactionId,
+        String note
+    ) {
+        var tx = paymentTransactions.findLockedById(transactionId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment transaction not found"));
+
+        var trimmedNote = note.trim();
+        tx.markRefunded(adminId, trimmedNote, clock.instant());
+        var saved = paymentTransactions.save(tx);
+
+        var orderIds = paymentTransactions.findOrderIdsByTransactionId(saved.getId());
+        for (var orderId : orderIds) {
+            orderService.settleOrderRefund(adminId, orderId, trimmedNote);
+        }
+
+        configAudit.record(
+            ConfigAuditEntity.PAYMENT_TRANSACTION,
+            saved.getTxnRef(),
+            "REFUND",
+            "PENDING",
+            "REFUNDED: " + trimmedNote,
+            adminId
+        );
+
+        return toTransactionResponse(saved);
+    }
+
+    private PaymentTransactionResponse toTransactionResponse(PaymentTransaction tx) {
+        var buyerEmail = "";
+        var account = identityDirectory.findById(tx.getBuyerId()).orElse(null);
+        if (account != null && account.email() != null) {
+            buyerEmail = account.email();
+        }
+        var briefs = paymentTransactions.findOrderBriefsByTransactionId(tx.getId());
+        return new PaymentTransactionResponse(
+            tx.getId(),
+            tx.getBuyerId(),
+            buyerEmail,
+            tx.getProvider(),
+            tx.getTxnRef(),
+            tx.getAmount(),
+            tx.getReceivedAmount(),
+            tx.getStatus().name(),
+            tx.getBankCode(),
+            tx.getAccountNumber(),
+            tx.getBankTransactionId(),
+            tx.getTransferContent(),
+            tx.getPaidAt(),
+            tx.getExpiresAt(),
+            tx.getRefundStatus().name(),
+            tx.getRefundAmount(),
+            tx.getRefundReason(),
+            tx.getRefundedAt(),
+            tx.getRefundNote(),
+            briefs,
+            tx.getCreatedAt()
+        );
     }
 }

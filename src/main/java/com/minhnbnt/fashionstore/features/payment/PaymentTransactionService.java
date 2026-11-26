@@ -1,13 +1,16 @@
 package com.minhnbnt.fashionstore.features.payment;
 
 import com.minhnbnt.fashionstore.dto.payment.PaymentGatewayResponse;
+import com.minhnbnt.fashionstore.dto.payment.VietQrOrderBrief;
 import com.minhnbnt.fashionstore.dto.payment.VietQrSessionResponse;
 import com.minhnbnt.fashionstore.features.payment.repository.PaymentTransactionRepository;
 import com.minhnbnt.fashionstore.model.Order;
 import com.minhnbnt.fashionstore.model.PaymentMethod;
 import com.minhnbnt.fashionstore.model.PaymentTransaction;
 import com.minhnbnt.fashionstore.model.PaymentTransactionStatus;
+import com.minhnbnt.fashionstore.model.RefundStatus;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -88,6 +91,11 @@ public class PaymentTransactionService {
     }
 
     @Transactional(readOnly = true)
+    public List<VietQrOrderBrief> findOrderBriefsByTransactionId(UUID transactionId) {
+        return transactions.findOrderBriefsByTransactionId(transactionId);
+    }
+
+    @Transactional(readOnly = true)
     public Optional<PaymentTransaction> findByTxnRef(String txnRef) {
         return transactions.findByTxnRef(txnRef);
     }
@@ -95,6 +103,31 @@ public class PaymentTransactionService {
     @Transactional
     public Optional<PaymentTransaction> findLockedByTxnRef(String txnRef) {
         return transactions.findLockedByTxnRef(txnRef);
+    }
+
+    @Transactional
+    public Optional<PaymentTransaction> findLockedById(UUID id) {
+        return transactions.findLockedById(id);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentTransaction> searchForAdmin(
+        @Nullable PaymentTransactionStatus status,
+        @Nullable RefundStatus refundStatus,
+        @Nullable String q,
+        int page,
+        int size
+    ) {
+        return transactions.searchForAdmin(status, refundStatus, q, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public long countForAdmin(
+        @Nullable PaymentTransactionStatus status,
+        @Nullable RefundStatus refundStatus,
+        @Nullable String q
+    ) {
+        return transactions.countForAdmin(status, refundStatus, q);
     }
 
     @Transactional
@@ -129,6 +162,9 @@ public class PaymentTransactionService {
 
     @Transactional
     public void flagOrderRefund(UUID orderId, long refundAmount, String reason) {
+        if (refundAmount <= 0) {
+            return;
+        }
         var list = transactions.findTransactionsByOrderId(orderId);
         for (var tx : list) {
             if (tx.getStatus() == PaymentTransactionStatus.SUCCESS) {
