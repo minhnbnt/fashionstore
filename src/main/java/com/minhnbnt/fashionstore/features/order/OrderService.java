@@ -839,7 +839,10 @@ public class OrderService {
             order.getCancelledAt(),
             itemResponses,
             monitoring.timeline(orderId),
-            returnRequests.listForOrder(orderId)
+            returnRequests.listForOrder(orderId),
+            order.getVoucherId(),
+            order.getVoucherCode(),
+            order.getDiscountAmount()
         );
     }
 

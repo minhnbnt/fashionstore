@@ -427,6 +427,7 @@ class VoucherServiceTest {
         var ownerId = createUser();
         var shopId = createApprovedShop(ownerId, "Audit Shop");
         var productA = createShopProduct(shopId, ownerId, "Đầm Công Sở");
+        var productB = createShopProduct(shopId, ownerId, "Chân Váy Xếp Ly");
         var now = clock.instant();
         var startsAt = now.minusSeconds(300);
         var endsAt = now.plusSeconds(3600);
@@ -516,6 +517,33 @@ class VoucherServiceTest {
                 endsAt,
                 true,
                 List.of(productA.getId())
+            )
+        ))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+            .isEqualTo(HttpStatus.CONFLICT);
+
+        // Updating productIds of SPECIFIC_PRODUCTS when usedCount > 0 -> 409 CONFLICT
+        assertThatThrownBy(() -> vouchers.update(
+            ownerId,
+            shopId,
+            created.id(),
+            new UpdateShopVoucherRequest(
+                "EDITME20",
+                "Đổi sản phẩm áp dụng khi đã dùng",
+                "Mô tả 2",
+                VoucherDiscountType.PERCENTAGE,
+                20L,
+                50_000L,
+                150_000L,
+                VoucherProductScope.SPECIFIC_PRODUCTS,
+                VoucherVisibility.PRIVATE,
+                10,
+                2,
+                startsAt,
+                endsAt,
+                true,
+                List.of(productB.getId())
             )
         ))
             .isInstanceOf(ResponseStatusException.class)

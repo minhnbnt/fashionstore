@@ -189,6 +189,16 @@ public class VoucherService {
         }
 
         var validatedProductIds = resolveValidatedProductIds(shopId, request.productScope(), request.productIds());
+        if (voucher.getUsedCount() > 0 && voucher.getProductScope() == VoucherProductScope.SPECIFIC_PRODUCTS) {
+            var existingProductIds = new LinkedHashSet<>(vouchers.findProductIdsByVoucherId(voucher.getId()));
+            var requestedProductIds = new LinkedHashSet<>(validatedProductIds);
+            if (!existingProductIds.equals(requestedProductIds)) {
+                throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Cannot modify core discount terms of a voucher that has already been used"
+                );
+            }
+        }
         var now = clock.instant();
 
         voucher.update(

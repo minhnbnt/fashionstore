@@ -271,6 +271,11 @@ class OrderVoucherIntegrationTest {
 
         var tx = paymentTransactions.findByTxnRef(txnRef).orElseThrow();
         assertThat(tx.getAmount()).isEqualTo(510_000L);
+
+        var adminDetail1 = orderService.getForAdmin(placedShop1.id());
+        assertThat(adminDetail1.voucherId()).isEqualTo(shop1Voucher.id());
+        assertThat(adminDetail1.voucherCode()).isEqualTo("SHOP1V50K");
+        assertThat(adminDetail1.discountAmount()).isEqualTo(50_000L);
     }
 
     @Test
