@@ -16,7 +16,9 @@ public enum ShopPermission {
     REVIEW_READ,
     REVIEW_REPLY,
     CHAT_ACCESS,
-    DECORATION_WRITE;
+    DECORATION_WRITE,
+    VOUCHER_READ,
+    VOUCHER_WRITE;
 
     public static Optional<ShopPermission> parse(String raw) {
         for (var permission : values()) {
