@@ -31,8 +31,6 @@ public class PaymentFlowService {
 
     private final OrderService orderService;
 
-    private final PaymentGatewayService paymentGateways;
-
     private final IdentityDirectoryService identityDirectory;
 
     private final ConfigAuditService configAudit;
@@ -111,35 +109,51 @@ public class PaymentFlowService {
     }
 
     @Transactional
-    public VietQrSessionResponse simulateTransfer(
-        UUID callerId,
-        boolean isAdmin,
-        String txnRef,
+    public PaymentTransactionResponse confirmTransferByAdmin(
+        UUID adminId,
+        UUID transactionId,
         @Nullable Long amount
     ) {
-        var gateway = paymentGateways.requireActiveVietQrGateway();
-        if (!gateway.isSandboxMode()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "VietQR sandbox simulation is disabled");
-        }
-
-        var tx = paymentTransactions.findByTxnRef(txnRef)
+        var tx = paymentTransactions.findLockedById(transactionId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment transaction not found"));
 
-        if (!isAdmin && !tx.getBuyerId().equals(callerId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment transaction not found");
+        if (tx.getStatus() == PaymentTransactionStatus.SUCCESS) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment transaction is already paid");
         }
 
-        var simulatedAmount = tx.getAmount();
+        var prevStatus = tx.getStatus().name();
+        var receivedAmount = tx.getAmount();
         if (amount != null) {
             if (amount <= 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Simulated transfer amount must be positive");
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Confirmed transfer amount must be positive"
+                );
             }
-            simulatedAmount = amount;
+            receivedAmount = amount;
         }
 
-        var bankTxId = "SBX-" + UUID.randomUUID().toString().substring(0, 8);
-        processIncomingTransfer("SANDBOX " + txnRef, simulatedAmount, bankTxId, "{\"sandbox\":true}");
-        return getSessionForViewer(callerId, isAdmin, txnRef);
+        var bankTxId = "ADM-" + UUID.randomUUID().toString().substring(0, 8);
+        processIncomingTransfer(
+            "ADMIN_CONFIRM " + tx.getTxnRef(),
+            receivedAmount,
+            bankTxId,
+            "{\"adminId\":\"" + adminId + "\"}"
+        );
+
+        var updated = paymentTransactions.findLockedById(transactionId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment transaction not found"));
+
+        configAudit.record(
+            ConfigAuditEntity.PAYMENT_TRANSACTION,
+            updated.getTxnRef(),
+            "CONFIRM_TRANSFER",
+            prevStatus,
+            updated.getStatus().name() + ": " + receivedAmount,
+            adminId
+        );
+
+        return toTransactionResponse(updated);
     }
 
     @Transactional(noRollbackFor = ResponseStatusException.class)

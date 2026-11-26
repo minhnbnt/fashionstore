@@ -127,22 +127,6 @@ class PaymentControllerTest {
     }
 
     @Test
-    void simulateVietQrTransferDelegatesToPaymentFlowService() throws Exception {
-        var buyerId = UUID.randomUUID();
-        var txnRef = "DHMQ1234567890";
-        when(paymentFlow.simulateTransfer(buyerId, false, txnRef, 180_000L))
-            .thenReturn(sampleSession(txnRef, "UNDERPAID", 360_000L, 180_000L));
-
-        mockMvc.perform(post("/api/payments/vietqr/{txnRef}/simulate", txnRef)
-                .with(jwt().jwt(builder -> builder.subject(buyerId.toString())))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"amount\":180000}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.status").value("UNDERPAID"))
-            .andExpect(jsonPath("$.receivedAmount").value(180000));
-    }
-
-    @Test
     void retryVietQrPaymentEndpointCreatesOrReturnsSession() throws Exception {
         var buyerId = UUID.randomUUID();
         var orderId = UUID.randomUUID();

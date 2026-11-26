@@ -5,6 +5,7 @@ import com.minhnbnt.fashionstore.dto.payment.AdminWithdrawalResponse;
 import com.minhnbnt.fashionstore.dto.payment.MarkRefundedRequest;
 import com.minhnbnt.fashionstore.dto.payment.PaymentGatewayResponse;
 import com.minhnbnt.fashionstore.dto.payment.PaymentTransactionResponse;
+import com.minhnbnt.fashionstore.dto.payment.SimulateVietQrRequest;
 import com.minhnbnt.fashionstore.dto.payment.UpdatePaymentGatewayRequest;
 import com.minhnbnt.fashionstore.features.order.RevenueService;
 import com.minhnbnt.fashionstore.features.payment.PaymentFlowService;
@@ -25,6 +26,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -173,6 +175,33 @@ public class AdminPaymentController {
         @RequestParam(defaultValue = "20") int size
     ) {
         return paymentFlow.searchTransactionsForAdmin(status, refundStatus, q, page, size);
+    }
+
+    @PostMapping("/payments/transactions/{id}/confirm-transfer")
+    @Operation(
+        operationId = "confirmPaymentTransfer",
+        summary = "Xác nhận hoặc giả lập đã nhận tiền chuyển khoản VietQR",
+        description = "Dành cho Admin đối soát thủ công sao kê ngân hàng hoặc giả lập biến động số dư "
+            + "(nhận đủ 100% hoặc chuyển thiếu). Tự động kích hoạt đơn hàng sang PENDING/PAID nếu nhận đủ tiền."
+    )
+    @ApiResponse(responseCode = "200", description = "Giao dịch sau khi xác nhận nhận tiền")
+    @ApiResponse(responseCode = "400", description = "Số tiền xác nhận không hợp lệ")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải admin")
+    @ApiResponse(responseCode = "404", description = "Không tìm thấy giao dịch")
+    @ApiResponse(responseCode = "409", description = "Giao dịch đã được thanh toán trước đó")
+    @SecurityRequirement(name = "bearerAuth")
+    public PaymentTransactionResponse confirmPaymentTransfer(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "ID giao dịch thanh toán")
+        @PathVariable UUID id,
+        @RequestBody(required = false) @Valid @Nullable SimulateVietQrRequest request
+    ) {
+        Long amount = null;
+        if (request != null) {
+            amount = request.amount();
+        }
+        return paymentFlow.confirmTransferByAdmin(adminIdOf(jwt), id, amount);
     }
 
     @PatchMapping("/payments/transactions/{id}/refunded")

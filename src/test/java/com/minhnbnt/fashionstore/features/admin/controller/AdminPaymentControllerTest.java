@@ -37,6 +37,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -288,6 +289,20 @@ class AdminPaymentControllerTest {
 
         when(paymentFlow.markTransactionRefunded(adminId, txId, "Đã chuyển khoản hoàn tiền qua MB Bank"))
             .thenReturn(refundedTx);
+        when(paymentFlow.confirmTransferByAdmin(adminId, txId, 230_000L))
+            .thenReturn(pendingRefundTx);
+
+        mockMvc.perform(post("/api/admin/payments/transactions/{id}/confirm-transfer", txId)
+                .with(jwt()))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/admin/payments/transactions/{id}/confirm-transfer", txId)
+                .with(admin(adminId))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":230000}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(txId.toString()))
+            .andExpect(jsonPath("$.status").value("SUCCESS"));
 
         mockMvc.perform(get("/api/admin/payments/transactions")
                 .param("status", "SUCCESS")

@@ -318,7 +318,7 @@ Chi tiết luồng này xem `docs/wishlist.md`.
 |------|---|--------|------|-------|
 | [x] | 114 | GET | `/api/public/payment-methods` | Danh sách cổng thanh toán đang bật (`COD`, `VIETQR`) kèm giới hạn COD và thời gian giữ đơn |
 | [x] | 115 | GET | `/api/payments/vietqr/{txnRef}` | Buyer/Admin xem phiên thanh toán mã VietQR (ảnh QR, ngân hàng, số tiền, hạn thanh toán, các đơn gộp) |
-| [x] | 116 | POST | `/api/payments/vietqr/{txnRef}/simulate` | Giả lập ngân hàng báo nhận chuyển khoản VietQR (chỉ khi `sandboxMode = true`) |
+| [x] | 116 | POST | `/api/admin/payments/transactions/{id}/confirm-transfer` | Admin đối soát thủ công sao kê hoặc giả lập đã nhận tiền chuyển khoản VietQR (nhận đủ / chuyển thiếu) |
 | [x] | 117 | POST | `/api/orders/{id}/payments/vietqr` | Buyer tạo/lấy lại phiên thanh toán VietQR cho đơn `AWAITING_PAYMENT` còn hạn |
 | [x] | 118 | POST | `/api/public/payments/vietqr/webhook` | Webhook biến động số dư (SePay/Casso) xác thực `webhookSecret` constant-time và đối chiếu số tiền |
 | [x] | 119 | GET | `/api/admin/payment-gateways` | Admin xem cấu hình các cổng thanh toán (`webhookSecret` write-only) |

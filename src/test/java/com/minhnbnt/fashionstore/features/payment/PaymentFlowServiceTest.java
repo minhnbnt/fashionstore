@@ -8,7 +8,6 @@ import com.minhnbnt.fashionstore.dto.identity.CreateUserRequest;
 import com.minhnbnt.fashionstore.dto.order.BuyerCancelOrderRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutItemRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
-import com.minhnbnt.fashionstore.dto.payment.UpdatePaymentGatewayRequest;
 import com.minhnbnt.fashionstore.features.cart.CartService;
 import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
@@ -46,9 +45,6 @@ class PaymentFlowServiceTest {
 
     @Autowired
     private PaymentFlowService paymentFlow;
-
-    @Autowired
-    private PaymentGatewayService paymentGateways;
 
     @Autowired
     private PaymentExpiryJob paymentExpiryJob;
@@ -404,7 +400,7 @@ class PaymentFlowServiceTest {
     }
 
     @Test
-    void simulateTransferWorksInSandboxAndRejectsWhenSandboxDisabled() {
+    void confirmTransferByAdminConfirmsFullOrUnderpaidTransferAndRejectsAlreadyPaid() {
         var ownerId = mirroredUser();
         var buyerId = mirroredUser();
         var adminId = mirroredUser();
@@ -424,28 +420,23 @@ class PaymentFlowServiceTest {
             )
         );
         var txnRef = Objects.requireNonNull(created.paymentTxnRef());
+        var session = paymentFlow.getSessionForViewer(buyerId, false, txnRef);
 
-        var simulated = paymentFlow.simulateTransfer(buyerId, false, txnRef, null);
-        assertThat(simulated.status()).isEqualTo("SUCCESS");
+        var underpaid = paymentFlow.confirmTransferByAdmin(adminId, session.transactionId(), 50_000L);
+        assertThat(underpaid.status()).isEqualTo("UNDERPAID");
+        assertThat(underpaid.receivedAmount()).isEqualTo(50_000L);
+        assertThat(underpaid.refundStatus()).isEqualTo("PENDING");
+        assertThat(orders.getDetail(buyerId, created.id()).status()).isEqualTo("AWAITING_PAYMENT");
+
+        var confirmed = paymentFlow.confirmTransferByAdmin(adminId, session.transactionId(), null);
+        assertThat(confirmed.status()).isEqualTo("SUCCESS");
+        assertThat(confirmed.receivedAmount()).isEqualTo(130_000L);
         assertThat(orders.getDetail(buyerId, created.id()).status()).isEqualTo("PENDING");
         assertThat(orders.getDetail(buyerId, created.id()).paymentStatus()).isEqualTo("PAID");
 
-        paymentGateways.update(
-            adminId,
-            PaymentMethod.VIETQR,
-            new UpdatePaymentGatewayRequest(null, null, null, null, null, null, false)
-        );
-        try {
-            assertThatThrownBy(() -> paymentFlow.simulateTransfer(buyerId, false, txnRef, null))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-                .isEqualTo(HttpStatus.CONFLICT);
-        } finally {
-            paymentGateways.update(
-                adminId,
-                PaymentMethod.VIETQR,
-                new UpdatePaymentGatewayRequest(null, null, null, null, null, null, true)
-            );
-        }
+        assertThatThrownBy(() -> paymentFlow.confirmTransferByAdmin(adminId, session.transactionId(), null))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+            .isEqualTo(HttpStatus.CONFLICT);
     }
 }
