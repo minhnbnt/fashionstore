@@ -38,9 +38,9 @@ public record CreateProductRequest(
     @Valid
     List<CreateVariantRequest> variants,
 
-    @Schema(description = "Danh sách ảnh sản phẩm (tối thiểu 3, tối đa 9 ảnh)")
+    @Schema(description = "Danh sách ảnh sản phẩm (tối thiểu 1, tối đa 9 ảnh)")
     @NotNull(message = "Product images are required")
-    @Size(min = 3, max = 9, message = "Product requires between 3 and 9 images")
+    @Size(min = 1, max = 9, message = "Product requires between 1 and 9 images")
     @Valid
     List<ImageItemRequest> images,
 
