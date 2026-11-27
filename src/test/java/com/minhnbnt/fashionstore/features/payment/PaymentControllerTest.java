@@ -3,6 +3,7 @@ package com.minhnbnt.fashionstore.features.payment;
 import com.minhnbnt.fashionstore.config.SecurityConfig;
 import com.minhnbnt.fashionstore.dto.payment.VietQrOrderBrief;
 import com.minhnbnt.fashionstore.dto.payment.VietQrSessionResponse;
+import com.minhnbnt.fashionstore.dto.payment.VietQrWebhookRequest;
 import com.minhnbnt.fashionstore.features.order.OrderService;
 import com.minhnbnt.fashionstore.features.order.controller.OrderController;
 import com.minhnbnt.fashionstore.features.payment.controller.PaymentController;
@@ -16,11 +17,13 @@ import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -97,7 +100,7 @@ class PaymentControllerTest {
             "Ngân hàng TMCP Quân đội (MB Bank)",
             "0900123456789",
             "SAN TMDT FASHIONSTORE",
-            "demo-vietqr-secret-key",
+            "configured-vietqr-webhook-secret",
             true,
             Instant.parse("2026-11-26T10:00:00Z"),
             null,
@@ -176,7 +179,7 @@ class PaymentControllerTest {
         ));
 
         mockMvc.perform(post("/api/public/payments/vietqr/webhook")
-                .header("Authorization", "Apikey demo-vietqr-secret-key")
+                .header("Authorization", "Apikey configured-vietqr-webhook-secret")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -192,7 +195,7 @@ class PaymentControllerTest {
             .andExpect(jsonPath("$.txnRef").value("DHMQ1234567890"));
 
         mockMvc.perform(post("/api/public/payments/vietqr/webhook")
-                .header("Authorization", "Apikey demo-vietqr-secret-key")
+                .header("Authorization", "Apikey configured-vietqr-webhook-secret")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -207,14 +210,78 @@ class PaymentControllerTest {
             .andExpect(jsonPath("$.outcome").value("IGNORED"));
 
         var bearerResp = publicPaymentController.vietQrWebhook(
-            "Bearer demo-vietqr-secret-key",
-            new com.minhnbnt.fashionstore.dto.payment.VietQrWebhookRequest(
+            "Bearer configured-vietqr-webhook-secret",
+            new VietQrWebhookRequest(
                 "MBVCB CK DHMQ1234567890",
                 360_000L,
                 "FT999",
                 "in"
             )
         );
-        org.assertj.core.api.Assertions.assertThat(bearerResp.outcome()).isEqualTo("SUCCESS");
+        assertThat(bearerResp.outcome()).isEqualTo("SUCCESS");
+    }
+
+    @Test
+    void vietQrWebhookRejectsInsecureDefaultDemoSecretEvenWhenHeaderMatches() throws Exception {
+        var insecureGateway = new PaymentGateway(
+            "VIETQR",
+            "Chuyển khoản ngân hàng (VietQR)",
+            true,
+            "970422",
+            "MB",
+            "Ngân hàng TMCP Quân đội (MB Bank)",
+            "0900123456789",
+            "SAN TMDT FASHIONSTORE",
+            "demo-vietqr-secret-key",
+            true,
+            Instant.parse("2026-11-26T10:00:00Z"),
+            null,
+            false
+        );
+        when(gateways.requireActiveVietQrGateway()).thenReturn(insecureGateway);
+
+        mockMvc.perform(post("/api/public/payments/vietqr/webhook")
+                .header("Authorization", "Apikey demo-vietqr-secret-key")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"content\":\"CK DHMQ1234567890\",\"transferAmount\":360000,\"transferType\":\"in\"}"))
+            .andExpect(status().isUnauthorized());
+
+        verify(paymentFlow, never()).processIncomingTransfer(anyString(), anyLong(), any(), anyString());
+    }
+
+    @Test
+    void vietQrWebhookIgnoresZeroOrNegativeTransferAmount() throws Exception {
+        when(gateways.requireActiveVietQrGateway()).thenReturn(activeVietQrGateway());
+
+        mockMvc.perform(post("/api/public/payments/vietqr/webhook")
+                .header("Authorization", "Apikey configured-vietqr-webhook-secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"content\":\"CK DHMQ1234567890\",\"transferAmount\":0,\"transferType\":\"in\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.outcome").value("IGNORED"));
+
+        mockMvc.perform(post("/api/public/payments/vietqr/webhook")
+                .header("Authorization", "Apikey configured-vietqr-webhook-secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"content\":\"CK DHMQ1234567890\",\"transferAmount\":-10000,\"transferType\":\"in\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.outcome").value("IGNORED"));
+
+        mockMvc.perform(post("/api/public/payments/vietqr/webhook")
+                .header("Authorization", "Apikey configured-vietqr-webhook-secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"content\":\"CK DHMQ1234567890\",\"transferType\":\"in\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.outcome").value("IGNORED"));
+
+        verify(paymentFlow, never()).processIncomingTransfer(anyString(), anyLong(), any(), anyString());
+    }
+
+    @Test
+    void toRawPayloadJsonEscapesControlCharactersInBankNarration() throws Exception {
+        var rawContent = "CK\nDHMQ1234567890\r\t\"\\\u0007";
+        var rawJson = new VietQrWebhookRequest(rawContent, 360_000L, "FT1", "in").toRawPayloadJson();
+        var tree = new ObjectMapper().readTree(rawJson);
+        assertThat(tree.get("content").asText()).isEqualTo(rawContent);
     }
 }

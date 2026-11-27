@@ -191,7 +191,8 @@ public class ShopVoucher implements Persistable<UUID> {
                 || this.discountValue != discountValue
                 || !Objects.equals(this.maxDiscountAmount, normalizedMaxDiscount)
                 || this.minOrderSubtotal != minOrderSubtotal
-                || this.productScope != productScope;
+                || this.productScope != productScope
+                || !this.startsAt.equals(startsAt);
             if (coreChanged) {
                 throw new ResponseStatusException(
                     HttpStatus.CONFLICT,

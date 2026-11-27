@@ -207,4 +207,46 @@ class RevenueServiceUnitTest {
             .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
             .isEqualTo(HttpStatus.CONFLICT);
     }
+
+    @Test
+    void cancelAndAdjustSettlementAlsoUpdateAlreadyReleasedSettlement() {
+        var shopId = UUID.randomUUID();
+
+        var order1 = UUID.randomUUID();
+        var releasedToCancel = SellerSettlement.create(shopId, order1, 200000L, 10000L);
+        releasedToCancel.release();
+        when(settlements.findByOrderId(order1)).thenReturn(Optional.of(releasedToCancel));
+
+        revenueService.cancelSettlementForOrder(order1);
+        assertThat(releasedToCancel.getStatus()).isEqualTo(SettlementStatus.CANCELLED);
+        verify(settlements).save(releasedToCancel);
+
+        var order2 = UUID.randomUUID();
+        var releasedToAdjust = SellerSettlement.create(shopId, order2, 200000L, 10000L);
+        releasedToAdjust.release();
+        when(settlements.findByOrderId(order2)).thenReturn(Optional.of(releasedToAdjust));
+
+        revenueService.adjustSettlementOnReturn(order2, 50000L);
+        assertThat(releasedToAdjust.getGrossAmount()).isEqualTo(150000L);
+        assertThat(releasedToAdjust.getPlatformFee()).isEqualTo(7500L);
+        assertThat(releasedToAdjust.getNetAmount()).isEqualTo(142500L);
+        assertThat(releasedToAdjust.getStatus()).isEqualTo(SettlementStatus.RELEASED);
+        verify(settlements).save(releasedToAdjust);
+    }
+
+    @Test
+    void getSummaryExposesNegativeWalletBalanceWithoutClampingToZero() {
+        var userId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+
+        when(orders.sumDeliveredRevenue(shopId))
+            .thenReturn(new OrderRepository.RevenueSummaryRow(200000L, 1L, 200000L));
+        when(settlements.sumAvailableBalance(shopId)).thenReturn(50000L);
+        when(withdrawals.sumActiveWithdrawals(shopId)).thenReturn(190000L);
+        when(settlements.sumHoldingBalance(shopId)).thenReturn(0L);
+
+        var summary = revenueService.getSummary(userId, shopId);
+
+        assertThat(summary.walletBalance()).isEqualTo(-140000L);
+    }
 }

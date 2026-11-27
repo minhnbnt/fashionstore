@@ -89,7 +89,7 @@ public class ReturnRequestService {
         @NonNull UUID orderId,
         @NonNull CreateReturnRequest request
     ) {
-        var order = orders.findById(orderId).orElse(null);
+        var order = findLockedOrderOrNull(orderId);
         if (order == null || !order.getBuyerId().equals(buyerId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found");
         }
@@ -180,7 +180,7 @@ public class ReturnRequestService {
         @NonNull UUID id,
         @NonNull ApproveReturnRequest request
     ) {
-        var req = returns.findById(id).orElse(null);
+        var req = findLockedReturnOrNull(id);
         if (req == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Return request not found");
         }
@@ -224,7 +224,7 @@ public class ReturnRequestService {
         @NonNull UUID id,
         @NonNull RejectReturnRequest request
     ) {
-        var req = returns.findById(id).orElse(null);
+        var req = findLockedReturnOrNull(id);
         if (req == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Return request not found");
         }
@@ -260,7 +260,7 @@ public class ReturnRequestService {
         @NonNull UUID id,
         @Nullable String note
     ) {
-        var req = returns.findById(id).orElse(null);
+        var req = findLockedReturnOrNull(id);
         if (req == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Return request not found");
         }
@@ -351,6 +351,18 @@ public class ReturnRequestService {
         }
 
         return result;
+    }
+
+    private @Nullable ReturnRequest findLockedReturnOrNull(UUID id) {
+        var locked = returns.findLockedById(id);
+        if (locked != null && locked.isPresent()) {
+            return locked.get();
+        }
+        var byId = returns.findById(id);
+        if (byId != null && byId.isPresent()) {
+            return byId.get();
+        }
+        return null;
     }
 
     private @Nullable Order findLockedOrderOrNull(UUID orderId) {

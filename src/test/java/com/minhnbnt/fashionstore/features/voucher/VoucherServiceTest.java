@@ -550,6 +550,33 @@ class VoucherServiceTest {
             .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
             .isEqualTo(HttpStatus.CONFLICT);
 
+        // Updating startsAt when usedCount > 0 -> 409 CONFLICT
+        assertThatThrownBy(() -> vouchers.update(
+            ownerId,
+            shopId,
+            created.id(),
+            new UpdateShopVoucherRequest(
+                "EDITME20",
+                "Đổi thời gian bắt đầu khi đã dùng",
+                "Mô tả 2",
+                VoucherDiscountType.PERCENTAGE,
+                20L,
+                50_000L,
+                150_000L,
+                VoucherProductScope.SPECIFIC_PRODUCTS,
+                VoucherVisibility.PRIVATE,
+                10,
+                2,
+                startsAt.plusSeconds(600),
+                endsAt,
+                true,
+                List.of(productA.getId())
+            )
+        ))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+            .isEqualTo(HttpStatus.CONFLICT);
+
         // Deleting when usedCount > 0 -> 409 CONFLICT
         assertThatThrownBy(() -> vouchers.delete(ownerId, shopId, created.id()))
             .isInstanceOf(ResponseStatusException.class)

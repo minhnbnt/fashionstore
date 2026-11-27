@@ -203,4 +203,23 @@ class AdminOrderControllerTest {
 
         verifyNoInteractions(adminOrders);
     }
+
+    @Test
+    void markRefundedDelegatesToAdminOrderService() throws Exception {
+        var id = UUID.randomUUID();
+        var now = Instant.now();
+        var refundedOrder = new AdminOrderResponse(
+            id, "ORD-AB12CD34", UUID.randomUUID(), "Shop An", "shop-an", UUID.randomUUID(), "buyer@t.local",
+            "Nguyen An", "0901234567", "DELIVERED", "REFUNDED", 200000L, 2, "Ao thun", null, null, null, null, now, now
+        );
+        when(adminOrders.settleRefund(ADMIN_ID, id, "Đã hoàn tiền ngoài hệ thống"))
+            .thenReturn(refundedOrder);
+
+        mockMvc.perform(patch("/api/admin/orders/{id}/refunded", id)
+                .with(admin())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"note\":\"Đã hoàn tiền ngoài hệ thống\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.paymentStatus").value("REFUNDED"));
+    }
 }

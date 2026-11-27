@@ -74,7 +74,7 @@ class PaymentGatewayServiceTest {
                 bank_name = 'Ngân hàng TMCP Quân đội (MB Bank)',
                 account_number = '0900123456789',
                 account_name = 'SAN TMDT FASHIONSTORE',
-                webhook_secret = 'demo-vietqr-secret-key',
+                webhook_secret = 'rotated-test-vietqr-secret',
                 sandbox_mode = TRUE,
                 updated_by = NULL
             WHERE code = 'VIETQR'
@@ -114,12 +114,27 @@ class PaymentGatewayServiceTest {
         );
         assertThat(updated.bankCode()).isEqualTo("VCB");
         assertThat(updated.webhookSecretSet()).isTrue();
-        assertThat(gateways.requireActiveVietQrGateway().getWebhookSecret()).isEqualTo("demo-vietqr-secret-key");
+        assertThat(gateways.requireActiveVietQrGateway().getWebhookSecret()).isEqualTo("rotated-test-vietqr-secret");
 
         var auditItems = audits.page(ConfigAuditEntity.PAYMENT_GATEWAY, 0, 10).items();
         assertThat(auditItems).hasSize(1);
         assertThat(auditItems.getFirst().newValue()).contains("****");
-        assertThat(auditItems.getFirst().newValue()).doesNotContain("demo-vietqr-secret-key");
+        assertThat(auditItems.getFirst().newValue()).doesNotContain("rotated-test-vietqr-secret");
+    }
+
+    @Test
+    void disablingSandboxModeWhileKeepingInsecureDemoWebhookSecretIsRejectedWithConflict() {
+        jdbc.sql("UPDATE payment_gateway SET webhook_secret = 'demo-vietqr-secret-key' WHERE code = 'VIETQR'")
+            .update();
+
+        assertThatThrownBy(() -> gateways.update(
+            adminId,
+            PaymentMethod.VIETQR,
+            new UpdatePaymentGatewayRequest(true, null, null, null, null, null, false)
+        ))
+            .isInstanceOf(ResponseStatusException.class)
+            .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+            .isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test

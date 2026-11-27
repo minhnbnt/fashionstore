@@ -8,6 +8,7 @@ import com.minhnbnt.fashionstore.dto.admin.AdminOrderFilter;
 import com.minhnbnt.fashionstore.dto.admin.AdminOrderResponse;
 import com.minhnbnt.fashionstore.dto.admin.AdminOrderSummaryResponse;
 import com.minhnbnt.fashionstore.dto.common.PageResponse;
+import com.minhnbnt.fashionstore.dto.payment.MarkRefundedRequest;
 import com.minhnbnt.fashionstore.model.OrderAlert;
 import com.minhnbnt.fashionstore.model.OrderStatus;
 import io.swagger.v3.oas.annotations.Operation;
@@ -143,6 +144,27 @@ public class AdminOrderController {
         @Valid @RequestBody AdminCancelOrderRequest request
     ) {
         return adminOrders.cancel(adminIdOf(jwt), id, request.reason(), request.note());
+    }
+
+    @PatchMapping("/{id}/refunded")
+    @Operation(
+        operationId = "adminMarkOrderRefunded",
+        summary = "Xác nhận đã hoàn tiền cho đơn hàng",
+        description = "Dành cho đơn ở trạng thái REFUND_PENDING (ví dụ đơn COD trả hàng hoàn tiền ngoài hệ thống)."
+    )
+    @ApiResponse(responseCode = "200", description = "Đơn hàng đã chuyển sang trạng thái REFUNDED")
+    @ApiResponse(responseCode = "400", description = "Ghi chú đối soát không hợp lệ")
+    @ApiResponse(responseCode = "401", description = "Thiếu hoặc sai JWT")
+    @ApiResponse(responseCode = "403", description = "Không phải admin")
+    @ApiResponse(responseCode = "404", description = "Đơn không tồn tại")
+    @ApiResponse(responseCode = "409", description = "Đơn không ở trạng thái chờ hoàn tiền (REFUND_PENDING)")
+    @SecurityRequirement(name = "bearerAuth")
+    public AdminOrderResponse markRefunded(
+        @AuthenticationPrincipal Jwt jwt,
+        @Parameter(description = "id đơn") @PathVariable UUID id,
+        @Valid @RequestBody MarkRefundedRequest request
+    ) {
+        return adminOrders.settleRefund(adminIdOf(jwt), id, request.note());
     }
 
     private static UUID adminIdOf(Jwt jwt) {

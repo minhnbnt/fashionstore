@@ -165,11 +165,16 @@ public class CartService {
         }
 
         var selected = selectLines(lines, request.variantIds());
+        var selectedVariantIds = selected.stream().map(CartItem::getVariantId).toList();
+        var variantsById = catalog.findVariantsByIds(selectedVariantIds);
 
         var totalsByShop = new LinkedHashMap<UUID, ShopLineTotals>();
         var voucherLinesByShop = new LinkedHashMap<UUID, List<VoucherLineItem>>();
         for (var item : selected) {
-            var variant = catalog.findVariantById(item.getVariantId()).orElse(null);
+            var variant = variantsById.get(item.getVariantId());
+            if (variant == null && variantsById.isEmpty()) {
+                variant = catalog.findVariantById(item.getVariantId()).orElse(null);
+            }
             if (variant == null) {
                 continue;
             }
@@ -263,7 +268,7 @@ public class CartService {
 
     @Transactional
     public List<OrderResponse> checkout(@NonNull UUID buyerId, @NonNull CartCheckoutRequest request) {
-        var cart = getOrCreate(buyerId);
+        var cart = getOrCreateLocked(buyerId);
         cart.touch();
         carts.save(cart);
         var lines = items.findByCartIdOrderByCreatedAtAsc(cart.getId());
@@ -517,6 +522,18 @@ public class CartService {
 
     private Cart getOrCreate(UUID buyerId) {
         var cart = carts.findByBuyerId(buyerId).orElse(null);
+        if (cart == null) {
+            cart = Cart.create(buyerId);
+        }
+
+        return cart;
+    }
+
+    private Cart getOrCreateLocked(UUID buyerId) {
+        var cart = carts.findLockedByBuyerId(buyerId).orElse(null);
+        if (cart == null) {
+            cart = carts.findByBuyerId(buyerId).orElse(null);
+        }
         if (cart == null) {
             cart = Cart.create(buyerId);
         }

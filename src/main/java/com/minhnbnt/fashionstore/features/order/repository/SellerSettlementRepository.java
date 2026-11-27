@@ -23,12 +23,13 @@ public interface SellerSettlementRepository extends CrudRepository<SellerSettlem
     Optional<SellerSettlement> findLockedByOrderId(UUID orderId);
 
     @Query("""
-        SELECT COALESCE(SUM(net_amount), 0)
+        SELECT id
         FROM seller_settlement
         WHERE shop_id = :shopId
           AND status IN ('RELEASED', 'WITHDRAWN')
+        FOR UPDATE
         """)
-    long sumAvailableBalance(UUID shopId);
+    List<UUID> lockReleasedByShopId(UUID shopId);
 
     @Query("""
         SELECT COALESCE(SUM(net_amount), 0)
@@ -36,7 +37,7 @@ public interface SellerSettlementRepository extends CrudRepository<SellerSettlem
         WHERE shop_id = :shopId
           AND status IN ('RELEASED', 'WITHDRAWN')
         """)
-    long sumReleasedBalance(UUID shopId);
+    long sumAvailableBalance(UUID shopId);
 
     @Query("SELECT COALESCE(SUM(net_amount), 0) FROM seller_settlement WHERE shop_id = :shopId AND status = 'HOLDING'")
     long sumHoldingBalance(UUID shopId);

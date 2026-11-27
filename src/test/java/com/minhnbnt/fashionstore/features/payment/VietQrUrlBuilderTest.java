@@ -55,8 +55,7 @@ class VietQrUrlBuilderTest {
             "0900123456789",
             "SAN TMDT FASHIONSTORE",
             "https://img.vietqr.io/image/970422-0900123456789-compact2.png",
-            now.plusSeconds(900),
-            now
+            now.plusSeconds(900)
         );
 
         assertThatThrownBy(() -> tx.markRefunded(UUID.randomUUID(), "Ghi chu", now))
@@ -71,6 +70,13 @@ class VietQrUrlBuilderTest {
         assertThat(tx.getRefundAmount()).isEqualTo(150_000L);
         assertThat(tx.getRefundReason()).isEqualTo("Khách chuyển thiếu tiền (150000/200000₫)");
 
+        tx.markSuccess(50_000L, "FT1-B", "CK DHMQ1234567890", "{}", now);
+        assertThat(tx.getStatus()).isEqualTo(PaymentTransactionStatus.SUCCESS);
+        assertThat(tx.getReceivedAmount()).isEqualTo(200_000L);
+        assertThat(tx.getRefundStatus()).isEqualTo(RefundStatus.NONE);
+        assertThat(tx.getRefundAmount()).isZero();
+        assertThat(tx.getRefundReason()).isNull();
+
         var overpaidTx = PaymentTransaction.create(
             UUID.randomUUID(),
             "DHMQ0987654321",
@@ -80,8 +86,7 @@ class VietQrUrlBuilderTest {
             "0900123456789",
             "SAN TMDT FASHIONSTORE",
             "https://img.vietqr.io/image/970422-0900123456789-compact2.png",
-            now.plusSeconds(900),
-            now
+            now.plusSeconds(900)
         );
         overpaidTx.markSuccess(250_000L, "FT2", "CK DHMQ0987654321", "{}", now);
         assertThat(overpaidTx.getStatus()).isEqualTo(PaymentTransactionStatus.SUCCESS);

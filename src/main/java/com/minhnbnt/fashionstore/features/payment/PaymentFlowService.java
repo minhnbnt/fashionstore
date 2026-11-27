@@ -42,11 +42,6 @@ public class PaymentFlowService {
         return paymentTransactions.getSessionForViewer(txnRef, viewerId, isAdmin);
     }
 
-    @Transactional(readOnly = true)
-    public VietQrSessionResponse getSessionForViewer(String txnRef, UUID viewerId, boolean isAdmin) {
-        return paymentTransactions.getSessionForViewer(txnRef, viewerId, isAdmin);
-    }
-
     @Transactional
     public TransferProcessResult processIncomingTransfer(
         String transferContent,
@@ -54,20 +49,31 @@ public class PaymentFlowService {
         @Nullable String bankTransactionId,
         String rawPayload
     ) {
+        if (transferAmount <= 0L) {
+            return new TransferProcessResult(TransferOutcome.IGNORED, null, 0L, transferAmount, List.of());
+        }
+
         var txnRef = VietQrUrlBuilder.extractTxnRef(transferContent);
         if (txnRef == null) {
             return new TransferProcessResult(TransferOutcome.NOT_FOUND, null, 0L, transferAmount, List.of());
         }
 
-        var txOpt = paymentTransactions.findLockedByTxnRef(txnRef);
-        if (txOpt.isEmpty()) {
+        var txUnlocked = paymentTransactions.findByTxnRef(txnRef);
+        if (txUnlocked.isEmpty()) {
             return new TransferProcessResult(TransferOutcome.NOT_FOUND, txnRef, 0L, transferAmount, List.of());
         }
 
-        var tx = txOpt.get();
-        var orderIds = paymentTransactions.findOrderIdsByTransactionId(tx.getId());
+        var txId = txUnlocked.get().getId();
+        var orderIds = paymentTransactions.findOrderIdsByTransactionId(txId);
+        orderService.lockOrdersInOrder(orderIds);
 
-        if (tx.getStatus() == PaymentTransactionStatus.SUCCESS) {
+        var tx = paymentTransactions.findLockedById(txId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment transaction not found"));
+
+        if (tx.getStatus() == PaymentTransactionStatus.SUCCESS
+            || (bankTransactionId != null
+                && !bankTransactionId.isBlank()
+                && bankTransactionId.equals(tx.getBankTransactionId()))) {
             return new TransferProcessResult(
                 TransferOutcome.ALREADY_PROCESSED,
                 tx.getTxnRef(),
@@ -78,14 +84,15 @@ public class PaymentFlowService {
         }
 
         var now = clock.instant();
-        if (transferAmount < tx.getAmount()) {
+        long effectiveHeld = tx.getReceivedAmount() + transferAmount - tx.alreadyRefundedAmount();
+        if (effectiveHeld < tx.getAmount()) {
             tx.markUnderpaid(transferAmount, bankTransactionId, transferContent, rawPayload, now);
             paymentTransactions.save(tx);
             return new TransferProcessResult(
                 TransferOutcome.UNDERPAID,
                 tx.getTxnRef(),
                 tx.getAmount(),
-                transferAmount,
+                tx.getReceivedAmount(),
                 orderIds
             );
         }
@@ -103,7 +110,7 @@ public class PaymentFlowService {
             TransferOutcome.SUCCESS,
             tx.getTxnRef(),
             tx.getAmount(),
-            transferAmount,
+            tx.getReceivedAmount(),
             orderIds
         );
     }
@@ -114,7 +121,7 @@ public class PaymentFlowService {
         UUID transactionId,
         @Nullable Long amount
     ) {
-        var tx = paymentTransactions.findLockedById(transactionId)
+        var tx = paymentTransactions.findById(transactionId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment transaction not found"));
 
         if (tx.getStatus() == PaymentTransactionStatus.SUCCESS) {
@@ -122,7 +129,8 @@ public class PaymentFlowService {
         }
 
         var prevStatus = tx.getStatus().name();
-        var receivedAmount = tx.getAmount();
+        long effectiveHeld = Math.max(0L, tx.getReceivedAmount() - tx.alreadyRefundedAmount());
+        var transferDelta = Math.max(1L, tx.getAmount() - effectiveHeld);
         if (amount != null) {
             if (amount <= 0) {
                 throw new ResponseStatusException(
@@ -130,18 +138,18 @@ public class PaymentFlowService {
                     "Confirmed transfer amount must be positive"
                 );
             }
-            receivedAmount = amount;
+            transferDelta = amount;
         }
 
         var bankTxId = "ADM-" + UUID.randomUUID().toString().substring(0, 8);
         processIncomingTransfer(
             "ADMIN_CONFIRM " + tx.getTxnRef(),
-            receivedAmount,
+            transferDelta,
             bankTxId,
             "{\"adminId\":\"" + adminId + "\"}"
         );
 
-        var updated = paymentTransactions.findLockedById(transactionId)
+        var updated = paymentTransactions.findById(transactionId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment transaction not found"));
 
         configAudit.record(
@@ -149,7 +157,7 @@ public class PaymentFlowService {
             updated.getTxnRef(),
             "CONFIRM_TRANSFER",
             prevStatus,
-            updated.getStatus().name() + ": " + receivedAmount,
+            updated.getStatus().name() + ": " + updated.getReceivedAmount(),
             adminId
         );
 
@@ -205,6 +213,12 @@ public class PaymentFlowService {
         UUID transactionId,
         String note
     ) {
+        if (paymentTransactions.findById(transactionId).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment transaction not found");
+        }
+        var orderIds = paymentTransactions.findOrderIdsByTransactionId(transactionId);
+        orderService.lockOrdersInOrder(orderIds);
+
         var tx = paymentTransactions.findLockedById(transactionId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment transaction not found"));
 
@@ -212,7 +226,6 @@ public class PaymentFlowService {
         tx.markRefunded(adminId, trimmedNote, clock.instant());
         var saved = paymentTransactions.save(tx);
 
-        var orderIds = paymentTransactions.findOrderIdsByTransactionId(saved.getId());
         for (var orderId : orderIds) {
             orderService.settleOrderRefund(adminId, orderId, trimmedNote);
         }

@@ -41,7 +41,7 @@ INSERT INTO payment_gateway (
         'Ngân hàng TMCP Quân đội (MB Bank)',
         '0900123456789',
         'SAN TMDT FASHIONSTORE',
-        'demo-vietqr-secret-key',
+        gen_random_uuid()::text,
         TRUE
     );
 
@@ -105,3 +105,5 @@ CREATE INDEX idx_pto_order ON payment_transaction_order (order_id);
 ALTER TABLE seller_settlement DROP CONSTRAINT IF EXISTS seller_settlement_status_check;
 ALTER TABLE seller_settlement ADD CONSTRAINT seller_settlement_status_check
     CHECK (status IN ('HOLDING', 'RELEASED', 'WITHDRAWN', 'CANCELLED'));
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_seller_settlement_order ON seller_settlement (order_id);

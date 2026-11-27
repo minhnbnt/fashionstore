@@ -158,17 +158,26 @@ public class ShopVoucherRepository {
             return;
         }
 
-        var insertSql = """
-            INSERT INTO shop_voucher_product (voucher_id, product_id)
-            VALUES (:voucherId, :productId)
-            ON CONFLICT (voucher_id, product_id) DO NOTHING
-            """;
+        var sql = new StringBuilder(
+            "INSERT INTO shop_voucher_product (voucher_id, product_id) VALUES "
+        );
+        var params = new HashMap<String, Object>();
+        params.put("voucherId", voucherId);
+        int idx = 0;
         for (var productId : productIds) {
-            jdbc.sql(insertSql)
-                .param("voucherId", voucherId)
-                .param("productId", productId)
-                .update();
+            if (idx > 0) {
+                sql.append(", ");
+            }
+            var paramName = "p" + idx;
+            sql.append("(:voucherId, :").append(paramName).append(')');
+            params.put(paramName, productId);
+            idx++;
         }
+        sql.append(" ON CONFLICT (voucher_id, product_id) DO NOTHING");
+
+        jdbc.sql(sql.toString())
+            .params(params)
+            .update();
     }
 
     public void replaceVoucherProducts(UUID voucherId, Collection<UUID> productIds) {
@@ -225,6 +234,31 @@ public class ShopVoucherRepository {
             .param("buyerId", buyerId)
             .query(Integer.class)
             .single();
+    }
+
+    public Map<UUID, Integer> countActiveUsagesByBuyerForVouchers(Collection<UUID> voucherIds, UUID buyerId) {
+        if (voucherIds.isEmpty()) {
+            return Map.of();
+        }
+        var sql = """
+            SELECT voucher_id, COUNT(*) AS cnt
+            FROM orders
+            WHERE buyer_id = :buyerId
+              AND voucher_id IN (:voucherIds)
+              AND status <> 'CANCELLED'
+            GROUP BY voucher_id
+            """;
+        var result = new HashMap<UUID, Integer>();
+        jdbc.sql(sql)
+            .param("buyerId", buyerId)
+            .param("voucherIds", voucherIds)
+            .query((rs, rowNum) -> {
+                var vId = Objects.requireNonNull(rs.getObject("voucher_id", UUID.class));
+                result.put(vId, rs.getInt("cnt"));
+                return vId;
+            })
+            .list();
+        return result;
     }
 
     public void decrementUsedCount(UUID voucherId, Instant now) {
