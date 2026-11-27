@@ -1,5 +1,5 @@
+import { mkdir, writeFile, stat } from 'node:fs/promises'
 import path from 'node:path'
-import { readFileSync } from 'node:fs'
 import {
   normalizeShop,
   normalizeProduct,
@@ -29,33 +29,60 @@ export const UNIQLO_QUERIES = [
 ]
 
 // ---------------------------------------------------------------------------
-// Shop pool: load from existing shops.json (the 50 Tiki shops)
+// 50 inline Uniqlo-themed shops
 // ---------------------------------------------------------------------------
 
-function loadShopPool() {
-  try {
-    const shopsPath = path.resolve(
-      import.meta.dirname,
-      '..', '..', '..', '..', 'data', 'marketplace-import', 'shops.json',
-    )
-    const raw = readFileSync(shopsPath, 'utf8')
-    const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed)) {
-      return parsed
-    }
-    if (Array.isArray(parsed.shops)) {
-      return parsed.shops
-    }
-  } catch {
-    // Fall through to built-in fallback
-  }
-  return FALLBACK_SHOP_POOL
-}
-
-// Fallback minimal shop pool in case shops.json is not found
-const FALLBACK_SHOP_POOL = [
-  { shopKey: 'UNIQLO-VN001', source: 'UNIQLO', sourceShopId: 'VN001', name: 'UNIQLO Vietnam Official', isOfficial: true, address: 'Quận 1, TP. Hồ Chí Minh', rating: 4.9, ratingCount: 1200 },
-  { shopKey: 'UNIQLO-VN002', source: 'UNIQLO', sourceShopId: 'VN002', name: 'UNIQLO Hà Nội', isOfficial: true, address: 'Quận Cầu Giấy, Hà Nội', rating: 4.8, ratingCount: 950 },
+export const UNIQLO_SHOPS = [
+  { shopKey: 'UNIQLO-VN001', name: 'Uniqlo AIRism - Hà Nội', address: 'Quận Cầu Giấy, Hà Nội', rating: 4.8, ratingCount: 1340 },
+  { shopKey: 'UNIQLO-VN002', name: 'Uniqlo AIRism - Hồ Chí Minh', address: 'Quận 1, TP. Hồ Chí Minh', rating: 4.7, ratingCount: 980 },
+  { shopKey: 'UNIQLO-VN003', name: 'Uniqlo AIRism - Thanh Xuân', address: 'Quận Thanh Xuân, Hà Nội', rating: 4.8, ratingCount: 760 },
+  { shopKey: 'UNIQLO-VN004', name: 'Uniqlo AIRism - Phú Nhuận', address: 'Quận Phú Nhuận, TP. Hồ Chí Minh', rating: 4.7, ratingCount: 820 },
+  { shopKey: 'UNIQLO-VN005', name: 'Uniqlo AIRism - Đống Đa', address: 'Quận Đống Đa, Hà Nội', rating: 4.9, ratingCount: 1100 },
+  { shopKey: 'UNIQLO-VN006', name: 'Uniqlo HEATTECH - Quận 3', address: 'Quận 3, TP. Hồ Chí Minh', rating: 4.8, ratingCount: 670 },
+  { shopKey: 'UNIQLO-VN007', name: 'Uniqlo HEATTECH - Hải Châu', address: 'Quận Hải Châu, Đà Nẵng', rating: 4.7, ratingCount: 530 },
+  { shopKey: 'UNIQLO-VN008', name: 'Uniqlo HEATTECH - Bình Thạnh', address: 'Quận Bình Thạnh, TP. Hồ Chí Minh', rating: 4.8, ratingCount: 890 },
+  { shopKey: 'UNIQLO-VN009', name: 'Uniqlo HEATTECH - Hoàn Kiếm', address: 'Quận Hoàn Kiếm, Hà Nội', rating: 4.9, ratingCount: 1250 },
+  { shopKey: 'UNIQLO-VN010', name: 'Uniqlo HEATTECH - Tân Bình', address: 'Quận Tân Bình, TP. Hồ Chí Minh', rating: 4.7, ratingCount: 740 },
+  { shopKey: 'UNIQLO-VN011', name: 'Uniqlo LifeWear - Cầu Giấy', address: 'Quận Cầu Giấy, Hà Nội', rating: 4.8, ratingCount: 920 },
+  { shopKey: 'UNIQLO-VN012', name: 'Uniqlo LifeWear - Quận 1', address: 'Quận 1, TP. Hồ Chí Minh', rating: 4.9, ratingCount: 1480 },
+  { shopKey: 'UNIQLO-VN013', name: 'Uniqlo LifeWear - Thanh Xuân', address: 'Quận Thanh Xuân, Hà Nội', rating: 4.7, ratingCount: 610 },
+  { shopKey: 'UNIQLO-VN014', name: 'Uniqlo LifeWear - Phú Nhuận', address: 'Quận Phú Nhuận, TP. Hồ Chí Minh', rating: 4.8, ratingCount: 770 },
+  { shopKey: 'UNIQLO-VN015', name: 'Uniqlo LifeWear - Đống Đa', address: 'Quận Đống Đa, Hà Nội', rating: 4.7, ratingCount: 550 },
+  { shopKey: 'UNIQLO-VN016', name: 'Uniqlo Linen - Quận 3', address: 'Quận 3, TP. Hồ Chí Minh', rating: 4.8, ratingCount: 680 },
+  { shopKey: 'UNIQLO-VN017', name: 'Uniqlo Linen - Hải Châu', address: 'Quận Hải Châu, Đà Nẵng', rating: 4.7, ratingCount: 490 },
+  { shopKey: 'UNIQLO-VN018', name: 'Uniqlo Linen - Bình Thạnh', address: 'Quận Bình Thạnh, TP. Hồ Chí Minh', rating: 4.9, ratingCount: 1030 },
+  { shopKey: 'UNIQLO-VN019', name: 'Uniqlo Linen - Hoàn Kiếm', address: 'Quận Hoàn Kiếm, Hà Nội', rating: 4.8, ratingCount: 860 },
+  { shopKey: 'UNIQLO-VN020', name: 'Uniqlo Linen - Tân Bình', address: 'Quận Tân Bình, TP. Hồ Chí Minh', rating: 4.7, ratingCount: 720 },
+  { shopKey: 'UNIQLO-VN021', name: 'Uniqlo Denim - Cầu Giấy', address: 'Quận Cầu Giấy, Hà Nội', rating: 4.9, ratingCount: 1120 },
+  { shopKey: 'UNIQLO-VN022', name: 'Uniqlo Denim - Quận 1', address: 'Quận 1, TP. Hồ Chí Minh', rating: 4.8, ratingCount: 950 },
+  { shopKey: 'UNIQLO-VN023', name: 'Uniqlo Denim - Thanh Xuân', address: 'Quận Thanh Xuân, Hà Nội', rating: 4.7, ratingCount: 630 },
+  { shopKey: 'UNIQLO-VN024', name: 'Uniqlo Denim - Phú Nhuận', address: 'Quận Phú Nhuận, TP. Hồ Chí Minh', rating: 4.8, ratingCount: 810 },
+  { shopKey: 'UNIQLO-VN025', name: 'Uniqlo Denim - Đống Đa', address: 'Quận Đống Đa, Hà Nội', rating: 4.7, ratingCount: 570 },
+  { shopKey: 'UNIQLO-VN026', name: 'Uniqlo Flannel - Quận 3', address: 'Quận 3, TP. Hồ Chí Minh', rating: 4.8, ratingCount: 700 },
+  { shopKey: 'UNIQLO-VN027', name: 'Uniqlo Flannel - Hải Châu', address: 'Quận Hải Châu, Đà Nẵng', rating: 4.7, ratingCount: 460 },
+  { shopKey: 'UNIQLO-VN028', name: 'Uniqlo Flannel - Bình Thạnh', address: 'Quận Bình Thạnh, TP. Hồ Chí Minh', rating: 4.9, ratingCount: 1050 },
+  { shopKey: 'UNIQLO-VN029', name: 'Uniqlo Flannel - Hoàn Kiếm', address: 'Quận Hoàn Kiếm, Hà Nội', rating: 4.8, ratingCount: 880 },
+  { shopKey: 'UNIQLO-VN030', name: 'Uniqlo Flannel - Tân Bình', address: 'Quận Tân Bình, TP. Hồ Chí Minh', rating: 4.7, ratingCount: 730 },
+  { shopKey: 'UNIQLO-VN031', name: 'Uniqlo BLOCKTECH - Cầu Giấy', address: 'Quận Cầu Giấy, Hà Nội', rating: 4.8, ratingCount: 940 },
+  { shopKey: 'UNIQLO-VN032', name: 'Uniqlo BLOCKTECH - Quận 1', address: 'Quận 1, TP. Hồ Chí Minh', rating: 4.9, ratingCount: 1300 },
+  { shopKey: 'UNIQLO-VN033', name: 'Uniqlo BLOCKTECH - Thanh Xuân', address: 'Quận Thanh Xuân, Hà Nội', rating: 4.7, ratingCount: 590 },
+  { shopKey: 'UNIQLO-VN034', name: 'Uniqlo BLOCKTECH - Phú Nhuận', address: 'Quận Phú Nhuận, TP. Hồ Chí Minh', rating: 4.8, ratingCount: 790 },
+  { shopKey: 'UNIQLO-VN035', name: 'Uniqlo BLOCKTECH - Đống Đa', address: 'Quận Đống Đa, Hà Nội', rating: 4.7, ratingCount: 540 },
+  { shopKey: 'UNIQLO-VN036', name: 'Uniqlo Men Basic - Quận 3', address: 'Quận 3, TP. Hồ Chí Minh', rating: 4.8, ratingCount: 710 },
+  { shopKey: 'UNIQLO-VN037', name: 'Uniqlo Men Basic - Hải Châu', address: 'Quận Hải Châu, Đà Nẵng', rating: 4.7, ratingCount: 480 },
+  { shopKey: 'UNIQLO-VN038', name: 'Uniqlo Men Basic - Bình Thạnh', address: 'Quận Bình Thạnh, TP. Hồ Chí Minh', rating: 4.9, ratingCount: 1070 },
+  { shopKey: 'UNIQLO-VN039', name: 'Uniqlo Men Basic - Hoàn Kiếm', address: 'Quận Hoàn Kiếm, Hà Nội', rating: 4.8, ratingCount: 870 },
+  { shopKey: 'UNIQLO-VN040', name: 'Uniqlo Men Basic - Tân Bình', address: 'Quận Tân Bình, TP. Hồ Chí Minh', rating: 4.7, ratingCount: 750 },
+  { shopKey: 'UNIQLO-VN041', name: 'Uniqlo Women Basic - Cầu Giấy', address: 'Quận Cầu Giấy, Hà Nội', rating: 4.9, ratingCount: 1180 },
+  { shopKey: 'UNIQLO-VN042', name: 'Uniqlo Women Basic - Quận 1', address: 'Quận 1, TP. Hồ Chí Minh', rating: 4.8, ratingCount: 1010 },
+  { shopKey: 'UNIQLO-VN043', name: 'Uniqlo Women Basic - Thanh Xuân', address: 'Quận Thanh Xuân, Hà Nội', rating: 4.7, ratingCount: 640 },
+  { shopKey: 'UNIQLO-VN044', name: 'Uniqlo Women Basic - Phú Nhuận', address: 'Quận Phú Nhuận, TP. Hồ Chí Minh', rating: 4.8, ratingCount: 830 },
+  { shopKey: 'UNIQLO-VN045', name: 'Uniqlo Women Basic - Đống Đa', address: 'Quận Đống Đa, Hà Nội', rating: 4.7, ratingCount: 560 },
+  { shopKey: 'UNIQLO-VN046', name: 'Uniqlo Accessories - Quận 3', address: 'Quận 3, TP. Hồ Chí Minh', rating: 4.8, ratingCount: 690 },
+  { shopKey: 'UNIQLO-VN047', name: 'Uniqlo Accessories - Hải Châu', address: 'Quận Hải Châu, Đà Nẵng', rating: 4.7, ratingCount: 470 },
+  { shopKey: 'UNIQLO-VN048', name: 'Uniqlo Accessories - Bình Thạnh', address: 'Quận Bình Thạnh, TP. Hồ Chí Minh', rating: 4.9, ratingCount: 1090 },
+  { shopKey: 'UNIQLO-VN049', name: 'Uniqlo Accessories - Hoàn Kiếm', address: 'Quận Hoàn Kiếm, Hà Nội', rating: 4.8, ratingCount: 850 },
+  { shopKey: 'UNIQLO-VN050', name: 'Uniqlo Accessories - Tân Bình', address: 'Quận Tân Bình, TP. Hồ Chí Minh', rating: 4.7, ratingCount: 760 },
 ]
 
 // ---------------------------------------------------------------------------
@@ -88,52 +115,37 @@ async function fetchUniqloJson(url) {
 }
 
 // ---------------------------------------------------------------------------
-// Gemini name translation (optional — skips gracefully if no API key)
+// File exists helper
 // ---------------------------------------------------------------------------
 
-async function translateName(englishName) {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) {
-    return null
-  }
-  const prompt = `Dịch tên sản phẩm thời trang sau sang tiếng Việt tự nhiên, ngắn gọn, không giải thích: "${englishName}"`
-  const body = JSON.stringify({
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 60, temperature: 0 },
-  })
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 10_000)
+async function fileExistsWithContent(filePath) {
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body,
-        signal: controller.signal,
-      },
-    )
-    if (!res.ok) {
-      return null
-    }
-    const data = await res.json()
-    const translated = data?.candidates?.[0]?.content?.parts?.[0]?.text
-    if (translated && String(translated).trim().length > 1) {
-      return String(translated).trim()
-    }
-    return null
+    const s = await stat(filePath)
+    return s.size > 0
   } catch {
-    return null
-  } finally {
-    clearTimeout(timer)
+    return false
   }
+}
+
+function extensionFromContentType(contentType) {
+  if (!contentType) {
+    return '.jpg'
+  }
+  const lower = contentType.toLowerCase()
+  if (lower.includes('webp')) {
+    return '.webp'
+  }
+  if (lower.includes('png')) {
+    return '.png'
+  }
+  return '.jpg'
 }
 
 // ---------------------------------------------------------------------------
 // Build variants (colors × sizes)
 // ---------------------------------------------------------------------------
 
-function buildVariants(item, colors, sizes, categorySlug) {
+function buildVariants(item, colors, sizes) {
   const basePrice = Number(item.prices?.base?.value ?? item.prices?.min?.value ?? 299000)
   const promoPrice = Number(item.prices?.promo?.value ?? basePrice)
   const finalPrice = Math.min(basePrice, promoPrice)
@@ -180,18 +192,18 @@ function buildVariants(item, colors, sizes, categorySlug) {
 // ---------------------------------------------------------------------------
 
 function buildShopFromPoolEntry(entry) {
+  // entry.shopKey is e.g. 'UNIQLO-VN001'; normalizeShop prepends 'UNIQLO-' to sourceShopId,
+  // so pass only the suffix (e.g. 'VN001') to avoid double-prefixing.
+  const sourceShopId = String(entry.shopKey ?? 'VN001').replace(/^UNIQLO-/i, '')
   return normalizeShop({
     source: 'UNIQLO',
-    sourceShopId: entry.sourceShopId ?? safeId(entry.shopKey ?? 'VN001'),
+    sourceShopId: sourceShopId,
     name: entry.name ?? 'UNIQLO Vietnam',
-    logoUrl: entry.logoUrl ?? null,
-    isOfficial: entry.sellerType === 'CORPORATE' || entry.isOfficial === true || (entry.name ?? '').toLowerCase().includes('official'),
+    logoUrl: null,
+    isOfficial: true,
     address: entry.address ?? null,
     rating: entry.rating ?? null,
     ratingCount: entry.ratingCount ?? null,
-    description: entry.description ?? null,
-    returnPolicy: entry.returnPolicy ?? null,
-    phone: entry.phone ?? null,
   })
 }
 
@@ -204,21 +216,35 @@ export function buildUniqloProduct(item, categorySlug, shopPool) {
   const shopEntry = shopPool[shopIndex]
   const shop = buildShopFromPoolEntry(shopEntry)
 
-  const colors = Array.isArray(item.colors)
-    ? item.colors
-    : [item.colors].filter(Boolean)
+  let colors
+  if (Array.isArray(item.colors)) {
+    colors = item.colors
+  } else {
+    colors = [item.colors].filter(Boolean)
+  }
 
-  const sizes = Array.isArray(item.sizes)
-    ? item.sizes
-    : [item.sizes].filter(Boolean)
+  let sizes
+  if (Array.isArray(item.sizes)) {
+    sizes = item.sizes
+  } else {
+    sizes = [item.sizes].filter(Boolean)
+  }
 
-  const allSubs = Array.isArray(item.images?.sub) ? item.images.sub : []
+  let allSubs
+  if (Array.isArray(item.images?.sub)) {
+    allSubs = item.images.sub
+  } else {
+    allSubs = []
+  }
+
   const noModelSubs = allSubs.filter(
     (s) => s.image && (!s.model || s.model.length === 0),
   )
+
   const flatLayUrls = noModelSubs
     .filter((s) => /_sub1[47]_/.test(s.image))
-    .map((s) => s.image)
+    .map((s) => normalizeUrl(s.image))
+    .filter(Boolean)
 
   const mainColorImages = []
   for (const color of colors) {
@@ -239,7 +265,7 @@ export function buildUniqloProduct(item, categorySlug, shopPool) {
   }
   const imageUrls = Array.from(imageUrlSet).slice(0, 9)
 
-  const variants = buildVariants(item, colors, sizes, categorySlug)
+  const variants = buildVariants(item, colors, sizes)
 
   const basePrice = Number(item.prices?.base?.value ?? item.prices?.min?.value ?? 299000)
   const promoPrice = Number(item.prices?.promo?.value ?? basePrice)
@@ -259,6 +285,8 @@ export function buildUniqloProduct(item, categorySlug, shopPool) {
       originalPrice: originalPrice,
       description: item.longDescription ?? item.shortDescription ?? '',
       imageUrls: imageUrls,
+      // garmentImageFiles starts as URL strings; downloadGarmentImages() will
+      // convert them to local relative paths after ensureProductImages runs.
       garmentImageFiles: flatLayUrls,
       variants: variants,
       sourceUrl: sourceUrl,
@@ -270,10 +298,68 @@ export function buildUniqloProduct(item, categorySlug, shopPool) {
 }
 
 // ---------------------------------------------------------------------------
-// Export the shop pool so callers can pass it in (used by smoke test)
+// Download garment flat-lay URLs to local files and return relative paths
 // ---------------------------------------------------------------------------
 
-export const UNIQLO_SHOPS = loadShopPool()
+async function downloadGarmentImages(product, outputDir, downloadFn) {
+  if (!product.tryOnEnabled) {
+    return []
+  }
+
+  const garmentUrls = product.garmentImageFiles
+  if (!Array.isArray(garmentUrls) || garmentUrls.length === 0) {
+    return []
+  }
+
+  const sourceFolder = 'uniqlo'
+  const folderDir = path.join(outputDir, 'images', sourceFolder)
+  await mkdir(folderDir, { recursive: true })
+
+  const baseId = safeId(product.sourceId)
+  const localPaths = []
+
+  for (let i = 0; i < garmentUrls.length; i++) {
+    const url = garmentUrls[i]
+    if (!url || !url.startsWith('http')) {
+      // Already a local path — keep as-is
+      localPaths.push(url)
+      continue
+    }
+
+    for (const candidateExt of ['.jpg', '.webp', '.png']) {
+      const checkRel = `images/${sourceFolder}/${baseId}-garment-${i + 1}${candidateExt}`
+      const fullCheck = path.join(outputDir, checkRel)
+      const exists = await fileExistsWithContent(fullCheck)
+      if (exists) {
+        localPaths.push(checkRel)
+        break
+      }
+    }
+
+    // Check if we already added this garment from cache check above
+    if (localPaths.length > i) {
+      continue
+    }
+
+    if (!downloadFn) {
+      continue
+    }
+
+    try {
+      const downloaded = await downloadFn(url)
+      if (downloaded && downloaded.body && downloaded.body.length > 40) {
+        const ext = extensionFromContentType(downloaded.contentType)
+        const rel = `images/${sourceFolder}/${baseId}-garment-${i + 1}${ext}`
+        await writeFile(path.join(outputDir, rel), downloaded.body)
+        localPaths.push(rel)
+      }
+    } catch {
+      // Skip failed download — garment images are optional
+    }
+  }
+
+  return localPaths
+}
 
 // ---------------------------------------------------------------------------
 // Main scrapeUniqlo function
@@ -281,6 +367,7 @@ export const UNIQLO_SHOPS = loadShopPool()
 
 export async function scrapeUniqlo(options, storage, quotaTracker) {
   const { downloadFn } = options
+  const outputDir = storage.outputDir
   const shopPool = UNIQLO_SHOPS
   const seen = new Set()
 
@@ -330,17 +417,25 @@ export async function scrapeUniqlo(options, storage, quotaTracker) {
           continue
         }
 
-        // Translate name if GEMINI_API_KEY is set
-        const translated = await translateName(product.name)
-        if (translated) {
-          product.name = translated
-        }
-
         quotaTracker.recordProduct(product, shop)
 
         await storage.ensureShopImages(shop, downloadFn)
         await storage.saveShop(shop, false)
+
+        // ensureProductImages downloads gallery imageUrls → sets product.imageFiles
+        // It also sets product.garmentImageFiles to [imageFiles[0]] as fallback
+        // (since our garmentImageFiles are still https:// URLs at this point,
+        //  they won't pass the fileExistsWithContent check)
         await storage.ensureProductImages(product, downloadFn)
+
+        // Now download the actual garment flat-lay URLs to local files
+        if (outputDir) {
+          const garmentLocalPaths = await downloadGarmentImages(product, outputDir, downloadFn)
+          if (garmentLocalPaths.length > 0) {
+            product.garmentImageFiles = garmentLocalPaths
+          }
+        }
+
         await storage.saveProduct(product, false)
 
         console.log(
