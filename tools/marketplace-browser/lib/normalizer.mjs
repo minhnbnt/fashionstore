@@ -49,6 +49,36 @@ const COLOR_CODE_MAP = {
   'Họa tiết': 'PTN',
 }
 
+const UNIQLO_FILTER_CODE_TO_CANONICAL = {
+  WHITE: 'Trắng',
+  BLACK: 'Đen',
+  GRAY: 'Xám',
+  BLUE: 'Xanh Dương',
+  NAVY: 'Xanh Navy',
+  GREEN: 'Xanh Rêu',
+  PINK: 'Hồng',
+  RED: 'Đỏ',
+  BROWN: 'Nâu',
+  BEIGE: 'Be',
+  YELLOW: 'Vàng',
+  PURPLE: 'Tím',
+  ORANGE: 'Cam',
+  STRIPE: 'Kẻ sọc',
+  PRINT: 'Họa tiết',
+}
+
+export function mapUniqloFilterCode(filterCode) {
+  if (!filterCode) {
+    return null
+  }
+  const upper = String(filterCode).toUpperCase().trim()
+  const direct = UNIQLO_FILTER_CODE_TO_CANONICAL[upper]
+  if (direct) {
+    return direct
+  }
+  return null
+}
+
 const DEFAULT_ADDRESSES = [
   'Quận Cầu Giấy, Hà Nội',
   'Quận 1, TP. Hồ Chí Minh',
@@ -83,7 +113,7 @@ export function safeId(input) {
   return cleaned
 }
 
-function hashString(input) {
+export function hashString(input) {
   const str = String(input ?? '')
   let hash = 2166136261
   for (let i = 0; i < str.length; i++) {
