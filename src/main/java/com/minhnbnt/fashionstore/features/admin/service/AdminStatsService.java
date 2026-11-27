@@ -3,12 +3,15 @@ package com.minhnbnt.fashionstore.features.admin.service;
 import com.minhnbnt.fashionstore.dto.admin.AdminDailyStatResponse;
 import com.minhnbnt.fashionstore.dto.admin.AdminStatsResponse;
 import com.minhnbnt.fashionstore.dto.admin.DailyOrderTotals;
+import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.catalog.ProductReportService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
+import com.minhnbnt.fashionstore.features.review.ReviewService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.model.AccountStatus;
 import com.minhnbnt.fashionstore.model.OrderStatus;
+import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.model.ShopStatus;
 import com.minhnbnt.fashionstore.model.UserRole;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -32,7 +36,17 @@ public class AdminStatsService {
      */
     static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
-    static final int TREND_DAYS = 14;
+    /**
+     * 60 ngày để client so sánh N ngày gần nhất với N ngày liền trước (N tối đa 30).
+     */
+    static final int TREND_DAYS = 60;
+
+    /**
+     * Cửa sổ của bảng xếp hạng, tốc độ xử lý đơn và người mua lại.
+     */
+    static final int WINDOW_DAYS = 30;
+
+    static final int TOP_LIMIT = 5;
 
     private static final DailyOrderTotals NO_ORDERS = new DailyOrderTotals(0, 0);
 
@@ -44,6 +58,10 @@ public class AdminStatsService {
 
     private final ProductReportService productReports;
 
+    private final CatalogService catalog;
+
+    private final ReviewService reviews;
+
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -52,7 +70,12 @@ public class AdminStatsService {
         var userCounts = users.countByStatus();
         var roleCounts = users.countByRole();
         var orderCounts = orders.countByStatus();
+        var productCounts = catalog.countProductsByStatus();
         var revenue = orders.revenueTotals();
+        var reviewTotals = reviews.platformTotals();
+
+        var windowFrom = startOfDayAgo(WINDOW_DAYS - 1);
+        var fulfillment = orders.fulfillment(windowFrom);
 
         return new AdminStatsResponse(
             sum(userCounts),
@@ -74,14 +97,39 @@ public class AdminStatsService {
             revenue.grossMerchandiseValue(),
             revenue.collected(),
             productReports.countOpen(),
+            sum(productCounts),
+            countOf(productCounts, ProductStatus.ACTIVE),
+            countOf(productCounts, ProductStatus.PENDING),
+            countOf(productCounts, ProductStatus.HIDDEN),
+            countOf(productCounts, ProductStatus.BANNED),
+            reviewTotals.count(),
+            reviewTotals.averageRating(),
+            orders.countOpenReturns(),
+            fulfillment.avgConfirmHours(),
+            fulfillment.avgDeliveryHours(),
+            fulfillment.activeBuyers(),
+            fulfillment.repeatBuyers(),
+            orders.topShops(windowFrom, TOP_LIMIT),
+            orders.topProducts(windowFrom, TOP_LIMIT),
+            orders.topCategories(windowFrom, TOP_LIMIT),
             dailyTrend()
         );
     }
 
+    private LocalDate today() {
+        return clock.instant().atZone(ZONE).toLocalDate();
+    }
+
+    /**
+     * 00:00 giờ Việt Nam của ngày cách hôm nay {@code days} ngày.
+     */
+    private Instant startOfDayAgo(int days) {
+        return today().minusDays(days).atStartOfDay(ZONE).toInstant();
+    }
+
     private List<AdminDailyStatResponse> dailyTrend() {
-        var today = clock.instant().atZone(ZONE).toLocalDate();
-        var firstDay = today.minusDays(TREND_DAYS - 1);
-        var from = firstDay.atStartOfDay(ZONE).toInstant();
+        var firstDay = today().minusDays(TREND_DAYS - 1);
+        var from = startOfDayAgo(TREND_DAYS - 1);
 
         var newUsers = users.countCreatedPerDay(from, ZONE);
         var newShops = shops.countCreatedPerDay(from, ZONE);

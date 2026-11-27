@@ -265,4 +265,56 @@ class AdminServicesTest {
         assertThat(today.newUsers()).isPositive();
         assertThat(today.newShops()).isPositive();
     }
+
+    @Test
+    void statsRankShopsProductsAndCategoriesByRecentSales() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var adminId = mirroredUser();
+        var shopId = registerShop(ownerId, "admin-stats-ranking");
+        shops.approve(adminId, shopId);
+
+        var product = catalog.createProduct(
+            ownerId,
+            shopId,
+            ProductTestFixtures.request(
+                "Ao ranking",
+                "admin-stats-ranking-ao",
+                null,
+                null,
+                List.of(new CreateVariantRequest("RANK-1", "M", "Den", 5_000_000L, null, 50, true))
+            )
+        );
+        var variantId = catalog.getDetail(product.id()).variants().get(0).id();
+        var before = stats.get();
+
+        orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 3)), "An", "0901", "Ha Noi")
+        );
+        orders.checkout(
+            buyerId,
+            new CheckoutRequest(shopId, List.of(new CheckoutItemRequest(variantId, 1)), "An", "0901", "Ha Noi")
+        );
+        var after = stats.get();
+
+        // 4 x 5tr vượt mọi shop test khác nên chắc chắn đứng đầu bảng xếp hạng
+        var topShop = after.topShops().get(0);
+        assertThat(topShop.shopId()).isEqualTo(shopId);
+        assertThat(topShop.orders()).isEqualTo(2);
+        assertThat(topShop.gmv()).isGreaterThanOrEqualTo(20_000_000L);
+
+        var topProduct = after.topProducts().get(0);
+        assertThat(topProduct.productId()).isEqualTo(product.id());
+        assertThat(topProduct.quantity()).isEqualTo(4);
+        assertThat(topProduct.revenue()).isEqualTo(20_000_000L);
+        assertThat(topProduct.shopName()).isEqualTo("Shop admin-stats-ranking");
+
+        assertThat(after.topShops()).hasSizeLessThanOrEqualTo(AdminStatsService.TOP_LIMIT);
+        assertThat(after.topCategories()).isNotEmpty();
+        assertThat(after.activeBuyers()).isGreaterThan(before.activeBuyers());
+        assertThat(after.repeatBuyers()).isGreaterThan(before.repeatBuyers());
+        assertThat(after.totalProducts()).isPositive();
+        assertThat(after.totalProducts()).isGreaterThanOrEqualTo(after.activeProducts());
+    }
 }

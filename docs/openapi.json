@@ -30558,12 +30558,168 @@
             "format" : "int64",
             "description" : "Số báo cáo sản phẩm đang chờ xử lý (người mua + hệ thống)"
           },
+          "totalProducts" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Tổng sản phẩm (mọi trạng thái)"
+          },
+          "activeProducts" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Sản phẩm đang bán (ACTIVE)"
+          },
+          "pendingProducts" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Sản phẩm chờ admin duyệt (PENDING)"
+          },
+          "hiddenProducts" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Sản phẩm shop tự ẩn (HIDDEN)"
+          },
+          "bannedProducts" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Sản phẩm bị gỡ do vi phạm (BANNED)"
+          },
+          "totalReviews" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Tổng đánh giá sản phẩm toàn sàn"
+          },
+          "averageRating" : {
+            "type" : "number",
+            "format" : "double",
+            "description" : "Điểm đánh giá trung bình toàn sàn (1-5), 0 khi chưa có đánh giá"
+          },
+          "openReturnRequests" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Yêu cầu đổi trả đang chờ shop xử lý (REQUESTED)"
+          },
+          "avgConfirmHours" : {
+            "type" : "number",
+            "format" : "double",
+            "description" : "Thời gian trung bình từ lúc đặt tới lúc shop xác nhận, 30 ngày gần nhất (giờ)"
+          },
+          "avgDeliveryHours" : {
+            "type" : "number",
+            "format" : "double",
+            "description" : "Thời gian trung bình từ lúc đặt tới lúc giao thành công, 30 ngày gần nhất (giờ)"
+          },
+          "activeBuyers" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Số người mua có ít nhất 1 đơn chưa hủy trong 30 ngày gần nhất"
+          },
+          "repeatBuyers" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Số người mua có từ 2 đơn chưa hủy trở lên trong 30 ngày gần nhất"
+          },
+          "topShops" : {
+            "type" : "array",
+            "description" : "Top 5 shop theo GMV 30 ngày gần nhất, cao trước",
+            "items" : {
+              "$ref" : "#/components/schemas/AdminTopShopResponse"
+            }
+          },
+          "topProducts" : {
+            "type" : "array",
+            "description" : "Top 5 sản phẩm theo số lượng bán 30 ngày gần nhất, cao trước",
+            "items" : {
+              "$ref" : "#/components/schemas/AdminTopProductResponse"
+            }
+          },
+          "topCategories" : {
+            "type" : "array",
+            "description" : "Top 5 danh mục theo doanh số 30 ngày gần nhất, cao trước",
+            "items" : {
+              "$ref" : "#/components/schemas/AdminTopCategoryResponse"
+            }
+          },
           "dailyTrend" : {
             "type" : "array",
-            "description" : "Số liệu theo ngày (giờ Việt Nam), 14 ngày gần nhất, cũ trước mới sau, ngày cuối là hôm nay",
+            "description" : "Số liệu theo ngày (giờ Việt Nam), 60 ngày gần nhất, cũ trước mới sau, ngày cuối là hôm nay",
             "items" : {
               "$ref" : "#/components/schemas/AdminDailyStatResponse"
             }
+          }
+        }
+      },
+      "AdminTopCategoryResponse" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "description" : "Tên danh mục; sản phẩm chưa gắn danh mục gom vào \"Chưa phân loại\""
+          },
+          "quantity" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Số lượng bán trong đơn chưa hủy, 30 ngày gần nhất"
+          },
+          "revenue" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Doanh số dòng hàng trong 30 ngày gần nhất (VND)"
+          }
+        }
+      },
+      "AdminTopProductResponse" : {
+        "type" : "object",
+        "properties" : {
+          "productId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "Id sản phẩm"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "Tên sản phẩm"
+          },
+          "shopName" : {
+            "type" : "string",
+            "description" : "Tên shop bán"
+          },
+          "quantity" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Số lượng bán trong đơn chưa hủy, 30 ngày gần nhất"
+          },
+          "revenue" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Doanh số dòng hàng (đơn giá x số lượng), 30 ngày gần nhất (VND)"
+          }
+        }
+      },
+      "AdminTopShopResponse" : {
+        "type" : "object",
+        "properties" : {
+          "shopId" : {
+            "type" : "string",
+            "format" : "uuid",
+            "description" : "Id shop"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "Tên shop"
+          },
+          "slug" : {
+            "type" : "string",
+            "description" : "Slug trang gian hàng"
+          },
+          "orders" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Số đơn chưa hủy trong 30 ngày gần nhất"
+          },
+          "gmv" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Tổng giá trị đơn chưa hủy trong 30 ngày gần nhất (VND)"
           }
         }
       },

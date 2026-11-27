@@ -105,4 +105,7 @@ public interface ReviewRepository extends CrudRepository<Review, UUID> {
         ORDER BY r.created_at DESC
         """)
     List<Review> findUnrepliedByShopIdOrderByCreatedAtDesc(UUID shopId);
+
+    @Query("SELECT coalesce(avg(stars), 0) FROM review")
+    double averageStars();
 }

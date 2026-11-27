@@ -8,6 +8,8 @@ import com.minhnbnt.fashionstore.config.SecurityConfig;
 import com.minhnbnt.fashionstore.dto.admin.AdminDailyStatResponse;
 import com.minhnbnt.fashionstore.dto.admin.AdminShopResponse;
 import com.minhnbnt.fashionstore.dto.admin.AdminStatsResponse;
+import com.minhnbnt.fashionstore.dto.admin.AdminTopCategoryResponse;
+import com.minhnbnt.fashionstore.dto.admin.AdminTopShopResponse;
 import com.minhnbnt.fashionstore.dto.admin.AdminUserResponse;
 import com.minhnbnt.fashionstore.dto.common.PageResponse;
 import com.minhnbnt.fashionstore.dto.identity.UserResponse;
@@ -232,11 +234,18 @@ class AdminControllerTest {
     @Test
     void statsNeedsAdmin() throws Exception {
         var trend = List.of(new AdminDailyStatResponse(LocalDate.of(2026, 10, 16), 3, 1, 2, 450000L));
+        var shopId = UUID.randomUUID();
         when(stats.get()).thenReturn(new AdminStatsResponse(
             10, 1, 6, 3, 1,
             5, 2, 2, 1, 0,
             17, 4, 3, 2, 7, 1,
             1600000L, 700000L, 6L,
+            16, 12, 3, 0, 1,
+            42, 4.35, 2,
+            5.5, 48.0, 20, 6,
+            List.of(new AdminTopShopResponse(shopId, "nét lab", "net-lab", 4, 900000L)),
+            List.of(),
+            List.of(new AdminTopCategoryResponse("Áo", 9, 800000L)),
             trend
         ));
 
@@ -247,7 +256,12 @@ class AdminControllerTest {
             .andExpect(jsonPath("$.collectedRevenue").value(700000))
             .andExpect(jsonPath("$.openProductReports").value(6))
             .andExpect(jsonPath("$.dailyTrend[0].date").value("2026-10-16"))
-            .andExpect(jsonPath("$.dailyTrend[0].orderValue").value(450000));
+            .andExpect(jsonPath("$.dailyTrend[0].orderValue").value(450000))
+            .andExpect(jsonPath("$.activeProducts").value(12))
+            .andExpect(jsonPath("$.averageRating").value(4.35))
+            .andExpect(jsonPath("$.repeatBuyers").value(6))
+            .andExpect(jsonPath("$.topShops[0].slug").value("net-lab"))
+            .andExpect(jsonPath("$.topCategories[0].revenue").value(800000));
 
         mockMvc.perform(get("/api/admin/stats").with(jwt()))
             .andExpect(status().isForbidden());

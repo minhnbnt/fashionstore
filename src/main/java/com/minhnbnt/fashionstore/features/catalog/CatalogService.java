@@ -597,6 +597,11 @@ public class CatalogService {
     }
 
     @Transactional(readOnly = true)
+    public Map<ProductStatus, Long> countProductsByStatus() {
+        return adminQueries.countByStatus();
+    }
+
+    @Transactional(readOnly = true)
     public ProductResponse getDetail(@NonNull UUID productId) {
         var product = products.findById(productId).orElse(null);
         if (product == null) {
