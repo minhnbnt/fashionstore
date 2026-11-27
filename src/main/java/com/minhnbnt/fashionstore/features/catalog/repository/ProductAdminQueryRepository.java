@@ -101,6 +101,22 @@ public class ProductAdminQueryRepository {
             .list();
     }
 
+    /**
+     * Số sản phẩm theo từng trạng thái; trạng thái không có sản phẩm nào thì không có key.
+     */
+    public Map<ProductStatus, Long> countByStatus() {
+        var rows = jdbc.sql("SELECT status, count(*) AS total FROM product GROUP BY status")
+            .query((rs, rowNum) -> Map.entry(ProductStatus.valueOf(rs.getString("status")), rs.getLong("total")))
+            .list();
+
+        var counts = new HashMap<ProductStatus, Long>();
+        for (var row : rows) {
+            counts.put(row.getKey(), row.getValue());
+        }
+
+        return counts;
+    }
+
     public long count(@Nullable ProductStatus status, @Nullable UUID shopId, @Nullable String query, boolean reported) {
         var filter = filterOf(status, shopId, query, reported);
 

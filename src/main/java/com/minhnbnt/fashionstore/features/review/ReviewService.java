@@ -28,6 +28,7 @@ import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.upload.S3UrlService;
 import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.infrastructure.media.VideoMetadataService;
+import com.minhnbnt.fashionstore.dto.admin.ReviewTotals;
 import com.minhnbnt.fashionstore.model.Review;
 import com.minhnbnt.fashionstore.model.ReviewMedia;
 import com.minhnbnt.fashionstore.model.ReviewReplyTemplate;
@@ -102,6 +103,14 @@ public class ReviewService {
     private final UploadRepository uploads;
 
     private final S3UrlService s3Urls;
+
+    @Transactional(readOnly = true)
+    public ReviewTotals platformTotals() {
+        var count = reviews.count();
+        var average = reviews.averageStars();
+
+        return new ReviewTotals(count, average);
+    }
 
     @Transactional(readOnly = true)
     public List<ReviewResponse> getReviews(

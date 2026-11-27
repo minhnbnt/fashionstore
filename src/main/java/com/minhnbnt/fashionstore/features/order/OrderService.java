@@ -4,7 +4,11 @@ import com.minhnbnt.fashionstore.dto.admin.AdminOrderDetailResponse;
 import com.minhnbnt.fashionstore.dto.admin.AdminOrderFilter;
 import com.minhnbnt.fashionstore.dto.admin.AdminOrderResponse;
 import com.minhnbnt.fashionstore.dto.admin.AdminOrderSummaryResponse;
+import com.minhnbnt.fashionstore.dto.admin.AdminTopCategoryResponse;
+import com.minhnbnt.fashionstore.dto.admin.AdminTopProductResponse;
+import com.minhnbnt.fashionstore.dto.admin.AdminTopShopResponse;
 import com.minhnbnt.fashionstore.dto.admin.DailyOrderTotals;
+import com.minhnbnt.fashionstore.dto.admin.FulfillmentTotals;
 import com.minhnbnt.fashionstore.dto.admin.OrderRevenueTotals;
 import com.minhnbnt.fashionstore.dto.common.PageResponse;
 import com.minhnbnt.fashionstore.dto.admin.OrderTimelineResponse;
@@ -253,6 +257,31 @@ public class OrderService {
     @Transactional(readOnly = true)
     public Map<LocalDate, DailyOrderTotals> totalsPerDay(@NonNull Instant from, @NonNull ZoneId zone) {
         return adminQueries.totalsPerDay(from, zone);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminTopShopResponse> topShops(@NonNull Instant from, int limit) {
+        return adminQueries.topShops(from, limit);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminTopProductResponse> topProducts(@NonNull Instant from, int limit) {
+        return adminQueries.topProducts(from, limit);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminTopCategoryResponse> topCategories(@NonNull Instant from, int limit) {
+        return adminQueries.topCategories(from, limit);
+    }
+
+    @Transactional(readOnly = true)
+    public FulfillmentTotals fulfillment(@NonNull Instant from) {
+        return adminQueries.fulfillment(from);
+    }
+
+    @Transactional(readOnly = true)
+    public long countOpenReturns() {
+        return adminQueries.countOpenReturns();
     }
 
     @Transactional(readOnly = true)

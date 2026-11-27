@@ -18,6 +18,7 @@ import com.minhnbnt.fashionstore.model.SettlementStatus;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -104,16 +105,46 @@ class DemoShopOpsSeeder {
         staff.changeMemberRole(ownerId, shopId, hanh.id(), new ChangeMemberRoleRequest(cskh.id()));
     }
 
-    void seedDecoration(UUID ownerId, UUID shopId) {
-        var draftJson = """
-            [
-              {"id":"b-1","type":"BANNER","title":"Banner Khuyến Mãi Đầu Mùa","enabled":true},
-              {"id":"b-2","type":"FLASH_SALE","title":"Đồng Hồ Flash Sale Đếm Ngược","enabled":true},
-              {"id":"b-3","type":"COLLECTION","title":"Bộ Sưu Tập Mới Nhất 2026","enabled":true},
-              {"id":"b-4","type":"VIDEO","title":"Video Trải Nghiệm Sản Phẩm","enabled":false}
-            ]
-            """;
-        decoration.saveDraft(ownerId, shopId, draftJson);
+    /**
+     * Xuất bản sẵn một bố cục đầy đủ để trang gian hàng demo có nội dung ngay, rồi để lại
+     * một bản nháp chưa xuất bản (thêm block video tắt) cho luồng "lưu nháp / xuất bản" ở seller.
+     */
+    void seedDecoration(UUID ownerId, UUID shopId, List<String> bannerUrls) {
+        var published = layoutJson(bannerUrls, false);
+        decoration.saveDraft(ownerId, shopId, published);
+        decoration.publish(ownerId, shopId);
+
+        var draft = layoutJson(bannerUrls, true);
+        decoration.saveDraft(ownerId, shopId, draft);
+    }
+
+    private static String layoutJson(List<String> bannerUrls, boolean withVideo) {
+        var slides = new ArrayList<String>();
+        var slideTitles = List.of("Hè rộng, mặc nhẹ", "Đồ đi làm tối giản");
+        for (int i = 0; i < bannerUrls.size(); i++) {
+            var title = slideTitles.get(i % slideTitles.size());
+            slides.add(String.format(
+                "{\"id\":\"slide-%d\",\"imageUrl\":\"%s\",\"title\":\"%s\",\"linkUrl\":\"\"}",
+                i + 1,
+                bannerUrls.get(i),
+                title
+            ));
+        }
+
+        var blocks = new ArrayList<String>();
+        blocks.add("{\"id\":\"b-1\",\"type\":\"BANNER_SLIDER\",\"title\":\"Mùa mới\",\"enabled\":true,"
+            + "\"banners\":[" + String.join(",", slides) + "]}");
+        blocks.add("{\"id\":\"b-2\",\"type\":\"PRODUCT_COLLECTION\",\"title\":\"Hàng mới về\",\"enabled\":true,"
+            + "\"collectionType\":\"NEW_ARRIVALS\",\"itemLimit\":8,\"displayStyle\":\"GRID\"}");
+        blocks.add("{\"id\":\"b-3\",\"type\":\"CATEGORY_GRID\",\"title\":\"Mua theo danh mục\",\"enabled\":true}");
+        blocks.add("{\"id\":\"b-4\",\"type\":\"PRODUCT_COLLECTION\",\"title\":\"Được mua nhiều\",\"enabled\":true,"
+            + "\"collectionType\":\"BEST_SELLER\",\"itemLimit\":8,\"displayStyle\":\"SLIDER\"}");
+        if (withVideo) {
+            blocks.add("{\"id\":\"b-5\",\"type\":\"VIDEO\",\"title\":\"Video trải nghiệm sản phẩm\","
+                + "\"enabled\":false}");
+        }
+
+        return "[" + String.join(",", blocks) + "]";
     }
 
     void seedRevenue(UUID ownerId, UUID shopId, UUID releaseOrderId) {

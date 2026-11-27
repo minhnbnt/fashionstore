@@ -20,6 +20,7 @@ import com.minhnbnt.fashionstore.features.shop.ShopDecorationService;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.features.shop.ShopStaffService;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
 import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.model.Category;
 import com.minhnbnt.fashionstore.model.Upload;
@@ -93,6 +94,8 @@ public class DemoSeeder implements ApplicationRunner {
 
     private final DemoShopOpsSeeder opsSeeder;
 
+    private final S3UrlService s3Urls;
+
     public DemoSeeder(
         ShopService shopService,
         CatalogService catalogService,
@@ -111,7 +114,8 @@ public class DemoSeeder implements ApplicationRunner {
         ShopDecorationService shopDecorationService,
         RevenueService revenueService,
         SellerSettlementRepository settlementRepository,
-        SellerWithdrawalRepository withdrawalRepository
+        SellerWithdrawalRepository withdrawalRepository,
+        S3UrlService s3Urls
     ) {
         this.shopService = shopService;
         this.catalogService = catalogService;
@@ -122,6 +126,7 @@ public class DemoSeeder implements ApplicationRunner {
         this.s3 = s3;
         this.bucket = bucket;
         this.imageFetcher = imageFetcher;
+        this.s3Urls = s3Urls;
         this.orderSeeder = new DemoOrderSeeder(userService, orderService);
         this.engagementSeeder = new DemoEngagementSeeder(reviewService, returnRequestService, chatService);
         this.opsSeeder = new DemoShopOpsSeeder(
@@ -206,7 +211,7 @@ public class DemoSeeder implements ApplicationRunner {
         var orderIds = orderSeeder.seedOrders(ownerId, shop.id(), variantIdBySku, buyers);
         engagementSeeder.seed(ownerId, shop.id(), productIdBySlug, buyers, orderIds);
         opsSeeder.seedStaff(ownerId, shop.id());
-        opsSeeder.seedDecoration(ownerId, shop.id());
+        opsSeeder.seedDecoration(ownerId, shop.id(), uploadDecorationBanners());
         opsSeeder.seedRevenue(ownerId, shop.id(), orderIds.aoThunLinh());
 
         log.info("Demo seed done: {} products, images uploaded {}, skipped {}.", productCount, uploaded, skipped);
@@ -227,6 +232,28 @@ public class DemoSeeder implements ApplicationRunner {
             items.add(new ImageItemRequest(seedUploadId(keys.get(i), "image/jpeg"), null, i));
         }
         return new AttachImagesRequest(items);
+    }
+
+    /**
+     * Banner ngang 3:1 cho slider trang gian hàng. Layout decoration lưu URL public (giống
+     * PresignResponse.publicUrl mà trình trang trí phía seller dùng), không lưu key.
+     */
+    private List<String> uploadDecorationBanners() {
+        var urls = new ArrayList<String>();
+        for (int i = 1; i <= 2; i++) {
+            var key = IMAGE_PREFIX + "decoration-banner-" + i + ".jpg";
+            var body = imageFetcher.fetch("https://picsum.photos/seed/net-banner-" + i + "/1500/500");
+            if (body.isEmpty()) {
+                continue;
+            }
+
+            s3.putObject(
+                PutObjectRequest.builder().bucket(bucket).key(key).contentType("image/jpeg").build(),
+                RequestBody.fromBytes(body.get())
+            );
+            urls.add(s3Urls.publicUrl(key));
+        }
+        return urls;
     }
 
     private List<String> uploadImages(DemoProduct item) {
