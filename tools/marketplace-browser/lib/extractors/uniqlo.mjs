@@ -285,14 +285,16 @@ export function buildUniqloProduct(item, categorySlug, shopPool) {
       originalPrice: originalPrice,
       description: item.longDescription ?? item.shortDescription ?? '',
       imageUrls: imageUrls,
-      // garmentImageFiles starts as URL strings; downloadGarmentImages() will
-      // convert them to local relative paths after ensureProductImages runs.
-      garmentImageFiles: flatLayUrls,
       variants: variants,
       sourceUrl: sourceUrl,
     },
     shop.shopKey,
   )
+
+  // Store flat-lay URLs in a side-channel field that survives ensureProductImages.
+  // ensureProductImages clobbers product.garmentImageFiles with a gallery fallback,
+  // so we keep the original https:// URLs here and read them back in scrapeUniqlo.
+  product.garmentImageUrls = flatLayUrls
 
   return { shop, product }
 }
@@ -301,13 +303,12 @@ export function buildUniqloProduct(item, categorySlug, shopPool) {
 // Download garment flat-lay URLs to local files and return relative paths
 // ---------------------------------------------------------------------------
 
-async function downloadGarmentImages(product, outputDir, downloadFn) {
+async function downloadGarmentImages(product, urls, outputDir, downloadFn) {
   if (!product.tryOnEnabled) {
     return []
   }
 
-  const garmentUrls = product.garmentImageFiles
-  if (!Array.isArray(garmentUrls) || garmentUrls.length === 0) {
+  if (!Array.isArray(urls) || urls.length === 0) {
     return []
   }
 
@@ -318,26 +319,25 @@ async function downloadGarmentImages(product, outputDir, downloadFn) {
   const baseId = safeId(product.sourceId)
   const localPaths = []
 
-  for (let i = 0; i < garmentUrls.length; i++) {
-    const url = garmentUrls[i]
+  for (let i = 0; i < urls.length; i++) {
+    const url = urls[i]
     if (!url || !url.startsWith('http')) {
-      // Already a local path — keep as-is
-      localPaths.push(url)
       continue
     }
 
+    let foundCached = false
     for (const candidateExt of ['.jpg', '.webp', '.png']) {
       const checkRel = `images/${sourceFolder}/${baseId}-garment-${i + 1}${candidateExt}`
       const fullCheck = path.join(outputDir, checkRel)
       const exists = await fileExistsWithContent(fullCheck)
       if (exists) {
         localPaths.push(checkRel)
+        foundCached = true
         break
       }
     }
 
-    // Check if we already added this garment from cache check above
-    if (localPaths.length > i) {
+    if (foundCached) {
       continue
     }
 
@@ -422,17 +422,27 @@ export async function scrapeUniqlo(options, storage, quotaTracker) {
         await storage.ensureShopImages(shop, downloadFn)
         await storage.saveShop(shop, false)
 
+        // Save the original flat-lay URLs BEFORE ensureProductImages runs,
+        // because ensureProductImages clobbers product.garmentImageFiles with
+        // [imageFiles[0]] (gallery fallback) since the https:// URLs fail the
+        // fileExistsWithContent check.
+        let flatLayUrls
+        if (Array.isArray(product.garmentImageUrls)) {
+          flatLayUrls = product.garmentImageUrls
+        } else {
+          flatLayUrls = []
+        }
+
         // ensureProductImages downloads gallery imageUrls → sets product.imageFiles
-        // It also sets product.garmentImageFiles to [imageFiles[0]] as fallback
-        // (since our garmentImageFiles are still https:// URLs at this point,
-        //  they won't pass the fileExistsWithContent check)
         await storage.ensureProductImages(product, downloadFn)
 
-        // Now download the actual garment flat-lay URLs to local files
+        // Now download the actual garment flat-lay URLs using the saved https:// list
         if (outputDir) {
-          const garmentLocalPaths = await downloadGarmentImages(product, outputDir, downloadFn)
+          const garmentLocalPaths = await downloadGarmentImages(product, flatLayUrls, outputDir, downloadFn)
           if (garmentLocalPaths.length > 0) {
             product.garmentImageFiles = garmentLocalPaths
+          } else {
+            product.garmentImageFiles = [product.imageFiles[0]]
           }
         }
 
