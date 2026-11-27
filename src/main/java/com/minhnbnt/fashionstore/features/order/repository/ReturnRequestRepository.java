@@ -3,13 +3,19 @@ package com.minhnbnt.fashionstore.features.order.repository;
 import com.minhnbnt.fashionstore.model.ReturnRequest;
 import com.minhnbnt.fashionstore.model.ReturnStatus;
 import org.springframework.data.jdbc.repository.query.Query;
+import org.springframework.data.relational.core.sql.LockMode;
+import org.springframework.data.relational.repository.Lock;
 import org.springframework.data.repository.CrudRepository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface ReturnRequestRepository extends CrudRepository<ReturnRequest, UUID> {
+
+    @Lock(LockMode.PESSIMISTIC_WRITE)
+    Optional<ReturnRequest> findLockedById(UUID id);
 
     List<ReturnRequest> findByShopIdOrderByCreatedAtDesc(UUID shopId);
 

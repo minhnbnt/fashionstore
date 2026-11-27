@@ -18,6 +18,8 @@ import java.util.UUID;
 @AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class SellerSettlement implements Persistable<UUID> {
 
+    public static final int PLATFORM_FEE_PERCENT = 5;
+
     @Id
     private UUID id;
 
@@ -42,6 +44,14 @@ public class SellerSettlement implements Persistable<UUID> {
     @Transient
     private boolean newRecord;
 
+    public static long calculatePlatformFee(long grossAmount) {
+        return (grossAmount * PLATFORM_FEE_PERCENT) / 100L;
+    }
+
+    public static SellerSettlement createWithDefaultFee(UUID shopId, UUID orderId, long grossAmount) {
+        return create(shopId, orderId, grossAmount, calculatePlatformFee(grossAmount));
+    }
+
     public static SellerSettlement create(UUID shopId, UUID orderId, long grossAmount, long platformFee) {
         var now = Instant.now();
         return new SellerSettlement(
@@ -65,6 +75,18 @@ public class SellerSettlement implements Persistable<UUID> {
 
     public void withdraw() {
         this.status = SettlementStatus.WITHDRAWN;
+    }
+
+    public void cancel() {
+        this.status = SettlementStatus.CANCELLED;
+    }
+
+    public void adjustAndRelease(long newGrossAmount) {
+        this.grossAmount = newGrossAmount;
+        this.platformFee = calculatePlatformFee(newGrossAmount);
+        this.netAmount = newGrossAmount - this.platformFee;
+        this.status = SettlementStatus.RELEASED;
+        this.releasedAt = Instant.now();
     }
 
     @Override

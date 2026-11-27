@@ -3,6 +3,8 @@ package com.minhnbnt.fashionstore.features.order.repository;
 import com.minhnbnt.fashionstore.model.SellerSettlement;
 import com.minhnbnt.fashionstore.model.SettlementStatus;
 import org.springframework.data.jdbc.repository.query.Query;
+import org.springframework.data.relational.core.sql.LockMode;
+import org.springframework.data.relational.repository.Lock;
 import org.springframework.data.repository.CrudRepository;
 
 import java.util.List;
@@ -17,7 +19,24 @@ public interface SellerSettlementRepository extends CrudRepository<SellerSettlem
 
     Optional<SellerSettlement> findByOrderId(UUID orderId);
 
-    @Query("SELECT COALESCE(SUM(net_amount), 0) FROM seller_settlement WHERE shop_id = :shopId AND status = 'RELEASED'")
+    @Lock(LockMode.PESSIMISTIC_WRITE)
+    Optional<SellerSettlement> findLockedByOrderId(UUID orderId);
+
+    @Query("""
+        SELECT id
+        FROM seller_settlement
+        WHERE shop_id = :shopId
+          AND status IN ('RELEASED', 'WITHDRAWN')
+        FOR UPDATE
+        """)
+    List<UUID> lockReleasedByShopId(UUID shopId);
+
+    @Query("""
+        SELECT COALESCE(SUM(net_amount), 0)
+        FROM seller_settlement
+        WHERE shop_id = :shopId
+          AND status IN ('RELEASED', 'WITHDRAWN')
+        """)
     long sumAvailableBalance(UUID shopId);
 
     @Query("SELECT COALESCE(SUM(net_amount), 0) FROM seller_settlement WHERE shop_id = :shopId AND status = 'HOLDING'")

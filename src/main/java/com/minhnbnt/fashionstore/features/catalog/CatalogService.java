@@ -2107,6 +2107,18 @@ public class CatalogService {
     }
 
     @Transactional(readOnly = true)
+    public Map<UUID, ProductVariant> findVariantsByIds(@NonNull Collection<UUID> variantIds) {
+        if (variantIds.isEmpty()) {
+            return Map.of();
+        }
+        var result = new LinkedHashMap<UUID, ProductVariant>();
+        for (var variant : variants.findAllById(variantIds)) {
+            result.put(variant.getId(), variant);
+        }
+        return result;
+    }
+
+    @Transactional(readOnly = true)
     public Optional<Product> findProductById(@NonNull UUID productId) {
         return products.findById(productId);
     }

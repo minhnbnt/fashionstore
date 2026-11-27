@@ -1,6 +1,7 @@
 package com.minhnbnt.fashionstore.dto.cart;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import org.jspecify.annotations.Nullable;
 
 import java.util.UUID;
 
@@ -26,7 +27,43 @@ public record ShopCheckoutPreview(
     @Schema(description = "Tiền hàng còn thiếu để được freeship; 0 nếu đã đạt hoặc freeship tắt", example = "300000")
     long amountToFreeShip,
 
-    @Schema(description = "Tổng đơn = tiền hàng + phí ship, VND", example = "230000")
-    long total
+    @Schema(description = "Tổng đơn = tiền hàng + phí ship - giảm giá voucher, VND", example = "230000")
+    long total,
+
+    @Schema(description = "Mã giảm giá của shop đang áp dụng", nullable = true, example = "SUMMER50K")
+    @Nullable
+    String voucherCode,
+
+    @Schema(description = "Số tiền được giảm từ voucher của shop, VND", example = "50000")
+    long discountAmount,
+
+    @Schema(description = "Thông báo lỗi nếu mã giảm giá không hợp lệ hoặc chưa đủ điều kiện", nullable = true)
+    @Nullable
+    String voucherError
 ) {
+
+    public ShopCheckoutPreview(
+        UUID shopId,
+        int itemCount,
+        long subtotal,
+        long shippingFee,
+        long originalShippingFee,
+        boolean freeShipApplied,
+        long amountToFreeShip,
+        long total
+    ) {
+        this(
+            shopId,
+            itemCount,
+            subtotal,
+            shippingFee,
+            originalShippingFee,
+            freeShipApplied,
+            amountToFreeShip,
+            total,
+            null,
+            0L,
+            null
+        );
+    }
 }

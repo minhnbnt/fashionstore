@@ -5,11 +5,14 @@ import com.minhnbnt.fashionstore.dto.order.CreateReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.RejectReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.ReturnEvidenceResponse;
 import com.minhnbnt.fashionstore.dto.order.ReturnRequestResponse;
+import com.minhnbnt.fashionstore.features.catalog.ProductStockService;
 import com.minhnbnt.fashionstore.features.notification.NotificationCategory;
 import com.minhnbnt.fashionstore.features.notification.NotificationService;
+import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.ReturnEvidenceRepository;
 import com.minhnbnt.fashionstore.features.order.repository.ReturnRequestRepository;
+import com.minhnbnt.fashionstore.features.payment.PaymentTransactionService;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.features.upload.S3UrlService;
@@ -60,6 +63,14 @@ public class ReturnRequestService {
 
     private final OrderRepository orders;
 
+    private final OrderItemRepository orderItems;
+
+    private final ProductStockService productStock;
+
+    private final RevenueService revenue;
+
+    private final PaymentTransactionService paymentTransactions;
+
     private final ShopService shops;
 
     private final ShopAccessChecker access;
@@ -78,7 +89,7 @@ public class ReturnRequestService {
         @NonNull UUID orderId,
         @NonNull CreateReturnRequest request
     ) {
-        var order = orders.findById(orderId).orElse(null);
+        var order = findLockedOrderOrNull(orderId);
         if (order == null || !order.getBuyerId().equals(buyerId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found");
         }
@@ -169,11 +180,20 @@ public class ReturnRequestService {
         @NonNull UUID id,
         @NonNull ApproveReturnRequest request
     ) {
-        var req = returns.findById(id).orElse(null);
+        var req = findLockedReturnOrNull(id);
         if (req == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Return request not found");
         }
         access.requireShopPermission(userId, req.getShopId(), ShopPermission.RETURN_PROCESS);
+
+        var order = findOrderOrNull(req.getOrderId());
+        var requestedRefund = request.refundAmount();
+        if (order != null && requestedRefund != null && requestedRefund > order.netMerchandiseTotal()) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Refund amount cannot exceed net merchandise total"
+            );
+        }
 
         req.approve(request.resolution(), request.refundAmount(), request.sellerNote());
         var saved = returns.save(req);
@@ -184,7 +204,6 @@ public class ReturnRequestService {
         }
         audit.record(saved.getShopId(), userId, "RETURN_APPROVE", "RETURN", saved.getId(), approveDetail);
 
-        var order = findOrderOrNull(saved.getOrderId());
         var label = orderLabel(order);
         notifications.create(
             Set.of(saved.getBuyerId()),
@@ -205,7 +224,7 @@ public class ReturnRequestService {
         @NonNull UUID id,
         @NonNull RejectReturnRequest request
     ) {
-        var req = returns.findById(id).orElse(null);
+        var req = findLockedReturnOrNull(id);
         if (req == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Return request not found");
         }
@@ -241,7 +260,7 @@ public class ReturnRequestService {
         @NonNull UUID id,
         @Nullable String note
     ) {
-        var req = returns.findById(id).orElse(null);
+        var req = findLockedReturnOrNull(id);
         if (req == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Return request not found");
         }
@@ -255,7 +274,44 @@ public class ReturnRequestService {
         }
         audit.record(saved.getShopId(), userId, "RETURN_COMPLETE", "RETURN", saved.getId(), completeDetail);
 
-        var order = findOrderOrNull(saved.getOrderId());
+        var order = findLockedOrderOrNull(saved.getOrderId());
+        if (order != null) {
+            var resolution = saved.getResolution();
+            if (resolution == null || !"PARTIAL_REFUND".equalsIgnoreCase(resolution)) {
+                for (var item : orderItems.findByOrderId(order.getId())) {
+                    if (item.getVariantId() != null) {
+                        productStock.incrementVariantStock(item.getVariantId(), item.getQuantity());
+                        productStock.recordStockMovement(
+                            item.getVariantId(),
+                            order.getShopId(),
+                            item.getQuantity(),
+                            "ORDER_RETURN",
+                            order.getId()
+                        );
+                    }
+                }
+            }
+
+            long refundAmount = 0L;
+            if (saved.getRefundAmount() != null && saved.getRefundAmount() > 0) {
+                refundAmount = saved.getRefundAmount();
+            } else if ("REFUND".equalsIgnoreCase(resolution)) {
+                refundAmount = order.netMerchandiseTotal();
+            }
+
+            revenue.adjustSettlementOnReturn(order.getId(), refundAmount);
+
+            if (refundAmount > 0) {
+                order.markRefundPending();
+                orders.save(order);
+                paymentTransactions.flagOrderRefund(
+                    order.getId(),
+                    refundAmount,
+                    "Hoàn tiền đổi trả đơn #" + order.getCode()
+                );
+            }
+        }
+
         var label = orderLabel(order);
         notifications.create(
             Set.of(saved.getBuyerId()),
@@ -295,6 +351,30 @@ public class ReturnRequestService {
         }
 
         return result;
+    }
+
+    private @Nullable ReturnRequest findLockedReturnOrNull(UUID id) {
+        var locked = returns.findLockedById(id);
+        if (locked != null && locked.isPresent()) {
+            return locked.get();
+        }
+        var byId = returns.findById(id);
+        if (byId != null && byId.isPresent()) {
+            return byId.get();
+        }
+        return null;
+    }
+
+    private @Nullable Order findLockedOrderOrNull(UUID orderId) {
+        var locked = orders.findLockedById(orderId);
+        if (locked != null && locked.isPresent()) {
+            return locked.get();
+        }
+        var byId = orders.findById(orderId);
+        if (byId != null && byId.isPresent()) {
+            return byId.get();
+        }
+        return findOrderOrNull(orderId);
     }
 
     private @Nullable Order findOrderOrNull(UUID orderId) {

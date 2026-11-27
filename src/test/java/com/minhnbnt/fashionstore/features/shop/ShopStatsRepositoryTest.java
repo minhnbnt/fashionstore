@@ -1,6 +1,7 @@
 package com.minhnbnt.fashionstore.features.shop;
 
 import com.minhnbnt.fashionstore.TestcontainersConfiguration;
+import com.minhnbnt.fashionstore.features.order.repository.OrderAdminQueryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +10,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
@@ -20,6 +23,9 @@ class ShopStatsRepositoryTest {
 
     @Autowired
     private ShopStatsRepository statsRepository;
+
+    @Autowired
+    private OrderAdminQueryRepository adminOrderQueries;
 
     @Autowired
     private JdbcClient jdbc;
@@ -139,9 +145,9 @@ class ShopStatsRepositoryTest {
                             UUID prodId, UUID varId, int qty, long lineTotal) {
         jdbc.sql("""
             INSERT INTO orders (id, code, shop_id, buyer_id, status, subtotal, shipping_fee, total,
-                                shipping_name, shipping_phone, shipping_address, created_at)
+                                shipping_name, shipping_phone, shipping_address, placed_at, created_at)
             VALUES (:id, :code, :shopId, :buyerId, :status, :total, 0, :total,
-                    'Test Buyer', '0901234567', '123 Test St', :createdAt)
+                    'Test Buyer', '0901234567', '123 Test St', :createdAt, :createdAt)
             """)
             .param("id", orderId)
             .param("code", "ORD-" + orderId.toString().substring(0, 8))
@@ -367,6 +373,66 @@ class ShopStatsRepositoryTest {
             .containsExactly("2025", "2026");
         assertThat(rows).extracting(ShopStatsRepository.RevenuePeriodRow::revenue)
             .containsExactly(100000L, 200000L);
+    }
+
+    @Test
+    void awaitingPaymentOrdersWithNullPlacedAtAreExcludedFromProductStatsAndDailyTotals() {
+        var futureDay = Instant.parse("2030-06-15T10:00:00Z");
+        var futureDate = LocalDate.of(2030, 6, 15);
+        var awaitingOrderId = UUID.randomUUID();
+        var var1Id = variantIdOf(prod1Id);
+
+        jdbc.sql("""
+            INSERT INTO orders (id, code, shop_id, buyer_id, status, payment_method, payment_status,
+                                subtotal, shipping_fee, total, shipping_name, shipping_phone,
+                                shipping_address, placed_at, created_at)
+            VALUES (:id, :code, :shopId, :buyerId, 'AWAITING_PAYMENT', 'VIETQR', 'UNPAID',
+                    900000, 0, 900000, 'Draft Buyer', '0901234567', '123 Draft St', NULL, :createdAt)
+            """)
+            .param("id", awaitingOrderId)
+            .param("code", "ORD-AWAIT-" + awaitingOrderId.toString().substring(0, 6))
+            .param("shopId", shopId)
+            .param("buyerId", buyer1Id)
+            .param("createdAt", java.sql.Timestamp.from(futureDay))
+            .update();
+
+        jdbc.sql("""
+            INSERT INTO order_item (id, order_id, product_id, variant_id, product_name, variant_label,
+                                    sku, unit_price, quantity, line_total)
+            VALUES (:id, :orderId, :prodId, :varId, 'Ao Thun Basic', 'M / Black',
+                    'SKU-AWAIT', 300000, 3, 900000)
+            """)
+            .param("id", UUID.randomUUID())
+            .param("orderId", awaitingOrderId)
+            .param("prodId", prod1Id)
+            .param("varId", var1Id)
+            .update();
+
+        var top = statsRepository.topSellingProducts(shopId, 10);
+        var prod1Top = top.stream()
+            .filter(r -> r.productId().equals(prod1Id))
+            .findFirst()
+            .orElseThrow();
+        assertThat(prod1Top.totalRevenue()).isEqualTo(800000L);
+        assertThat(prod1Top.totalSold()).isEqualTo(4L);
+
+        var exportedProducts = statsRepository.productPerformanceForExport(
+            shopId,
+            futureDay.minus(1, ChronoUnit.DAYS),
+            futureDay.plus(1, ChronoUnit.DAYS)
+        );
+        var exportedProd1 = exportedProducts.stream()
+            .filter(r -> r.productId().equals(prod1Id))
+            .findFirst()
+            .orElseThrow();
+        assertThat(exportedProd1.totalRevenue()).isZero();
+        assertThat(exportedProd1.totalSold()).isZero();
+
+        var dailyTotals = adminOrderQueries.totalsPerDay(
+            futureDay.minus(1, ChronoUnit.DAYS),
+            ZoneOffset.UTC
+        );
+        assertThat(dailyTotals).doesNotContainKey(futureDate);
     }
 
     private UUID variantIdOf(UUID productId) {

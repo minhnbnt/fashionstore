@@ -610,7 +610,7 @@ public class ShopStaffService {
                 "PRODUCT_READ", "PRODUCT_WRITE", "INVENTORY_READ", "INVENTORY_WRITE",
                 "ORDER_READ", "ORDER_PROCESS", "ORDER_CANCEL", "RETURN_PROCESS",
                 "REVENUE_READ", "REVENUE_WITHDRAW", "REVIEW_READ", "REVIEW_REPLY",
-                "CHAT_ACCESS", "DECORATION_WRITE"
+                "CHAT_ACCESS", "DECORATION_WRITE", "VOUCHER_READ", "VOUCHER_WRITE"
             },
             true
         ));
@@ -629,7 +629,7 @@ public class ShopStaffService {
         roles.save(ShopRole.create(
             shopId,
             "Marketing",
-            new String[]{"PRODUCT_READ", "DECORATION_WRITE", "REVENUE_READ"},
+            new String[]{"PRODUCT_READ", "DECORATION_WRITE", "REVENUE_READ", "VOUCHER_READ", "VOUCHER_WRITE"},
             true
         ));
     }

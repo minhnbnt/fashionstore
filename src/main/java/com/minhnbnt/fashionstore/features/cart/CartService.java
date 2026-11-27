@@ -14,16 +14,22 @@ import com.minhnbnt.fashionstore.dto.order.CheckoutItemRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderItemResponse;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
+import com.minhnbnt.fashionstore.dto.voucher.VoucherLineItem;
 import com.minhnbnt.fashionstore.features.cart.repository.CartItemRepository;
 import com.minhnbnt.fashionstore.features.cart.repository.CartRepository;
 import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.order.OrderService;
+import com.minhnbnt.fashionstore.features.payment.PaymentGatewayService;
+import com.minhnbnt.fashionstore.features.payment.PaymentTransactionService;
 import com.minhnbnt.fashionstore.features.shipping.ShippingFeeService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.features.upload.S3UrlService;
 import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
+import com.minhnbnt.fashionstore.features.voucher.service.VoucherService;
 import com.minhnbnt.fashionstore.model.Cart;
 import com.minhnbnt.fashionstore.model.CartItem;
+import com.minhnbnt.fashionstore.model.Order;
+import com.minhnbnt.fashionstore.model.PaymentMethod;
 import com.minhnbnt.fashionstore.model.ProductImage;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import lombok.NonNull;
@@ -61,6 +67,12 @@ public class CartService {
     private final S3UrlService s3Urls;
 
     private final ShippingFeeService shipping;
+
+    private final PaymentGatewayService paymentGateways;
+
+    private final PaymentTransactionService paymentTransactions;
+
+    private final VoucherService vouchers;
 
     /** FK bảo đảm upload tồn tại; thiếu là lỗi dữ liệu, fail loud. */
     private String imageUrlOf(UUID uploadId) {
@@ -153,40 +165,78 @@ public class CartService {
         }
 
         var selected = selectLines(lines, request.variantIds());
+        var selectedVariantIds = selected.stream().map(CartItem::getVariantId).toList();
+        var variantsById = catalog.findVariantsByIds(selectedVariantIds);
 
         var totalsByShop = new LinkedHashMap<UUID, ShopLineTotals>();
+        var voucherLinesByShop = new LinkedHashMap<UUID, List<VoucherLineItem>>();
         for (var item : selected) {
-            var variant = catalog.findVariantById(item.getVariantId()).orElse(null);
+            var variant = variantsById.get(item.getVariantId());
+            if (variant == null && variantsById.isEmpty()) {
+                variant = catalog.findVariantById(item.getVariantId()).orElse(null);
+            }
             if (variant == null) {
                 continue;
             }
 
-            var line = new ShopLineTotals(variant.getPrice() * item.getQuantity(), item.getQuantity());
+            var lineTotal = variant.getPrice() * item.getQuantity();
+            var line = new ShopLineTotals(lineTotal, item.getQuantity());
             totalsByShop.merge(variant.getShopId(), line, ShopLineTotals::plus);
+            voucherLinesByShop
+                .computeIfAbsent(variant.getShopId(), ignored -> new ArrayList<>())
+                .add(new VoucherLineItem(variant.getProductId(), lineTotal));
         }
 
         var shopPreviews = new ArrayList<ShopCheckoutPreview>();
         var subtotal = 0L;
         var shippingFee = 0L;
+        var discountAmount = 0L;
         for (var entry : totalsByShop.entrySet()) {
+            var shopId = entry.getKey();
             var totals = entry.getValue();
             var quote = shipping.quote(totals.subtotal(), totals.itemCount());
 
+            String rawVoucherCode = null;
+            if (request.shopVouchers() != null) {
+                rawVoucherCode = request.shopVouchers().get(shopId);
+            }
+
+            String appliedCode = null;
+            var shopDiscount = 0L;
+            String voucherError = null;
+            if (rawVoucherCode != null && !rawVoucherCode.isBlank()) {
+                var shopLines = voucherLinesByShop.getOrDefault(shopId, List.of());
+                var voucherQuote = vouchers.quoteForPreview(shopId, buyerId, rawVoucherCode, shopLines);
+                appliedCode = voucherQuote.voucherCode();
+                shopDiscount = voucherQuote.discountAmount();
+                voucherError = voucherQuote.error();
+            }
+
             shopPreviews.add(new ShopCheckoutPreview(
-                entry.getKey(),
+                shopId,
                 totals.itemCount(),
                 totals.subtotal(),
                 quote.fee(),
                 quote.originalFee(),
                 quote.freeShipApplied(),
                 quote.amountToFreeShip(),
-                totals.subtotal() + quote.fee()
+                totals.subtotal() + quote.fee() - shopDiscount,
+                appliedCode,
+                shopDiscount,
+                voucherError
             ));
             subtotal += totals.subtotal();
             shippingFee += quote.fee();
+            discountAmount += shopDiscount;
         }
 
-        return new CheckoutPreviewResponse(shopPreviews, subtotal, shippingFee, subtotal + shippingFee);
+        return new CheckoutPreviewResponse(
+            shopPreviews,
+            subtotal,
+            shippingFee,
+            subtotal + shippingFee - discountAmount,
+            discountAmount
+        );
     }
 
     private record ShopLineTotals(long subtotal, int itemCount) {
@@ -218,7 +268,7 @@ public class CartService {
 
     @Transactional
     public List<OrderResponse> checkout(@NonNull UUID buyerId, @NonNull CartCheckoutRequest request) {
-        var cart = getOrCreate(buyerId);
+        var cart = getOrCreateLocked(buyerId);
         cart.touch();
         carts.save(cart);
         var lines = items.findByCartIdOrderByCreatedAtAsc(cart.getId());
@@ -229,6 +279,7 @@ public class CartService {
         var checked = selectLines(lines, request.variantIds());
 
         var linesByShop = new LinkedHashMap<UUID, List<CheckoutItemRequest>>();
+        var totalsByShop = new LinkedHashMap<UUID, ShopLineTotals>();
         var problems = new ArrayList<CheckoutBlockedItem>();
 
         for (var item : checked) {
@@ -265,25 +316,64 @@ public class CartService {
                 linesByShop.put(variant.getShopId(), shopLines);
             }
             shopLines.add(new CheckoutItemRequest(item.getVariantId(), item.getQuantity()));
+
+            var lineTotals = new ShopLineTotals(variant.getPrice() * item.getQuantity(), item.getQuantity());
+            totalsByShop.merge(variant.getShopId(), lineTotals, ShopLineTotals::plus);
         }
 
         if (!problems.isEmpty()) {
             throw new CartCheckoutBlockedException(problems);
         }
 
+        var method = request.resolvedPaymentMethod();
         var placed = new ArrayList<OrderResponse>();
 
-        for (Map.Entry<UUID, List<CheckoutItemRequest>> entry : linesByShop.entrySet()) {
-            placed.add(orders.checkout(
-                buyerId,
-                new CheckoutRequest(
-                    entry.getKey(),
-                    entry.getValue(),
-                    request.shippingName(),
-                    request.shippingPhone(),
-                    request.shippingAddress()
-                )
-            ));
+        if (method == PaymentMethod.VIETQR) {
+            var expiresAt = orders.nextPaymentExpiresAt();
+            var createdOrders = new ArrayList<Order>();
+            var draftResponses = new ArrayList<OrderResponse>();
+
+            for (Map.Entry<UUID, List<CheckoutItemRequest>> entry : linesByShop.entrySet()) {
+                var draft = orders.checkoutVietQrDraft(
+                    buyerId,
+                    new CheckoutRequest(
+                        entry.getKey(),
+                        entry.getValue(),
+                        request.shippingName(),
+                        request.shippingPhone(),
+                        request.shippingAddress(),
+                        PaymentMethod.VIETQR,
+                        resolveShopVoucherCode(request.shopVouchers(), entry.getKey())
+                    ),
+                    expiresAt
+                );
+                createdOrders.add(draft.order());
+                draftResponses.add(draft.response());
+            }
+
+            var tx = paymentTransactions.createSession(buyerId, createdOrders, expiresAt);
+            for (var draftResponse : draftResponses) {
+                placed.add(draftResponse.withPaymentSession(tx.getTxnRef(), tx.getQrImageUrl(), tx.getExpiresAt()));
+            }
+        } else {
+            var combinedTotal = 0L;
+            for (Map.Entry<UUID, List<CheckoutItemRequest>> entry : linesByShop.entrySet()) {
+                var placedOrder = orders.checkout(
+                    buyerId,
+                    new CheckoutRequest(
+                        entry.getKey(),
+                        entry.getValue(),
+                        request.shippingName(),
+                        request.shippingPhone(),
+                        request.shippingAddress(),
+                        PaymentMethod.COD,
+                        resolveShopVoucherCode(request.shopVouchers(), entry.getKey())
+                    )
+                );
+                combinedTotal += placedOrder.total();
+                placed.add(placedOrder);
+            }
+            paymentGateways.requireAvailable(PaymentMethod.COD, combinedTotal);
         }
 
         items.deleteAll(checked);
@@ -416,8 +506,34 @@ public class CartService {
         );
     }
 
+    private static @Nullable String resolveShopVoucherCode(
+        @Nullable Map<UUID, String> shopVouchers,
+        UUID shopId
+    ) {
+        if (shopVouchers == null) {
+            return null;
+        }
+        var raw = shopVouchers.get(shopId);
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return raw;
+    }
+
     private Cart getOrCreate(UUID buyerId) {
         var cart = carts.findByBuyerId(buyerId).orElse(null);
+        if (cart == null) {
+            cart = Cart.create(buyerId);
+        }
+
+        return cart;
+    }
+
+    private Cart getOrCreateLocked(UUID buyerId) {
+        var cart = carts.findLockedByBuyerId(buyerId).orElse(null);
+        if (cart == null) {
+            cart = carts.findByBuyerId(buyerId).orElse(null);
+        }
         if (cart == null) {
             cart = Cart.create(buyerId);
         }

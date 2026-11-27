@@ -39,6 +39,12 @@ public class Order implements Persistable<UUID> {
 
     private long shippingFee;
 
+    private @Nullable UUID voucherId;
+
+    private @Nullable String voucherCode;
+
+    private long discountAmount;
+
     private long total;
 
     private String shippingName;
@@ -59,6 +65,10 @@ public class Order implements Persistable<UUID> {
 
     private @Nullable OrderCanceller cancelledBy;
 
+    private @Nullable Instant paymentExpiresAt;
+
+    private @Nullable Instant placedAt;
+
     private @Nullable Instant confirmedAt;
 
     private @Nullable Instant shippedAt;
@@ -78,13 +88,67 @@ public class Order implements Persistable<UUID> {
 
     public static Order create(
         String code,
-                               UUID shopId,
-                               UUID buyerId,
-                               long subtotal,
-                               long shippingFee,
-                               String shippingName,
-                               String shippingPhone,
-                               String shippingAddress) {
+        UUID shopId,
+        UUID buyerId,
+        long subtotal,
+        long shippingFee,
+        String shippingName,
+        String shippingPhone,
+        String shippingAddress
+    ) {
+        return createCod(
+            code,
+            shopId,
+            buyerId,
+            subtotal,
+            shippingFee,
+            null,
+            null,
+            0L,
+            shippingName,
+            shippingPhone,
+            shippingAddress
+        );
+    }
+
+    public static Order createCod(
+        String code,
+        UUID shopId,
+        UUID buyerId,
+        long subtotal,
+        long shippingFee,
+        String shippingName,
+        String shippingPhone,
+        String shippingAddress
+    ) {
+        return createCod(
+            code,
+            shopId,
+            buyerId,
+            subtotal,
+            shippingFee,
+            null,
+            null,
+            0L,
+            shippingName,
+            shippingPhone,
+            shippingAddress
+        );
+    }
+
+    public static Order createCod(
+        String code,
+        UUID shopId,
+        UUID buyerId,
+        long subtotal,
+        long shippingFee,
+        @Nullable UUID voucherId,
+        @Nullable String voucherCode,
+        long discountAmount,
+        String shippingName,
+        String shippingPhone,
+        String shippingAddress
+    ) {
         var now = Instant.now();
         return new Order(
             UUID.randomUUID(),
@@ -96,7 +160,10 @@ public class Order implements Persistable<UUID> {
             PaymentStatus.UNPAID,
             subtotal,
             shippingFee,
-            subtotal + shippingFee,
+            voucherId,
+            voucherCode,
+            discountAmount,
+            subtotal + shippingFee - discountAmount,
             shippingName,
             shippingPhone,
             shippingAddress,
@@ -107,13 +174,144 @@ public class Order implements Persistable<UUID> {
             null,
             null,
             null,
+            now,
+            null,
             null,
             null,
             null,
             null,
             now,
             now,
-            true);
+            true
+        );
+    }
+
+    public static Order createVietQr(
+        String code,
+        UUID shopId,
+        UUID buyerId,
+        long subtotal,
+        long shippingFee,
+        String shippingName,
+        String shippingPhone,
+        String shippingAddress,
+        Instant paymentExpiresAt
+    ) {
+        return createVietQr(
+            code,
+            shopId,
+            buyerId,
+            subtotal,
+            shippingFee,
+            null,
+            null,
+            0L,
+            shippingName,
+            shippingPhone,
+            shippingAddress,
+            paymentExpiresAt
+        );
+    }
+
+    public static Order createVietQr(
+        String code,
+        UUID shopId,
+        UUID buyerId,
+        long subtotal,
+        long shippingFee,
+        @Nullable UUID voucherId,
+        @Nullable String voucherCode,
+        long discountAmount,
+        String shippingName,
+        String shippingPhone,
+        String shippingAddress,
+        Instant paymentExpiresAt
+    ) {
+        var now = Instant.now();
+        return new Order(
+            UUID.randomUUID(),
+            code,
+            shopId,
+            buyerId,
+            OrderStatus.AWAITING_PAYMENT,
+            "VIETQR",
+            PaymentStatus.UNPAID,
+            subtotal,
+            shippingFee,
+            voucherId,
+            voucherCode,
+            discountAmount,
+            subtotal + shippingFee - discountAmount,
+            shippingName,
+            shippingPhone,
+            shippingAddress,
+            "",
+            null,
+            null,
+            null,
+            null,
+            null,
+            paymentExpiresAt,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            now,
+            now,
+            true
+        );
+    }
+
+    public long netMerchandiseTotal() {
+        return Math.max(0L, subtotal - discountAmount);
+    }
+
+    public void markPaid() {
+        markPaid(Instant.now());
+    }
+
+    public void markPaid(Instant now) {
+        if (status != OrderStatus.AWAITING_PAYMENT) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Only awaiting payment orders can be marked paid"
+            );
+        }
+        status = OrderStatus.PENDING;
+        paymentStatus = PaymentStatus.PAID;
+        placedAt = now;
+        updatedAt = now;
+    }
+
+    public void expirePayment() {
+        expirePayment(Instant.now());
+    }
+
+    public void expirePayment(Instant now) {
+        if (status != OrderStatus.AWAITING_PAYMENT) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Only awaiting payment orders can expire"
+            );
+        }
+        status = OrderStatus.CANCELLED;
+        paymentStatus = PaymentStatus.FAILED;
+        cancelReason = "PAYMENT_EXPIRED";
+        cancelledBy = OrderCanceller.SYSTEM;
+        cancelledAt = now;
+        updatedAt = now;
+    }
+
+    public void markRefundPending() {
+        paymentStatus = PaymentStatus.REFUND_PENDING;
+        updatedAt = Instant.now();
+    }
+
+    public void markRefunded() {
+        paymentStatus = PaymentStatus.REFUNDED;
+        updatedAt = Instant.now();
     }
 
     public void confirm() {
@@ -154,7 +352,9 @@ public class Order implements Persistable<UUID> {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only shipping orders can be delivered");
         }
         status = OrderStatus.DELIVERED;
-        paymentStatus = PaymentStatus.COLLECTED;
+        if (paymentStatus != PaymentStatus.PAID) {
+            paymentStatus = PaymentStatus.COLLECTED;
+        }
         deliveredAt = Instant.now();
         updatedAt = Instant.now();
     }
@@ -164,8 +364,11 @@ public class Order implements Persistable<UUID> {
     }
 
     public void cancel(@Nullable String reason, @Nullable String note) {
-        if (status != OrderStatus.PENDING) {
+        if (status != OrderStatus.PENDING && status != OrderStatus.AWAITING_PAYMENT) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending orders can be cancelled");
+        }
+        if (status == OrderStatus.AWAITING_PAYMENT) {
+            paymentStatus = PaymentStatus.FAILED;
         }
         status = OrderStatus.CANCELLED;
         cancelReason = reason;
