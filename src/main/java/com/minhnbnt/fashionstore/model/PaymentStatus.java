@@ -2,6 +2,9 @@ package com.minhnbnt.fashionstore.model;
 
 public enum PaymentStatus {
     UNPAID,
+    PAID,
     COLLECTED,
-    FAILED
+    FAILED,
+    REFUND_PENDING,
+    REFUNDED
 }

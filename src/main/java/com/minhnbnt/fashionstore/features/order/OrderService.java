@@ -19,6 +19,8 @@ import com.minhnbnt.fashionstore.dto.order.OrderItemResponse;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
 import com.minhnbnt.fashionstore.dto.order.OrderTrackingEventResponse;
 import com.minhnbnt.fashionstore.dto.order.ShipOrderRequest;
+import com.minhnbnt.fashionstore.dto.payment.VietQrSessionResponse;
+import com.minhnbnt.fashionstore.dto.voucher.VoucherLineItem;
 import com.minhnbnt.fashionstore.features.catalog.ProductStockService;
 import com.minhnbnt.fashionstore.features.order.repository.OrderAdminQueryRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderItemRepository;
@@ -27,10 +29,13 @@ import com.minhnbnt.fashionstore.features.order.repository.OrderRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderStatusHistoryRepository;
 import com.minhnbnt.fashionstore.features.order.repository.OrderTrackingEventRepository;
 import com.minhnbnt.fashionstore.features.order.repository.ReturnRequestRepository;
+import com.minhnbnt.fashionstore.features.payment.PaymentGatewayService;
+import com.minhnbnt.fashionstore.features.payment.PaymentTransactionService;
 import com.minhnbnt.fashionstore.features.settings.SystemSettingsService;
 import com.minhnbnt.fashionstore.features.shipping.ShippingFeeService;
 import com.minhnbnt.fashionstore.features.shop.ShopAuditService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.features.voucher.service.VoucherService;
 import com.minhnbnt.fashionstore.model.AdminCancelReason;
 import com.minhnbnt.fashionstore.model.BuyerCancelReason;
 import com.minhnbnt.fashionstore.model.Order;
@@ -40,6 +45,8 @@ import com.minhnbnt.fashionstore.model.OrderStatus;
 import com.minhnbnt.fashionstore.model.OrderStatusHistory;
 import com.minhnbnt.fashionstore.model.OrderTrackingEvent;
 import com.minhnbnt.fashionstore.model.OrderTrackingStatus;
+import com.minhnbnt.fashionstore.model.PaymentMethod;
+import com.minhnbnt.fashionstore.model.PaymentStatus;
 import com.minhnbnt.fashionstore.model.ProductStatus;
 import com.minhnbnt.fashionstore.model.ReturnStatus;
 import com.minhnbnt.fashionstore.model.ShopPermission;
@@ -111,13 +118,125 @@ public class OrderService {
 
     private final NotificationService notifications;
 
+    private final PaymentGatewayService paymentGateways;
+
+    private final PaymentTransactionService paymentTransactions;
+
+    private final VoucherService vouchers;
+
     // Single source of truth for the pending-order confirmation timeout. Both the
     // seller-facing confirm() deadline check and the background auto-cancel job read this.
     @Value("${fashionstore.order.pending-timeout-hours:24}")
     private long pendingTimeoutHours;
 
+    public record VietQrDraftOrder(Order order, OrderResponse response) {
+    }
+
+    public record VietQrOrderPaymentOutcome(
+        UUID orderId,
+        UUID shopId,
+        String orderCode,
+        long subtotal,
+        long total,
+        boolean activated,
+        boolean refundRequired,
+        @Nullable String refundReason
+    ) {
+    }
+
+    public Instant nextPaymentExpiresAt() {
+        var holdMinutes = Math.max(1, systemSettings.current().paymentHoldMinutes());
+        return clock.instant().plus(holdMinutes, ChronoUnit.MINUTES);
+    }
+
     @Transactional
     public OrderResponse checkout(@NonNull UUID buyerId, @NonNull CheckoutRequest request) {
+        var method = request.resolvedPaymentMethod();
+        if (method == PaymentMethod.VIETQR) {
+            var expiresAt = nextPaymentExpiresAt();
+            var draft = checkoutVietQrDraft(buyerId, request, expiresAt);
+            var tx = paymentTransactions.createSession(buyerId, List.of(draft.order()), expiresAt);
+            return draft.response().withPaymentSession(tx.getTxnRef(), tx.getQrImageUrl(), tx.getExpiresAt());
+        }
+
+        return checkoutCod(buyerId, request);
+    }
+
+    @Transactional
+    public VietQrDraftOrder checkoutVietQrDraft(
+        @NonNull UUID buyerId,
+        @NonNull CheckoutRequest request,
+        @NonNull Instant expiresAt
+    ) {
+        var prepared = prepareCheckout(buyerId, request, PaymentMethod.VIETQR);
+
+        var order = Order.createVietQr(
+            generateCode(),
+            request.shopId(),
+            buyerId,
+            prepared.subtotal(),
+            prepared.shippingFee(),
+            prepared.voucherId(),
+            prepared.voucherCode(),
+            prepared.discountAmount(),
+            request.shippingName(),
+            request.shippingPhone(),
+            request.shippingAddress(),
+            expiresAt
+        );
+        orders.save(order);
+
+        var createdItems = persistOrderItemsAndMovements(order, request.shopId(), prepared.snapshots());
+        histories.save(OrderStatusHistory.record(order.getId(), null, OrderStatus.AWAITING_PAYMENT, buyerId));
+
+        return new VietQrDraftOrder(order, toResponse(order, createdItems));
+    }
+
+    private OrderResponse checkoutCod(UUID buyerId, CheckoutRequest request) {
+        var prepared = prepareCheckout(buyerId, request, PaymentMethod.COD);
+
+        var order = Order.createCod(
+            generateCode(),
+            request.shopId(),
+            buyerId,
+            prepared.subtotal(),
+            prepared.shippingFee(),
+            prepared.voucherId(),
+            prepared.voucherCode(),
+            prepared.discountAmount(),
+            request.shippingName(),
+            request.shippingPhone(),
+            request.shippingAddress()
+        );
+        orders.save(order);
+
+        var createdItems = persistOrderItemsAndMovements(order, request.shopId(), prepared.snapshots());
+        histories.save(OrderStatusHistory.record(order.getId(), null, OrderStatus.PENDING, buyerId));
+
+        notifications.create(
+            shops.findActiveUserIdsByShop(order.getShopId()),
+            NotificationCategory.SELLING,
+            "ORDER_PLACED",
+            "Có đơn hàng mới #" + order.getCode(),
+            "Khách hàng vừa đặt đơn #" + order.getCode() + " tại shop của bạn.",
+            "/shop?shopId=" + order.getShopId() + "&tab=orders&orderId=" + order.getId(),
+            order.getId()
+        );
+
+        return toResponse(order, createdItems);
+    }
+
+    private record PreparedCheckout(
+        List<OrderItemSnapshot> snapshots,
+        long subtotal,
+        long shippingFee,
+        @Nullable UUID voucherId,
+        @Nullable String voucherCode,
+        long discountAmount
+    ) {
+    }
+
+    private PreparedCheckout prepareCheckout(UUID buyerId, CheckoutRequest request, PaymentMethod method) {
         if (!shops.isShopApproved(request.shopId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Shop is not approved for selling");
         }
@@ -164,6 +283,34 @@ public class OrderService {
             ));
         }
 
+        UUID voucherId = null;
+        String voucherCode = null;
+        var discountAmount = 0L;
+        var rawVoucherCode = request.voucherCode();
+        if (rawVoucherCode != null && !rawVoucherCode.isBlank()) {
+            var voucherLines = new ArrayList<VoucherLineItem>(snapshots.size());
+            for (var snapshot : snapshots) {
+                voucherLines.add(new VoucherLineItem(
+                    snapshot.productId(),
+                    snapshot.unitPrice() * snapshot.quantity()
+                ));
+            }
+            var applied = vouchers.redeemForOrder(
+                request.shopId(),
+                buyerId,
+                rawVoucherCode,
+                voucherLines
+            );
+            voucherId = applied.voucherId();
+            voucherCode = applied.voucherCode();
+            discountAmount = applied.discountAmount();
+        }
+
+        // Phí ship do server tính theo cấu hình sàn, không nhận từ client.
+        var shippingFee = shipping.quote(subtotal, itemCount).fee();
+        var total = subtotal + shippingFee - discountAmount;
+        paymentGateways.requireAvailable(method, total);
+
         for (var snapshot : snapshots) {
             if (snapshot.variantId() != null) {
                 if (!productStock.decrementVariantStock(snapshot.variantId(), snapshot.quantity())) {
@@ -174,26 +321,19 @@ public class OrderService {
             }
         }
 
-        // Phí ship do server tính theo cấu hình sàn, không nhận từ client.
-        var shippingFee = shipping.quote(subtotal, itemCount).fee();
+        return new PreparedCheckout(snapshots, subtotal, shippingFee, voucherId, voucherCode, discountAmount);
+    }
 
-        var order = Order.create(
-            generateCode(),
-            request.shopId(),
-            buyerId,
-            subtotal,
-            shippingFee,
-            request.shippingName(),
-            request.shippingPhone(),
-            request.shippingAddress()
-        );
-        orders.save(order);
-
+    private List<OrderItem> persistOrderItemsAndMovements(
+        Order order,
+        UUID shopId,
+        List<OrderItemSnapshot> snapshots
+    ) {
         for (var snapshot : snapshots) {
             if (snapshot.variantId() != null) {
                 productStock.recordStockMovement(
                     snapshot.variantId(),
-                    request.shopId(),
+                    shopId,
                     snapshot.quantity(),
                     "ORDER_CREATED",
                     order.getId()
@@ -214,20 +354,7 @@ public class OrderService {
             ))
             .toList();
         items.saveAll(createdItems);
-
-        histories.save(OrderStatusHistory.record(order.getId(), null, OrderStatus.PENDING, buyerId));
-
-        notifications.create(
-            shops.findActiveUserIdsByShop(order.getShopId()),
-            NotificationCategory.SELLING,
-            "ORDER_PLACED",
-            "Có đơn hàng mới #" + order.getCode(),
-            "Khách hàng vừa đặt đơn #" + order.getCode() + " tại shop của bạn.",
-            "/shop?shopId=" + order.getShopId() + "&tab=orders&orderId=" + order.getId(),
-            order.getId()
-        );
-
-        return toResponse(order, createdItems);
+        return createdItems;
     }
 
     @Transactional(readOnly = true)
@@ -237,7 +364,7 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public long countByShop(@NonNull UUID shopId) {
-        return orders.countByShopId(shopId);
+        return orders.countPlacedByShopId(shopId);
     }
 
     @Transactional(readOnly = true)
@@ -280,6 +407,8 @@ public class OrderService {
         @Nullable BuyerCancelOrderRequest request
     ) {
         var order = requireLockedBuyerOrder(buyerId, orderId);
+        var fromStatus = order.getStatus();
+        var wasPaid = order.getPaymentStatus() == PaymentStatus.PAID;
         String notificationBody;
         if (request != null) {
             var reason = BuyerCancelReason.parse(request.reason());
@@ -297,7 +426,7 @@ public class OrderService {
             }
             histories.save(OrderStatusHistory.record(
                 order.getId(),
-                OrderStatus.PENDING,
+                fromStatus,
                 OrderStatus.CANCELLED,
                 buyerId,
                 historyNote
@@ -307,26 +436,210 @@ public class OrderService {
             order.cancel();
             histories.save(OrderStatusHistory.record(
                 order.getId(),
-                OrderStatus.PENDING,
+                fromStatus,
                 OrderStatus.CANCELLED,
                 buyerId
             ));
             notificationBody = "Khách hàng đã hủy đơn #" + order.getCode() + ".";
         }
 
-        notifications.create(
-            shops.findActiveUserIdsByShop(order.getShopId()),
-            NotificationCategory.SELLING,
-            "ORDER_CANCELLED",
-            "Đơn #" + order.getCode() + " đã bị hủy",
-            notificationBody,
-            "/shop?shopId=" + order.getShopId() + "&tab=orders&orderId=" + order.getId(),
-            order.getId()
-        );
+        if (wasPaid) {
+            order.markRefundPending();
+        }
+
+        paymentTransactions.expirePendingSessionsForOrder(order.getId(), clock.instant());
+
+        if (fromStatus != OrderStatus.AWAITING_PAYMENT) {
+            notifications.create(
+                shops.findActiveUserIdsByShop(order.getShopId()),
+                NotificationCategory.SELLING,
+                "ORDER_CANCELLED",
+                "Đơn #" + order.getCode() + " đã bị hủy",
+                notificationBody,
+                "/shop?shopId=" + order.getShopId() + "&tab=orders&orderId=" + order.getId(),
+                order.getId()
+            );
+        }
 
         var orderItems = items.findByOrderId(order.getId());
         restockOrderItems(order, orderItems);
-        return toResponse(orders.save(order), orderItems);
+        var saved = orders.save(order);
+        handlePaidOrderCancellation(saved, wasPaid);
+        return toResponse(saved, orderItems);
+    }
+
+    @Transactional
+    public void lockOrdersInOrder(@NonNull List<UUID> orderIds) {
+        var sorted = orderIds.stream().distinct().sorted().toList();
+        for (var orderId : sorted) {
+            orders.findLockedById(orderId);
+        }
+    }
+
+    @Transactional
+    public VietQrOrderPaymentOutcome applyVietQrPaymentSuccess(@NonNull UUID orderId, @NonNull String txnRef) {
+        var order = requireOrder(orderId);
+        var now = clock.instant();
+
+        if (order.getStatus() == OrderStatus.AWAITING_PAYMENT) {
+            order.markPaid(now);
+            var saved = orders.save(order);
+            histories.save(OrderStatusHistory.record(
+                saved.getId(),
+                OrderStatus.AWAITING_PAYMENT,
+                OrderStatus.PENDING,
+                saved.getBuyerId(),
+                "Đã thanh toán qua VietQR (" + txnRef + ")"
+            ));
+            revenue.createSettlementForOrder(saved.getShopId(), saved.getId(), saved.netMerchandiseTotal());
+
+            notifications.create(
+                shops.findActiveUserIdsByShop(saved.getShopId()),
+                NotificationCategory.SELLING,
+                "ORDER_PLACED",
+                "Có đơn hàng mới #" + saved.getCode(),
+                "Khách hàng vừa đặt đơn #" + saved.getCode() + " tại shop của bạn.",
+                "/shop?shopId=" + saved.getShopId() + "&tab=orders&orderId=" + saved.getId(),
+                saved.getId()
+            );
+
+            notifications.create(
+                Set.of(saved.getBuyerId()),
+                NotificationCategory.ORDER,
+                "PAYMENT_SUCCESS",
+                "Thanh toán đơn #" + saved.getCode() + " thành công",
+                "Đơn hàng #" + saved.getCode() + " đã được xác nhận thanh toán qua VietQR.",
+                "/account/orders/" + saved.getId(),
+                saved.getId()
+            );
+
+            return new VietQrOrderPaymentOutcome(
+                saved.getId(),
+                saved.getShopId(),
+                saved.getCode(),
+                saved.getSubtotal(),
+                saved.getTotal(),
+                true,
+                false,
+                null
+            );
+        }
+
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            order.markRefundPending();
+            var saved = orders.save(order);
+            var reason = "Thanh toán đến muộn sau khi đơn #" + saved.getCode() + " đã hủy";
+            histories.save(OrderStatusHistory.record(
+                saved.getId(),
+                OrderStatus.CANCELLED,
+                OrderStatus.CANCELLED,
+                null,
+                reason + " (" + txnRef + ")"
+            ));
+            return new VietQrOrderPaymentOutcome(
+                saved.getId(),
+                saved.getShopId(),
+                saved.getCode(),
+                saved.getSubtotal(),
+                saved.getTotal(),
+                false,
+                true,
+                reason
+            );
+        }
+
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            var reason = "Thanh toán trùng lặp cho đơn #" + order.getCode();
+            return new VietQrOrderPaymentOutcome(
+                order.getId(),
+                order.getShopId(),
+                order.getCode(),
+                order.getSubtotal(),
+                order.getTotal(),
+                false,
+                true,
+                reason
+            );
+        }
+
+        return new VietQrOrderPaymentOutcome(
+            order.getId(),
+            order.getShopId(),
+            order.getCode(),
+            order.getSubtotal(),
+            order.getTotal(),
+            false,
+            false,
+            null
+        );
+    }
+
+    @Transactional(noRollbackFor = ResponseStatusException.class)
+    public Order requireValidOrderForVietQrRetry(@NonNull UUID buyerId, @NonNull UUID orderId) {
+        var order = requireLockedBuyerOrder(buyerId, orderId);
+        if (order.getStatus() != OrderStatus.AWAITING_PAYMENT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Order is not awaiting payment");
+        }
+        var now = clock.instant();
+        var expiresAt = order.getPaymentExpiresAt();
+        if (expiresAt != null && !expiresAt.isAfter(now)) {
+            systemExpireAwaitingPaymentOrder(order.getId());
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Payment time has expired");
+        }
+        return order;
+    }
+
+    @Transactional(noRollbackFor = ResponseStatusException.class)
+    public VietQrSessionResponse retryVietQrPayment(@NonNull UUID buyerId, @NonNull UUID orderId) {
+        var order = requireValidOrderForVietQrRetry(buyerId, orderId);
+        var now = clock.instant();
+        var existingPending = paymentTransactions.findPendingSessionForOrder(order.getId(), now);
+        if (existingPending.isPresent()) {
+            return paymentTransactions.toSessionResponse(existingPending.get());
+        }
+        var expiresAt = order.getPaymentExpiresAt();
+        if (expiresAt == null) {
+            expiresAt = nextPaymentExpiresAt();
+        }
+        var created = paymentTransactions.createSession(buyerId, List.of(order), expiresAt);
+        return paymentTransactions.toSessionResponse(created);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Order> findExpiredAwaitingPaymentOrders() {
+        return orders.findExpiredAwaitingPaymentOrders(clock.instant());
+    }
+
+    @Transactional
+    public boolean systemExpireAwaitingPaymentOrder(@NonNull UUID orderId) {
+        var order = requireOrder(orderId);
+        if (order.getStatus() != OrderStatus.AWAITING_PAYMENT) {
+            return false;
+        }
+        var now = clock.instant();
+        order.expirePayment(now);
+        var orderItems = items.findByOrderId(order.getId());
+        restockOrderItems(order, orderItems);
+        var saved = orders.save(order);
+        histories.save(OrderStatusHistory.record(
+            saved.getId(),
+            OrderStatus.AWAITING_PAYMENT,
+            OrderStatus.CANCELLED,
+            null,
+            "Hết thời hạn thanh toán"
+        ));
+        paymentTransactions.expirePendingSessionsForOrder(saved.getId(), now);
+
+        notifications.create(
+            Set.of(saved.getBuyerId()),
+            NotificationCategory.ORDER,
+            "ORDER_CANCELLED",
+            "Đơn #" + saved.getCode() + " đã hết hạn thanh toán",
+            "Đơn #" + saved.getCode() + " đã tự động hủy do quá thời hạn thanh toán VietQR.",
+            "/account/orders/" + saved.getId(),
+            saved.getId()
+        );
+        return true;
     }
 
     @Transactional
@@ -355,6 +668,7 @@ public class OrderService {
             buyerId,
             "Khách hàng xác nhận đã nhận được hàng"
         ));
+        revenue.releaseSettlementForOrder(saved.getId());
 
         return toResponse(saved, orderItems);
     }
@@ -363,7 +677,7 @@ public class OrderService {
     public List<OrderResponse> listSellerOrders(@NonNull UUID userId) {
         var allOrders = new ArrayList<Order>();
         for (var shopId : orderReadableShopIds(userId)) {
-            allOrders.addAll(orders.findByShopIdOrderByCreatedAtDesc(shopId));
+            allOrders.addAll(orders.findPlacedByShopIdOrderByCreatedAtDesc(shopId));
         }
         allOrders.sort((left, right) -> right.getCreatedAt().compareTo(left.getCreatedAt()));
         return toResponses(allOrders);
@@ -379,13 +693,18 @@ public class OrderService {
         access.requireShopPermission(userId, order.getShopId(), ShopPermission.ORDER_CANCEL);
 
         var from = order.getStatus();
+        var wasPaid = order.getPaymentStatus() == PaymentStatus.PAID;
         var orderItems = items.findByOrderId(order.getId());
 
         order.cancelBySeller(request.reason(), request.note());
+        if (wasPaid) {
+            order.markRefundPending();
+        }
         restockOrderItems(order, orderItems);
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CANCELLED, userId));
 
         var saved = orders.save(order);
+        handlePaidOrderCancellation(saved, wasPaid);
         var cancelDetail = "Hủy đơn hàng #" + saved.getCode() + " | Lý do: " + request.reason();
         if (request.note() != null && !request.note().isBlank()) {
             cancelDetail = cancelDetail + " (" + request.note() + ")";
@@ -414,9 +733,13 @@ public class OrderService {
         }
 
         var from = order.getStatus();
+        var wasPaid = order.getPaymentStatus() == PaymentStatus.PAID;
         var orderItems = items.findByOrderId(order.getId());
 
         order.cancelBySystem("Hết thời hạn xác nhận đơn hàng (" + pendingTimeoutHours + " giờ)", null);
+        if (wasPaid) {
+            order.markRefundPending();
+        }
         restockOrderItems(order, orderItems);
         histories.save(OrderStatusHistory.record(
             order.getId(),
@@ -427,6 +750,7 @@ public class OrderService {
         ));
 
         var saved = orders.save(order);
+        handlePaidOrderCancellation(saved, wasPaid);
         var cancelDetail = "Hệ thống tự động hủy đơn hàng #" + saved.getCode()
             + " do quá hạn " + pendingTimeoutHours + " giờ chưa xác nhận | Khôi phục tồn kho cho "
             + orderItems.size() + " mặt hàng";
@@ -509,7 +833,10 @@ public class OrderService {
             order.getCancelledAt(),
             itemResponses,
             monitoring.timeline(orderId),
-            returnRequests.listForOrder(orderId)
+            returnRequests.listForOrder(orderId),
+            order.getVoucherId(),
+            order.getVoucherCode(),
+            order.getDiscountAmount()
         );
     }
 
@@ -526,11 +853,16 @@ public class OrderService {
     ) {
         var order = requireOrder(orderId);
         var from = order.getStatus();
+        var wasPaid = order.getPaymentStatus() == PaymentStatus.PAID;
         var orderItems = items.findByOrderId(order.getId());
 
         order.cancelByAdmin(reason, note);
+        if (wasPaid) {
+            order.markRefundPending();
+        }
         restockOrderItems(order, orderItems);
-        orders.save(order);
+        var saved = orders.save(order);
+        handlePaidOrderCancellation(saved, wasPaid);
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.CANCELLED, adminId, note));
 
         notifications.create(
@@ -544,6 +876,59 @@ public class OrderService {
         );
 
         return requireAdminOrder(orderId);
+    }
+
+    @Transactional
+    public AdminOrderResponse settleOrderRefundByAdmin(
+        @NonNull UUID adminId,
+        @NonNull UUID orderId,
+        @NonNull String note
+    ) {
+        var order = requireOrder(orderId);
+        if (order.getPaymentStatus() != PaymentStatus.REFUND_PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Order is not pending refund");
+        }
+        var trimmedNote = note.trim();
+        settleOrderRefund(adminId, orderId, trimmedNote);
+        return requireAdminOrder(orderId);
+    }
+
+    @Transactional
+    public void settleOrderRefund(@NonNull UUID adminId, @NonNull UUID orderId, @NonNull String note) {
+        var order = requireOrder(orderId);
+        if (order.getPaymentStatus() != PaymentStatus.REFUND_PENDING) {
+            return;
+        }
+        order.markRefunded();
+        var saved = orders.save(order);
+        histories.save(OrderStatusHistory.record(
+            saved.getId(),
+            saved.getStatus(),
+            saved.getStatus(),
+            adminId,
+            "Đã hoàn tiền: " + note
+        ));
+        notifications.create(
+            Set.of(saved.getBuyerId()),
+            NotificationCategory.ORDER,
+            "ORDER_REFUNDED",
+            "Đơn #" + saved.getCode() + " đã được hoàn tiền",
+            "Khoản hoàn tiền cho đơn #" + saved.getCode() + " đã được xử lý: " + note,
+            "/account/orders/" + saved.getId(),
+            saved.getId()
+        );
+    }
+
+    private void handlePaidOrderCancellation(Order order, boolean wasPaid) {
+        if (!wasPaid) {
+            return;
+        }
+        revenue.cancelSettlementForOrder(order.getId());
+        paymentTransactions.flagOrderRefund(
+            order.getId(),
+            order.getTotal(),
+            "Đơn hàng #" + order.getCode() + " bị hủy sau khi đã thanh toán"
+        );
     }
 
     @Transactional(readOnly = true)
@@ -565,7 +950,7 @@ public class OrderService {
 
         var matched = new ArrayList<Order>();
         for (var sId : shopIds) {
-            for (var order : orders.findByShopIdOrderByCreatedAtDesc(sId)) {
+            for (var order : orders.findPlacedByShopIdOrderByCreatedAtDesc(sId)) {
                 if (statusFilter != null && !statusFilter.isBlank()) {
                     if (!order.getStatus().name().equalsIgnoreCase(statusFilter)) {
                         continue;
@@ -767,7 +1152,7 @@ public class OrderService {
         var from = order.getStatus();
         order.deliver();
         histories.save(OrderStatusHistory.record(order.getId(), from, OrderStatus.DELIVERED, userId));
-        revenue.createSettlementForOrder(order.getShopId(), order.getId(), order.getSubtotal());
+        revenue.createSettlementForOrder(order.getShopId(), order.getId(), order.netMerchandiseTotal());
 
         var orderItems = items.findByOrderId(order.getId());
         var saved = orders.save(order);
@@ -931,6 +1316,7 @@ public class OrderService {
             null,
             "Hệ thống tự động xác nhận hoàn thành sau " + days + " ngày giao hàng"
         ));
+        revenue.releaseSettlementForOrder(saved.getId());
 
         audit.record(
             saved.getShopId(),
@@ -1087,6 +1473,9 @@ public class OrderService {
      * ở bất kỳ trạng thái nào trước khi giao.
      */
     private void restockOrderItems(Order order, List<OrderItem> orderItems) {
+        if (order.getVoucherId() != null) {
+            vouchers.releaseVoucherUsage(order.getVoucherId());
+        }
         for (var item : orderItems) {
             if (item.getVariantId() == null) {
                 continue;
@@ -1325,7 +1714,13 @@ public class OrderService {
             order.getCancelledAt(),
             returnStatus,
             itemResponses,
-            order.getCreatedAt()
+            order.getCreatedAt(),
+            null,
+            null,
+            order.getPaymentExpiresAt(),
+            order.getVoucherId(),
+            order.getVoucherCode(),
+            order.getDiscountAmount()
         );
     }
 

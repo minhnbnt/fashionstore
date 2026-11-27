@@ -43,8 +43,8 @@ public class OrderAdminQueryRepository {
 
     public OrderRevenueTotals revenueTotals() {
         var sql = """
-            SELECT coalesce(sum(total) FILTER (WHERE status <> 'CANCELLED'), 0) AS gmv,
-                   coalesce(sum(total) FILTER (WHERE payment_status = 'COLLECTED'), 0) AS collected
+            SELECT coalesce(sum(total) FILTER (WHERE status <> 'CANCELLED' AND placed_at IS NOT NULL), 0) AS gmv,
+                   coalesce(sum(total) FILTER (WHERE payment_status IN ('COLLECTED', 'PAID')), 0) AS collected
             FROM orders
             """;
 
@@ -63,6 +63,7 @@ public class OrderAdminQueryRepository {
                    coalesce(sum(total) FILTER (WHERE status <> 'CANCELLED'), 0) AS value
             FROM orders
             WHERE created_at >= :from
+              AND placed_at IS NOT NULL
             GROUP BY day
             """;
 

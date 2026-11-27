@@ -35,8 +35,45 @@ public record ProductResponse(
     @Schema(nullable = true) @Nullable Integer weightGrams,
     @Schema(nullable = true) @Nullable Integer lengthCm,
     @Schema(nullable = true) @Nullable Integer widthCm,
-    @Schema(nullable = true) @Nullable Integer heightCm
+    @Schema(nullable = true) @Nullable Integer heightCm,
+    @Schema(description = "Danh sách ảnh garment thử đồ ảo") List<GarmentImageResponse> garments
 ) {
+    public ProductResponse(
+        UUID id,
+        UUID shopId,
+        @Nullable UUID categoryId,
+        String name,
+        String slug,
+        String description,
+        String status,
+        List<VariantResponse> variants,
+        List<ImageResponse> images,
+        Instant updatedAt,
+        @Nullable Double averageRating,
+        long reviewCount,
+        @Nullable String videoUrl,
+        @Nullable String garmentUrl,
+        @Nullable UUID videoUploadId,
+        @Nullable UUID garmentUploadId,
+        Boolean tryOnEnabled,
+        @Nullable String material,
+        @Nullable String origin,
+        @Nullable String careInstructions,
+        @Nullable String sizeGuide,
+        @Nullable Integer weightGrams,
+        @Nullable Integer lengthCm,
+        @Nullable Integer widthCm,
+        @Nullable Integer heightCm
+    ) {
+        this(
+            id, shopId, categoryId, name, slug, description, status,
+            variants, images, updatedAt, averageRating, reviewCount,
+            videoUrl, garmentUrl, videoUploadId, garmentUploadId, tryOnEnabled,
+            material, origin, careInstructions, sizeGuide,
+            weightGrams, lengthCm, widthCm, heightCm, List.of()
+        );
+    }
+
     public ProductResponse(
         UUID id,
         UUID shopId,
@@ -54,7 +91,7 @@ public record ProductResponse(
         this(
             id, shopId, categoryId, name, slug, description, status,
             variants, images, updatedAt, averageRating, reviewCount,
-            null, null, null, null, false, null, null, null, null, null, null, null, null
+            null, null, null, null, false, null, null, null, null, null, null, null, null, List.of()
         );
     }
 }

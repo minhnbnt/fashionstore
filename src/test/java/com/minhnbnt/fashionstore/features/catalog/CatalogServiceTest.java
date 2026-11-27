@@ -820,6 +820,58 @@ class CatalogServiceTest {
     }
 
     @Test
+    void sellerCanCreateAndUpdateProductWithMultipleGarments() {
+        var ownerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-multi-garment");
+        var gKey1 = uniqueKey("garment-1");
+        var gKey2 = uniqueKey("garment-2");
+        var gKey3 = uniqueKey("garment-3");
+        var gId1 = uploads.save(Upload.create(gKey1, "image/webp")).getId();
+        var gId2 = uploads.save(Upload.create(gKey2, "image/webp")).getId();
+        var gId3 = uploads.save(Upload.create(gKey3, "image/webp")).getId();
+
+        var createReq = new CreateProductRequest(
+            "Áo Sơ Mi Nhiều Màu Garment",
+            "ao-so-mi-multi-garment",
+            "Mô tả nhiều garment",
+            testCategory(),
+            List.of(new CreateVariantRequest("SKU-MG-1", "M", "Trắng", 250000L, null, 15, true)),
+            List.of(new ImageItemRequest(newImageUpload("mg-img-1"), null, 0)),
+            null,
+            gId1,
+            true,
+            null, null, null, null, null, null, null, null,
+            "ACTIVE",
+            List.of(gId1, gId2)
+        );
+
+        var created = catalog.createProduct(ownerId, shopId, createReq);
+        assertThat(created.tryOnEnabled()).isTrue();
+        assertThat(created.garmentUploadId()).isEqualTo(gId1);
+        assertThat(created.garmentUrl()).isEqualTo(s3Urls.publicUrl(gKey1));
+        assertThat(created.garments()).hasSize(2);
+        assertThat(created.garments().get(0).uploadId()).isEqualTo(gId1);
+        assertThat(created.garments().get(0).url()).isEqualTo(s3Urls.publicUrl(gKey1));
+        assertThat(created.garments().get(1).uploadId()).isEqualTo(gId2);
+        assertThat(created.garments().get(1).url()).isEqualTo(s3Urls.publicUrl(gKey2));
+
+        var updateReq = new UpdateProductRequest(
+            null, null, null, null, null, null, null,
+            gId2,
+            true,
+            null, null, null, null, null, null, null, null,
+            List.of(gId2, gId3, gId1)
+        );
+        var updated = catalog.updateProduct(ownerId, shopId, created.id(), updateReq);
+        assertThat(updated.garmentUploadId()).isEqualTo(gId2);
+        assertThat(updated.garmentUrl()).isEqualTo(s3Urls.publicUrl(gKey2));
+        assertThat(updated.garments()).hasSize(3);
+        assertThat(updated.garments().get(0).uploadId()).isEqualTo(gId2);
+        assertThat(updated.garments().get(1).uploadId()).isEqualTo(gId3);
+        assertThat(updated.garments().get(2).uploadId()).isEqualTo(gId1);
+    }
+
+    @Test
     void updateProductRejectsDeletedProduct() {
         var ownerId = mirroredUser();
         var shopId = approvedShop(ownerId, "shop-upd-del");

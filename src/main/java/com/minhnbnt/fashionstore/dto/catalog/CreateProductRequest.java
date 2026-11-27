@@ -38,9 +38,9 @@ public record CreateProductRequest(
     @Valid
     List<CreateVariantRequest> variants,
 
-    @Schema(description = "Danh sách ảnh sản phẩm (tối thiểu 3, tối đa 9 ảnh)")
+    @Schema(description = "Danh sách ảnh sản phẩm (tối thiểu 1, tối đa 9 ảnh)")
     @NotNull(message = "Product images are required")
-    @Size(min = 3, max = 9, message = "Product requires between 3 and 9 images")
+    @Size(min = 1, max = 9, message = "Product requires between 1 and 9 images")
     @Valid
     List<ImageItemRequest> images,
 
@@ -99,6 +99,38 @@ public record CreateProductRequest(
     )
     @Nullable
     @Pattern(regexp = "ACTIVE|HIDDEN", message = "Status must be ACTIVE or HIDDEN")
-    String status
+    String status,
+
+    @Schema(description = "Danh sách upload id ảnh garment phẳng (tối đa 9 ảnh) cho Virtual Try-On", nullable = true)
+    @Nullable
+    @Size(max = 9, message = "Product cannot exceed 9 garment images")
+    List<UUID> garmentUploadIds
 ) {
+    public CreateProductRequest(
+        String name,
+        String slug,
+        @Nullable String description,
+        @Nullable UUID categoryId,
+        List<CreateVariantRequest> variants,
+        List<ImageItemRequest> images,
+        @Nullable UUID videoUploadId,
+        @Nullable UUID garmentUploadId,
+        @Nullable Boolean tryOnEnabled,
+        @Nullable String material,
+        @Nullable String origin,
+        @Nullable String careInstructions,
+        @Nullable String sizeGuide,
+        @Nullable Integer weightGrams,
+        @Nullable Integer lengthCm,
+        @Nullable Integer widthCm,
+        @Nullable Integer heightCm,
+        @Nullable String status
+    ) {
+        this(
+            name, slug, description, categoryId, variants, images,
+            videoUploadId, garmentUploadId, tryOnEnabled,
+            material, origin, careInstructions, sizeGuide,
+            weightGrams, lengthCm, widthCm, heightCm, status, null
+        );
+    }
 }

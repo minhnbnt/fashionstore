@@ -19,7 +19,20 @@ public interface OrderRepository extends CrudRepository<Order, UUID> {
 
     List<Order> findByShopIdOrderByCreatedAtDesc(UUID shopId);
 
+    @Query("SELECT * FROM orders WHERE shop_id = :shopId AND placed_at IS NOT NULL ORDER BY created_at DESC")
+    List<Order> findPlacedByShopIdOrderByCreatedAtDesc(UUID shopId);
+
     List<Order> findByStatusAndCreatedAtBefore(OrderStatus status, Instant cutoff);
+
+    @Query("""
+        SELECT *
+        FROM orders
+        WHERE status = 'AWAITING_PAYMENT'
+          AND payment_expires_at IS NOT NULL
+          AND payment_expires_at <= :now
+        ORDER BY payment_expires_at ASC, id ASC
+        """)
+    List<Order> findExpiredAwaitingPaymentOrders(Instant now);
 
     /**
      * SELECT ... FOR UPDATE: shop chuyển trạng thái và admin hủy can thiệp đi qua đây để không ghi đè nhau.
@@ -31,6 +44,9 @@ public interface OrderRepository extends CrudRepository<Order, UUID> {
 
     long countByShopId(UUID shopId);
 
+    @Query("SELECT COUNT(*) FROM orders WHERE shop_id = :shopId AND placed_at IS NOT NULL")
+    long countPlacedByShopId(UUID shopId);
+
     public record RevenueSummaryRow(long totalRevenue, long totalOrders, long avgOrderValue) {
     }
 
@@ -38,22 +54,57 @@ public interface OrderRepository extends CrudRepository<Order, UUID> {
     }
 
     @Query("""
-        SELECT COALESCE(SUM(subtotal), 0)::bigint AS total_revenue,
+        SELECT COALESCE(SUM(net_rev), 0)::bigint AS total_revenue,
                COUNT(*) AS total_orders,
-               COALESCE(SUM(subtotal) / NULLIF(COUNT(*), 0), 0)::bigint AS avg_order_value
-        FROM orders
-        WHERE shop_id = :shopId
-          AND status = 'DELIVERED'
+               COALESCE(SUM(net_rev) / NULLIF(COUNT(*), 0), 0)::bigint AS avg_order_value
+        FROM (
+            SELECT GREATEST(
+                       0,
+                       o.subtotal - o.discount_amount - COALESCE((
+                           SELECT SUM(
+                               CASE
+                                   WHEN UPPER(COALESCE(rr.resolution, '')) = 'EXCHANGE' THEN 0
+                                   WHEN rr.refund_amount IS NOT NULL AND rr.refund_amount > 0 THEN rr.refund_amount
+                                   WHEN UPPER(COALESCE(rr.resolution, '')) = 'REFUND' THEN (o.subtotal - o.discount_amount)
+                                   ELSE 0
+                               END
+                           )
+                           FROM return_request rr
+                           WHERE rr.order_id = o.id
+                             AND rr.status = 'COMPLETED'
+                       ), 0)
+                   )::bigint AS net_rev
+            FROM orders o
+            WHERE o.shop_id = :shopId
+              AND o.status = 'DELIVERED'
+        ) t
         """)
     RevenueSummaryRow sumDeliveredRevenue(UUID shopId);
 
     @Query("""
-        SELECT (created_at AT TIME ZONE 'UTC')::date AS day,
-               SUM(subtotal)::bigint AS revenue,
+        SELECT (o.created_at AT TIME ZONE 'UTC')::date AS day,
+               SUM(
+                   GREATEST(
+                       0,
+                       o.subtotal - o.discount_amount - COALESCE((
+                           SELECT SUM(
+                               CASE
+                                   WHEN UPPER(COALESCE(rr.resolution, '')) = 'EXCHANGE' THEN 0
+                                   WHEN rr.refund_amount IS NOT NULL AND rr.refund_amount > 0 THEN rr.refund_amount
+                                   WHEN UPPER(COALESCE(rr.resolution, '')) = 'REFUND' THEN (o.subtotal - o.discount_amount)
+                                   ELSE 0
+                               END
+                           )
+                           FROM return_request rr
+                           WHERE rr.order_id = o.id
+                             AND rr.status = 'COMPLETED'
+                       ), 0)
+                   )
+               )::bigint AS revenue,
                COUNT(*) AS orders
-        FROM orders
-        WHERE shop_id = :shopId
-          AND status = 'DELIVERED'
+        FROM orders o
+        WHERE o.shop_id = :shopId
+          AND o.status = 'DELIVERED'
         GROUP BY day
         ORDER BY day DESC
         """)

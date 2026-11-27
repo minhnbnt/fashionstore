@@ -14,7 +14,19 @@ public record CheckoutPreviewResponse(
     @Schema(description = "Tổng phí ship các đơn, VND", example = "30000")
     long shippingFee,
 
-    @Schema(description = "Tổng thanh toán các đơn, VND", example = "230000")
-    long total
+    @Schema(description = "Tổng thanh toán các đơn sau giảm giá, VND", example = "230000")
+    long total,
+
+    @Schema(description = "Tổng số tiền giảm giá từ voucher các shop, VND", example = "50000")
+    long discountAmount
 ) {
+
+    public CheckoutPreviewResponse(
+        List<ShopCheckoutPreview> shops,
+        long subtotal,
+        long shippingFee,
+        long total
+    ) {
+        this(shops, subtotal, shippingFee, total, 0L);
+    }
 }

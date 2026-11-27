@@ -20,6 +20,7 @@ import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.catalog.repository.ProductImageRepository;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
+import com.minhnbnt.fashionstore.model.PaymentMethod;
 import com.minhnbnt.fashionstore.model.ProductImage;
 import com.minhnbnt.fashionstore.test.ShopTestFixtures;
 import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
@@ -30,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -41,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
+@TestPropertySource(properties = "test.isolation=OrderServiceTest")
 class OrderServiceTest {
 
     @Autowired
@@ -654,6 +657,72 @@ class OrderServiceTest {
             .filter(t -> "DELIVERED".equals(t.fromStatus()) && "DELIVERED".equals(t.toStatus()))
             .count();
         assertThat(receiptCount).isEqualTo(1L);
+    }
+
+    @Test
+    void vietQrSingleShopCheckoutCreatesAwaitingPaymentOrderWithQrSessionAndHidesFromSeller() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-order-vqr-1");
+        var variantId = variantInShop(ownerId, shopId, "ao-order-vqr-1", "SKU-ORDER-VQR-1", 10);
+
+        var created = orders.checkout(
+            buyerId,
+            new CheckoutRequest(
+                shopId,
+                List.of(new CheckoutItemRequest(variantId, 2)),
+                "An",
+                "0901234567",
+                "Ha Noi",
+                PaymentMethod.VIETQR
+            )
+        );
+
+        assertThat(created.status()).isEqualTo("AWAITING_PAYMENT");
+        assertThat(created.paymentMethod()).isEqualTo("VIETQR");
+        assertThat(created.paymentStatus()).isEqualTo("UNPAID");
+        assertThat(created.total()).isEqualTo(230_000L);
+        assertThat(created.paymentTxnRef()).matches("^DHMQ[A-Z0-9]{10}$");
+        assertThat(created.paymentQrUrl())
+            .contains("amount=230000")
+            .contains("addInfo=" + created.paymentTxnRef());
+        assertThat(created.paymentExpiresAt()).isNotNull();
+
+        assertThat(catalog.findVariantById(variantId).orElseThrow().getStockQuantity()).isEqualTo(8);
+        assertThat(notifications.findPage(ownerId, null, 0, 10)).isEmpty();
+        assertThat(orders.listSellerOrders(ownerId)).isEmpty();
+        assertThat(orders.listSellerOrdersFiltered(ownerId, shopId, null, null, 0, 20)).isEmpty();
+        assertThat(orders.countByShop(shopId)).isZero();
+
+        assertThat(orders.getMine(buyerId)).hasSize(1);
+        assertThat(orders.getDetail(buyerId, created.id()).status()).isEqualTo("AWAITING_PAYMENT");
+    }
+
+    @Test
+    void codCheckoutEnforcesCodMaxTotalLimit() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var shopId = approvedShop(ownerId, "shop-order-cod-limit");
+        var variantId = variantInShop(ownerId, shopId, "ao-order-cod-limit", "SKU-ORDER-COD-LIM", 10);
+
+        jdbc.sql("UPDATE system_setting SET value = '100000' WHERE key = 'order.cod_max_total'").update();
+        try {
+            assertThatThrownBy(() -> orders.checkout(
+                buyerId,
+                new CheckoutRequest(
+                    shopId,
+                    List.of(new CheckoutItemRequest(variantId, 1)),
+                    "An",
+                    "0901234567",
+                    "Ha Noi",
+                    PaymentMethod.COD
+                )
+            ))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> assertStatus((ResponseStatusException) e, HttpStatus.CONFLICT));
+        } finally {
+            jdbc.sql("UPDATE system_setting SET value = '10000000' WHERE key = 'order.cod_max_total'").update();
+        }
     }
 }
 
