@@ -163,20 +163,6 @@ public class OrderService {
     }
 
     @Transactional
-    public VietQrDraftOrder checkoutVietQrDraft(@NonNull UUID buyerId, @NonNull CheckoutRequest request) {
-        return checkoutVietQrDraft(buyerId, request, nextPaymentExpiresAt());
-    }
-
-    @Transactional
-    public VietQrDraftOrder checkoutDraftVietQr(
-        @NonNull UUID buyerId,
-        @NonNull CheckoutRequest request,
-        @NonNull Instant expiresAt
-    ) {
-        return checkoutVietQrDraft(buyerId, request, expiresAt);
-    }
-
-    @Transactional
     public VietQrDraftOrder checkoutVietQrDraft(
         @NonNull UUID buyerId,
         @NonNull CheckoutRequest request,
@@ -480,6 +466,14 @@ public class OrderService {
         var saved = orders.save(order);
         handlePaidOrderCancellation(saved, wasPaid);
         return toResponse(saved, orderItems);
+    }
+
+    @Transactional
+    public void lockOrdersInOrder(@NonNull List<UUID> orderIds) {
+        var sorted = orderIds.stream().distinct().sorted().toList();
+        for (var orderId : sorted) {
+            orders.findLockedById(orderId);
+        }
     }
 
     @Transactional
@@ -881,6 +875,21 @@ public class OrderService {
             order.getId()
         );
 
+        return requireAdminOrder(orderId);
+    }
+
+    @Transactional
+    public AdminOrderResponse settleOrderRefundByAdmin(
+        @NonNull UUID adminId,
+        @NonNull UUID orderId,
+        @NonNull String note
+    ) {
+        var order = requireOrder(orderId);
+        if (order.getPaymentStatus() != PaymentStatus.REFUND_PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Order is not pending refund");
+        }
+        var trimmedNote = note.trim();
+        settleOrderRefund(adminId, orderId, trimmedNote);
         return requireAdminOrder(orderId);
     }
 

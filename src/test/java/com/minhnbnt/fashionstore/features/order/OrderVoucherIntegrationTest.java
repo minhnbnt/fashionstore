@@ -39,11 +39,17 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -467,5 +473,66 @@ class OrderVoucherIntegrationTest {
         var session = paymentFlow.getSessionForViewer(buyerId, false, txnRef);
         assertThat(session.refundStatus()).isEqualTo("PENDING");
         assertThat(session.refundAmount()).isEqualTo(160_000L);
+    }
+
+    @Test
+    void concurrentCartCheckoutOnlyCreatesOneOrderSet() throws Exception {
+        var ownerId = createUser();
+        var buyerId = createUser();
+        var shopId = createApprovedShop(ownerId, "concurrent-cart-shop");
+        var variantId = createVariant(ownerId, shopId, "p-concurrent-cart", 150_000L, 10);
+
+        cartService.addItem(buyerId, new CartItemRequest(variantId, 1));
+
+        var readyLatch = new CountDownLatch(2);
+        var startLatch = new CountDownLatch(1);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var futures = new ArrayList<Future<?>>();
+            for (int i = 0; i < 2; i++) {
+                futures.add(executor.submit(() -> {
+                    readyLatch.countDown();
+                    startLatch.await(10, TimeUnit.SECONDS);
+                    return cartService.checkout(
+                        buyerId,
+                        new CartCheckoutRequest(
+                            "An",
+                            "0901234567",
+                            "Ha Noi",
+                            null,
+                            PaymentMethod.VIETQR,
+                            null
+                        )
+                    );
+                }));
+            }
+
+            assertThat(readyLatch.await(10, TimeUnit.SECONDS)).isTrue();
+            startLatch.countDown();
+
+            int successCount = 0;
+            var failures = new ArrayList<Throwable>();
+            for (var future : futures) {
+                try {
+                    future.get(15, TimeUnit.SECONDS);
+                    successCount++;
+                } catch (ExecutionException ex) {
+                    failures.add(ex.getCause());
+                }
+            }
+
+            assertThat(successCount).isEqualTo(1);
+            assertThat(failures).hasSize(1);
+            assertThat(failures.getFirst())
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    var rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason()).isEqualTo("Cart is empty");
+                });
+            assertThat(orderService.getMine(buyerId)).hasSize(1);
+        } finally {
+            executor.shutdownNow();
+        }
     }
 }

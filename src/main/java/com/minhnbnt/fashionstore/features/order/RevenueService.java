@@ -25,6 +25,7 @@ import com.minhnbnt.fashionstore.security.ShopAccessChecker;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,7 +66,11 @@ public class RevenueService {
             return;
         }
         var platformFee = SellerSettlement.calculatePlatformFee(grossAmount);
-        settlements.save(SellerSettlement.create(shopId, orderId, grossAmount, platformFee));
+        try {
+            settlements.save(SellerSettlement.create(shopId, orderId, grossAmount, platformFee));
+        } catch (DataIntegrityViolationException ignored) {
+            // Concurrent duplicate settlement creation for the same orderId; uq_seller_settlement_order enforces 1 row.
+        }
     }
 
     @Transactional
@@ -81,7 +86,9 @@ public class RevenueService {
     @Transactional
     public void cancelSettlementForOrder(UUID orderId) {
         var settlement = findLockedSettlementByOrderId(orderId).orElse(null);
-        if (settlement == null || settlement.getStatus() != SettlementStatus.HOLDING) {
+        if (settlement == null
+            || (settlement.getStatus() != SettlementStatus.HOLDING
+                && settlement.getStatus() != SettlementStatus.RELEASED)) {
             return;
         }
         settlement.cancel();
@@ -91,7 +98,9 @@ public class RevenueService {
     @Transactional
     public void adjustSettlementOnReturn(UUID orderId, long refundAmount) {
         var settlement = findLockedSettlementByOrderId(orderId).orElse(null);
-        if (settlement == null || settlement.getStatus() != SettlementStatus.HOLDING) {
+        if (settlement == null
+            || (settlement.getStatus() != SettlementStatus.HOLDING
+                && settlement.getStatus() != SettlementStatus.RELEASED)) {
             return;
         }
         if (refundAmount >= settlement.getGrossAmount()) {
@@ -109,10 +118,7 @@ public class RevenueService {
         access.requireShopPermission(userId, shopId, ShopPermission.REVENUE_READ);
 
         var row = orders.sumDeliveredRevenue(shopId);
-        var walletBalance = Math.max(
-            0L,
-            settlements.sumAvailableBalance(shopId) - withdrawals.sumActiveWithdrawals(shopId)
-        );
+        var walletBalance = settlements.sumAvailableBalance(shopId) - withdrawals.sumActiveWithdrawals(shopId);
         var holdingBalance = settlements.sumHoldingBalance(shopId);
 
         return new RevenueSummaryResponse(
@@ -197,11 +203,10 @@ public class RevenueService {
     ) {
         access.requireShopPermission(userId, request.shopId(), ShopPermission.REVENUE_WITHDRAW);
 
-        var available = Math.max(
-            0L,
-            settlements.sumAvailableBalance(request.shopId()) - withdrawals.sumActiveWithdrawals(request.shopId())
-        );
-        if (request.amount() > available) {
+        settlements.lockReleasedByShopId(request.shopId());
+        var available = settlements.sumAvailableBalance(request.shopId())
+            - withdrawals.sumActiveWithdrawals(request.shopId());
+        if (request.amount() <= 0L || request.amount() > available) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient available balance");
         }
 

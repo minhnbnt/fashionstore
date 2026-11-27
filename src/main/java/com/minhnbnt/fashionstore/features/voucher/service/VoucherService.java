@@ -37,6 +37,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -315,6 +316,10 @@ public class VoucherService {
 
         var voucherIds = visible.stream().map(ShopVoucher::getId).toList();
         var productIdsByVoucher = vouchers.findProductIdsByVoucherIds(voucherIds);
+        Map<UUID, Integer> usagesByVoucher = Map.of();
+        if (buyerId != null) {
+            usagesByVoucher = vouchers.countActiveUsagesByBuyerForVouchers(voucherIds, buyerId);
+        }
 
         var responses = new ArrayList<PublicShopVoucherResponse>(visible.size());
         for (var voucher : visible) {
@@ -326,11 +331,8 @@ public class VoucherService {
                 }
             }
 
-            var exhaustedByBuyer = false;
-            if (buyerId != null) {
-                var usedByBuyer = vouchers.countActiveUsagesByBuyer(voucher.getId(), buyerId);
-                exhaustedByBuyer = usedByBuyer >= voucher.getPerBuyerLimit();
-            }
+            var usedByBuyer = usagesByVoucher.getOrDefault(voucher.getId(), 0);
+            var exhaustedByBuyer = buyerId != null && usedByBuyer >= voucher.getPerBuyerLimit();
 
             responses.add(new PublicShopVoucherResponse(
                 voucher.getId(),

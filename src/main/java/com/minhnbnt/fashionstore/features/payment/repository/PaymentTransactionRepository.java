@@ -103,17 +103,26 @@ public class PaymentTransactionRepository {
     }
 
     public void linkOrders(UUID transactionId, List<UUID> orderIds) {
-        var sql = """
-            INSERT INTO payment_transaction_order (transaction_id, order_id)
-            VALUES (:transactionId, :orderId)
-            ON CONFLICT (transaction_id, order_id) DO NOTHING
-            """;
-        for (var orderId : orderIds) {
-            jdbc.sql(sql)
-                .param("transactionId", transactionId)
-                .param("orderId", orderId)
-                .update();
+        if (orderIds.isEmpty()) {
+            return;
         }
+        var sql = new StringBuilder(
+            "INSERT INTO payment_transaction_order (transaction_id, order_id) VALUES "
+        );
+        var params = new HashMap<String, Object>();
+        params.put("transactionId", transactionId);
+        for (int i = 0; i < orderIds.size(); i++) {
+            if (i > 0) {
+                sql.append(", ");
+            }
+            var key = "orderId" + i;
+            sql.append("(:transactionId, :").append(key).append(")");
+            params.put(key, orderIds.get(i));
+        }
+        sql.append(" ON CONFLICT (transaction_id, order_id) DO NOTHING");
+        jdbc.sql(sql.toString())
+            .params(params)
+            .update();
     }
 
     public List<UUID> findOrderIdsByTransactionId(UUID transactionId) {
@@ -165,6 +174,21 @@ public class PaymentTransactionRepository {
             JOIN payment_transaction_order pto ON pto.transaction_id = pt.id
             WHERE pto.order_id = :orderId
             ORDER BY pt.created_at DESC, pt.id DESC
+            """;
+        return jdbc.sql(sql)
+            .param("orderId", orderId)
+            .query(PaymentTransactionRepository::mapRow)
+            .list();
+    }
+
+    public List<PaymentTransaction> findLockedTransactionsByOrderId(UUID orderId) {
+        var sql = """
+            SELECT pt.*
+            FROM payment_transaction pt
+            JOIN payment_transaction_order pto ON pto.transaction_id = pt.id
+            WHERE pto.order_id = :orderId
+            ORDER BY pt.created_at DESC, pt.id DESC
+            FOR UPDATE OF pt
             """;
         return jdbc.sql(sql)
             .param("orderId", orderId)

@@ -29,7 +29,7 @@ public record UpdatePaymentGatewayRequest(
 
     @Schema(
         description = "Khóa bí mật xác thực Webhook (write-only); null hoặc rỗng = giữ nguyên khóa cũ",
-        example = "demo-vietqr-secret-key"
+        example = "whsec_vietqr_prod_9f8e7d6c5b4a"
     )
     @Size(max = 200)
     @Nullable String webhookSecret,

@@ -10,6 +10,7 @@ import com.minhnbnt.fashionstore.dto.order.CheckoutItemRequest;
 import com.minhnbnt.fashionstore.dto.order.CheckoutRequest;
 import com.minhnbnt.fashionstore.dto.order.CreateReturnRequest;
 import com.minhnbnt.fashionstore.dto.order.OrderResponse;
+import com.minhnbnt.fashionstore.features.admin.service.AdminOrderService;
 import com.minhnbnt.fashionstore.features.catalog.CatalogService;
 import com.minhnbnt.fashionstore.features.identity.UserService;
 import com.minhnbnt.fashionstore.features.notification.NotificationRepository;
@@ -40,6 +41,10 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -81,6 +86,9 @@ class PaymentRefundFlowTest {
 
     @Autowired
     private ConfigAuditService configAudit;
+
+    @Autowired
+    private AdminOrderService adminOrders;
 
     @Autowired
     private JdbcClient jdbc;
@@ -394,5 +402,173 @@ class PaymentRefundFlowTest {
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void completingReturnAfterBuyerConfirmedReceiptReversesReleasedSettlementSoShopAndBuyerAreNotPaidTwice() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var suffix = UUID.randomUUID().toString().substring(0, 8);
+        var shopId = approvedShop(ownerId, "refund-afterrec-" + suffix);
+        var variantId = variantInShop(ownerId, shopId, "ao-nr-" + suffix, "SKU-NR-" + suffix, 10);
+
+        var order = createPaidVietQrOrder(buyerId, shopId, variantId, 2);
+        var txnRef = Objects.requireNonNull(order.paymentTxnRef());
+        orders.confirm(ownerId, order.id());
+        orders.ship(ownerId, order.id());
+        orders.deliver(ownerId, order.id());
+        orders.confirmReceipt(buyerId, order.id());
+
+        assertThat(settlements.findByOrderId(order.id()).orElseThrow().getStatus())
+            .isEqualTo(SettlementStatus.RELEASED);
+        assertThat(revenue.getSummary(ownerId, shopId).walletBalance()).isEqualTo(190_000L);
+
+        var createdRet = returnRequests.create(
+            buyerId,
+            order.id(),
+            new CreateReturnRequest("DAMAGED", "Trả hàng sau khi đã bấm nhận hàng", List.of())
+        );
+        returnRequests.approve(
+            ownerId,
+            createdRet.id(),
+            new ApproveReturnRequest("REFUND", order.subtotal(), "Chấp nhận hoàn 100%")
+        );
+        returnRequests.complete(ownerId, createdRet.id(), "Shop đã nhận lại hàng hoàn");
+
+        var settlementAfterReturn = settlements.findByOrderId(order.id()).orElseThrow();
+        assertThat(settlementAfterReturn.getStatus()).isEqualTo(SettlementStatus.CANCELLED);
+        assertThat(revenue.getSummary(ownerId, shopId).walletBalance()).isZero();
+
+        var session = paymentFlow.getSessionForViewer(buyerId, false, txnRef);
+        assertThat(session.refundStatus()).isEqualTo("PENDING");
+        assertThat(session.refundAmount()).isEqualTo(order.subtotal());
+    }
+
+    @Test
+    void codOrderReturnCompletionCanBeSettledViaAdminOrderRefundEndpoint() {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var adminId = mirroredUser();
+        var suffix = UUID.randomUUID().toString().substring(0, 8);
+        var shopId = approvedShop(ownerId, "refund-cod-" + suffix);
+        var variantId = variantInShop(ownerId, shopId, "ao-cod-" + suffix, "SKU-COD-" + suffix, 10);
+
+        var codOrder = orders.checkout(
+            buyerId,
+            new CheckoutRequest(
+                shopId,
+                List.of(new CheckoutItemRequest(variantId, 1)),
+                "An",
+                "0901234567",
+                "Ha Noi",
+                PaymentMethod.COD
+            )
+        );
+        orders.confirm(ownerId, codOrder.id());
+        orders.ship(ownerId, codOrder.id());
+        orders.deliver(ownerId, codOrder.id());
+
+        var createdRet = returnRequests.create(
+            buyerId,
+            codOrder.id(),
+            new CreateReturnRequest("DAMAGED", "Lỗi khóa kéo", List.of())
+        );
+        returnRequests.approve(
+            ownerId,
+            createdRet.id(),
+            new ApproveReturnRequest("REFUND", codOrder.subtotal(), "Đồng ý hoàn tiền COD")
+        );
+        returnRequests.complete(ownerId, createdRet.id(), "Shop đã nhận lại hàng COD");
+
+        var afterReturn = orders.getDetail(buyerId, codOrder.id());
+        assertThat(afterReturn.paymentStatus()).isEqualTo("REFUND_PENDING");
+
+        var settled = adminOrders.settleRefund(adminId, codOrder.id(), "Đã chuyển khoản hoàn tiền COD cho khách");
+        assertThat(settled.paymentStatus()).isEqualTo("REFUNDED");
+
+        var afterSettled = orders.getDetail(buyerId, codOrder.id());
+        assertThat(afterSettled.paymentStatus()).isEqualTo("REFUNDED");
+
+        var audits = configAudit.page(ConfigAuditEntity.PAYMENT_TRANSACTION, 0, 10);
+        assertThat(audits.items())
+            .anySatisfy(a -> {
+                assertThat(a.entityKey()).isEqualTo(codOrder.code());
+                assertThat(a.action()).isEqualTo("ORDER_REFUND");
+            });
+
+        assertThatThrownBy(() -> adminOrders.settleRefund(adminId, codOrder.id(), "Hoàn lần 2"))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void concurrentReturnCompleteOnlyExecutesOnce() throws Exception {
+        var ownerId = mirroredUser();
+        var buyerId = mirroredUser();
+        var suffix = UUID.randomUUID().toString().substring(0, 8);
+        var shopId = approvedShop(ownerId, "refund-concret-" + suffix);
+        var variantId = variantInShop(ownerId, shopId, "ao-cr-" + suffix, "SKU-CR-" + suffix, 10);
+
+        var order = createPaidVietQrOrder(buyerId, shopId, variantId, 2);
+        var txnRef = Objects.requireNonNull(order.paymentTxnRef());
+        assertThat(catalog.findVariantById(variantId).orElseThrow().getStockQuantity()).isEqualTo(8);
+
+        orders.confirm(ownerId, order.id());
+        orders.ship(ownerId, order.id());
+        orders.deliver(ownerId, order.id());
+
+        var createdRet = returnRequests.create(
+            buyerId,
+            order.id(),
+            new CreateReturnRequest("DAMAGED", "Rách cổ áo", List.of())
+        );
+        returnRequests.approve(
+            ownerId,
+            createdRet.id(),
+            new ApproveReturnRequest("REFUND", order.subtotal(), "Hoàn đủ")
+        );
+
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var f1 = pool.submit(() -> {
+                ready.countDown();
+                start.await();
+                return returnRequests.complete(ownerId, createdRet.id(), "Hoàn tất luồng 1");
+            });
+            var f2 = pool.submit(() -> {
+                ready.countDown();
+                start.await();
+                return returnRequests.complete(ownerId, createdRet.id(), "Hoàn tất luồng 2");
+            });
+
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            var successCount = 0;
+            var conflictCount = 0;
+            for (var future : List.of(f1, f2)) {
+                try {
+                    var res = future.get(10, TimeUnit.SECONDS);
+                    assertThat(res.status()).isEqualTo("COMPLETED");
+                    successCount++;
+                } catch (ExecutionException ex) {
+                    var cause = Objects.requireNonNull(ex.getCause());
+                    assertThat(cause).isInstanceOf(ResponseStatusException.class);
+                    var rse = (ResponseStatusException) cause;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+                    conflictCount++;
+                }
+            }
+
+            assertThat(successCount).isEqualTo(1);
+            assertThat(conflictCount).isEqualTo(1);
+            assertThat(catalog.findVariantById(variantId).orElseThrow().getStockQuantity()).isEqualTo(10);
+
+            var session = paymentFlow.getSessionForViewer(buyerId, false, txnRef);
+            assertThat(session.refundStatus()).isEqualTo("PENDING");
+            assertThat(session.refundAmount()).isEqualTo(order.subtotal());
+        }
     }
 }

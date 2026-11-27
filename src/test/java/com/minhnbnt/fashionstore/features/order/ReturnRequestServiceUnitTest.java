@@ -118,6 +118,39 @@ class ReturnRequestServiceUnitTest {
     }
 
     @Test
+    void createReturnLocksOrderAndAllowsDisputeAfterReceiptConfirmation() {
+        var userId = UUID.randomUUID();
+        var orderId = UUID.randomUUID();
+        var shopId = UUID.randomUUID();
+
+        var order = Order.create(
+            "ORD-01B",
+            shopId,
+            userId,
+            100000L,
+            0L,
+            "Buyer",
+            "0900",
+            "Address"
+        );
+        order.confirm();
+        order.ship();
+        order.deliver();
+        order.confirmReceipt();
+
+        when(orders.findLockedById(orderId)).thenReturn(Optional.of(order));
+        var ret = ReturnRequest.create(orderId, shopId, userId, "DAMAGED", "Item broken");
+        when(returns.save(any(ReturnRequest.class))).thenReturn(ret);
+
+        var req = new CreateReturnRequest("DAMAGED", "Item broken", null);
+        var resp = returnService.create(userId, orderId, req);
+
+        assertThat(resp.orderId()).isEqualTo(orderId);
+        assertThat(resp.status()).isEqualTo("REQUESTED");
+        verify(orders).findLockedById(orderId);
+    }
+
+    @Test
     void createReturnSucceedsWhenOrderDelivered() {
         var userId = UUID.randomUUID();
         var orderId = UUID.randomUUID();

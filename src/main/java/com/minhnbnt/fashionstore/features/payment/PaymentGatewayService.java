@@ -125,6 +125,14 @@ public class PaymentGatewayService {
                     );
                 }
             }
+            if (newEnabled
+                && !newSandboxMode
+                && PaymentGateway.INSECURE_DEMO_WEBHOOK_SECRET.equals(newWebhookSecret)) {
+                throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "VietQR webhook secret must be rotated before disabling sandbox mode"
+                );
+            }
         }
 
         var anyEnabled = false;

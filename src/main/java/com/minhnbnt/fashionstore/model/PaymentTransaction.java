@@ -84,32 +84,7 @@ public class PaymentTransaction implements Persistable<UUID> {
         String qrImageUrl,
         Instant expiresAt
     ) {
-        return create(
-            buyerId,
-            txnRef,
-            amount,
-            bankBin,
-            bankCode,
-            accountNumber,
-            accountName,
-            qrImageUrl,
-            expiresAt,
-            Instant.now()
-        );
-    }
-
-    public static PaymentTransaction create(
-        UUID buyerId,
-        String txnRef,
-        long amount,
-        String bankBin,
-        String bankCode,
-        String accountNumber,
-        String accountName,
-        String qrImageUrl,
-        Instant expiresAt,
-        Instant now
-    ) {
+        var now = Instant.now();
         return new PaymentTransaction(
             UUID.randomUUID(),
             buyerId,
@@ -140,43 +115,58 @@ public class PaymentTransaction implements Persistable<UUID> {
         );
     }
 
+    public long alreadyRefundedAmount() {
+        if (this.refundStatus == RefundStatus.REFUNDED) {
+            return this.refundAmount;
+        }
+        return 0L;
+    }
+
     public void markSuccess(
-        long receivedAmount,
+        long transferAmount,
         @Nullable String bankTransactionId,
         @Nullable String transferContent,
         @Nullable String rawPayload,
         Instant now
     ) {
+        this.receivedAmount = this.receivedAmount + transferAmount;
+        long effectiveHeld = Math.max(0L, this.receivedAmount - alreadyRefundedAmount());
+
         this.status = PaymentTransactionStatus.SUCCESS;
-        this.receivedAmount = receivedAmount;
         this.bankTransactionId = bankTransactionId;
         this.transferContent = transferContent;
         this.rawPayload = rawPayload;
         this.paidAt = now;
         this.updatedAt = now;
 
-        if (receivedAmount > this.amount) {
+        if (effectiveHeld > this.amount) {
             this.refundStatus = RefundStatus.PENDING;
-            this.refundAmount = receivedAmount - this.amount;
+            this.refundAmount = effectiveHeld - this.amount;
             this.refundReason = "Khách chuyển dư tiền";
+        } else if (this.refundStatus == RefundStatus.PENDING) {
+            this.refundStatus = RefundStatus.NONE;
+            this.refundAmount = 0L;
+            this.refundReason = null;
         }
     }
 
     public void markUnderpaid(
-        long receivedAmount,
+        long transferAmount,
         @Nullable String bankTransactionId,
         @Nullable String transferContent,
         @Nullable String rawPayload,
         Instant now
     ) {
+        this.receivedAmount = this.receivedAmount + transferAmount;
+        long effectiveHeld = Math.max(0L, this.receivedAmount - alreadyRefundedAmount());
+
         this.status = PaymentTransactionStatus.UNDERPAID;
-        this.receivedAmount = receivedAmount;
         this.bankTransactionId = bankTransactionId;
         this.transferContent = transferContent;
         this.rawPayload = rawPayload;
         this.refundStatus = RefundStatus.PENDING;
-        this.refundAmount = receivedAmount;
-        this.refundReason = "Khách chuyển thiếu tiền (" + receivedAmount + "/" + this.amount + "₫)";
+        this.refundAmount = effectiveHeld;
+        this.refundReason = "Khách chuyển thiếu tiền (" + effectiveHeld + "/" + this.amount + "₫)";
         this.updatedAt = now;
     }
 

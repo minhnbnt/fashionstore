@@ -13,7 +13,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,7 +25,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/public")
@@ -39,7 +37,7 @@ public class PublicPaymentController {
 
     private final PaymentGatewayService gateways;
 
-    private final ObjectProvider<PaymentFlowService> paymentFlow;
+    private final PaymentFlowService paymentFlow;
 
     @GetMapping("/payment-methods")
     @Operation(
@@ -72,9 +70,11 @@ public class PublicPaymentController {
         if (transferType != null && !transferType.isBlank() && !transferType.equalsIgnoreCase("in")) {
             return new VietQrWebhookResponse(true, TransferOutcome.IGNORED.name(), null);
         }
+        if (request.resolvedAmount() <= 0L) {
+            return new VietQrWebhookResponse(true, TransferOutcome.IGNORED.name(), null);
+        }
 
-        var flow = Objects.requireNonNull(paymentFlow.getIfAvailable());
-        var result = flow.processIncomingTransfer(
+        var result = paymentFlow.processIncomingTransfer(
             request.resolvedContent(),
             request.resolvedAmount(),
             request.resolvedBankTransactionId(),
@@ -91,8 +91,11 @@ public class PublicPaymentController {
 
         var gateway = gateways.requireActiveVietQrGateway();
         var expectedSecret = gateway.getWebhookSecret();
-        if (expectedSecret == null || expectedSecret.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Webhook secret is not configured");
+        if (expectedSecret == null || expectedSecret.isBlank() || !gateway.hasCustomWebhookSecret()) {
+            throw new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED,
+                "Webhook secret is not configured or still using insecure default"
+            );
         }
 
         var providedBytes = providedSecret.getBytes(StandardCharsets.UTF_8);

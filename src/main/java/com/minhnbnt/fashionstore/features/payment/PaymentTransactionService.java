@@ -10,6 +10,7 @@ import com.minhnbnt.fashionstore.model.PaymentTransaction;
 import com.minhnbnt.fashionstore.model.PaymentTransactionStatus;
 import com.minhnbnt.fashionstore.model.RefundStatus;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PaymentTransactionService {
@@ -72,17 +74,16 @@ public class PaymentTransactionService {
             accountNumber,
             accountName,
             qrImageUrl,
-            expiresAt,
-            Instant.now()
+            expiresAt
         );
         var saved = transactions.save(tx);
         transactions.linkOrders(saved.getId(), orderIds);
         return saved;
     }
 
-    @Transactional
-    public PaymentTransaction createVietQrSession(UUID buyerId, List<Order> orders, Instant expiresAt) {
-        return createSession(buyerId, orders, expiresAt);
+    @Transactional(readOnly = true)
+    public Optional<PaymentTransaction> findById(UUID id) {
+        return transactions.findById(id);
     }
 
     @Transactional(readOnly = true)
@@ -135,12 +136,16 @@ public class PaymentTransactionService {
         return transactions.save(tx);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Optional<PaymentTransaction> findPendingSessionForOrder(UUID orderId, Instant now) {
-        var list = transactions.findTransactionsByOrderId(orderId);
+        var list = transactions.findLockedTransactionsByOrderId(orderId);
         for (var tx : list) {
-            if (tx.getStatus() == PaymentTransactionStatus.PENDING && tx.getExpiresAt().isAfter(now)) {
-                return Optional.of(tx);
+            if (tx.getStatus() == PaymentTransactionStatus.PENDING) {
+                if (tx.getExpiresAt().isAfter(now)) {
+                    return Optional.of(tx);
+                }
+                tx.markExpired(now);
+                transactions.save(tx);
             }
         }
         return Optional.empty();
@@ -161,9 +166,9 @@ public class PaymentTransactionService {
     }
 
     @Transactional
-    public void flagOrderRefund(UUID orderId, long refundAmount, String reason) {
+    public boolean flagOrderRefund(UUID orderId, long refundAmount, String reason) {
         if (refundAmount <= 0) {
-            return;
+            return false;
         }
         var list = transactions.findTransactionsByOrderId(orderId);
         for (var tx : list) {
@@ -172,10 +177,16 @@ public class PaymentTransactionService {
                 if (locked != null) {
                     locked.addRefund(refundAmount, reason, Instant.now());
                     transactions.save(locked);
-                    return;
+                    return true;
                 }
             }
         }
+        log.warn(
+            "No successful online payment transaction found to flag refund of {} VND for order {}",
+            refundAmount,
+            orderId
+        );
+        return false;
     }
 
     @Transactional(readOnly = true)
@@ -188,21 +199,6 @@ public class PaymentTransactionService {
         }
 
         return toSessionResponse(tx);
-    }
-
-    @Transactional(readOnly = true)
-    public VietQrSessionResponse getSessionForViewer(UUID viewerId, boolean isAdmin, String txnRef) {
-        return getSessionForViewer(txnRef, viewerId, isAdmin);
-    }
-
-    @Transactional(readOnly = true)
-    public VietQrSessionResponse getSessionForViewer(String txnRef, UUID viewerId) {
-        return getSessionForViewer(txnRef, viewerId, false);
-    }
-
-    @Transactional(readOnly = true)
-    public VietQrSessionResponse getSessionForViewer(UUID viewerId, String txnRef) {
-        return getSessionForViewer(txnRef, viewerId, false);
     }
 
     @Transactional(readOnly = true)

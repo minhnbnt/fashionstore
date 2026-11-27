@@ -36,7 +36,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor
-@Tag(name = "Orders", description = "Buyer checkout COD va theo doi don")
+@Tag(name = "Orders", description = "Buyer checkout (COD / VietQR) va theo doi don")
 public class OrderController {
 
     private final OrderService orders;
@@ -45,7 +45,11 @@ public class OrderController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Checkout COD", description = "1 don dung 1 shop, tao don PENDING, chua tru kho.")
+    @Operation(
+        summary = "Checkout don hang (COD hoac VietQR)",
+        description = "1 don dung 1 shop; COD tao don PENDING, VIETQR tao don AWAITING_PAYMENT "
+            + "kem phien VietQR; giu va tru ton kho ngay khi dat."
+    )
     @ApiResponse(responseCode = "201", description = "Don vua tao")
     @ApiResponse(responseCode = "400", description = "Item khac shop hoac body khong hop le")
     @ApiResponse(responseCode = "401", description = "Thieu hoac sai JWT")

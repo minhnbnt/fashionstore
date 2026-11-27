@@ -85,8 +85,31 @@ public record VietQrWebhookRequest(
             sb.append("null");
             return;
         }
-        var escaped = value.replace("\\", "\\\\").replace("\"", "\\\"");
-        sb.append("\"").append(escaped).append("\"");
+        sb.append("\"").append(escapeJsonString(value)).append("\"");
+    }
+
+    private static String escapeJsonString(String value) {
+        var out = new StringBuilder(value.length() + 8);
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            switch (ch) {
+                case '\\' -> out.append("\\\\");
+                case '"' -> out.append("\\\"");
+                case '\b' -> out.append("\\b");
+                case '\f' -> out.append("\\f");
+                case '\n' -> out.append("\\n");
+                case '\r' -> out.append("\\r");
+                case '\t' -> out.append("\\t");
+                default -> {
+                    if (ch < 0x20) {
+                        out.append(String.format("\\u%04x", (int) ch));
+                    } else {
+                        out.append(ch);
+                    }
+                }
+            }
+        }
+        return out.toString();
     }
 
     private static void appendJsonNumber(StringBuilder sb, String key, long value) {

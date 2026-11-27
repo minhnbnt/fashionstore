@@ -17,6 +17,8 @@ import java.util.UUID;
 @AllArgsConstructor(onConstructor_ = @PersistenceCreator)
 public class PaymentGateway implements Persistable<String> {
 
+    public static final String INSECURE_DEMO_WEBHOOK_SECRET = "demo-vietqr-secret-key";
+
     @Id
     private String code;
 
@@ -47,6 +49,10 @@ public class PaymentGateway implements Persistable<String> {
 
     public boolean hasWebhookSecret() {
         return webhookSecret != null && !webhookSecret.isBlank();
+    }
+
+    public boolean hasCustomWebhookSecret() {
+        return hasWebhookSecret() && !INSECURE_DEMO_WEBHOOK_SECRET.equals(webhookSecret);
     }
 
     public boolean hasCompleteVietQrBankConfig() {
