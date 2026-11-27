@@ -16,6 +16,7 @@ import com.minhnbnt.fashionstore.features.shop.ShopDecorationService;
 import com.minhnbnt.fashionstore.features.shop.ShopRepository;
 import com.minhnbnt.fashionstore.features.shop.ShopService;
 import com.minhnbnt.fashionstore.features.shop.ShopStaffService;
+import com.minhnbnt.fashionstore.features.upload.S3UrlService;
 import com.minhnbnt.fashionstore.features.upload.repository.UploadRepository;
 import com.minhnbnt.fashionstore.model.ShopStatus;
 
@@ -39,6 +40,9 @@ class DemoSeederTest {
 
     @Autowired
     private ShopService shopService;
+
+    @Autowired
+    private S3UrlService s3Urls;
 
     @Autowired
     private CatalogService catalogService;
@@ -113,7 +117,8 @@ class DemoSeederTest {
             shopDecorationService,
             revenueService,
             settlements,
-            withdrawals
+            withdrawals,
+            s3Urls
         );
     }
 
@@ -145,6 +150,12 @@ class DemoSeederTest {
         var shop = shops.findBySlug("net-lab").orElseThrow();
         assertThat(shop.getStatus()).isEqualTo(ShopStatus.APPROVED);
         assertThat(categories.count()).isGreaterThanOrEqualTo(5);
+
+        // Trang gian hàng demo phải có bố cục đã xuất bản (khách thấy ngay), còn bản nháp để seller thử.
+        var published = shopDecorationService.getPublishedLayout(shop.getId());
+        assertThat(published.publishedAt()).isNotNull();
+        assertThat(published.layout()).contains("\"BANNER_SLIDER\"", "\"PRODUCT_COLLECTION\"", "\"CATEGORY_GRID\"");
+        assertThat(published.layout()).doesNotContain("FLASH_SALE");
 
         var steady = products.count();
         seeder().run(new DefaultApplicationArguments());
