@@ -6,6 +6,7 @@ import { MarketplaceStorage } from './lib/storage.mjs'
 import { scrapeLazada } from './lib/extractors/lazada.mjs'
 import { scrapeShopee } from './lib/extractors/shopee.mjs'
 import { scrapeTiki } from './lib/extractors/tiki.mjs'
+import { scrapeUniqlo } from './lib/extractors/uniqlo.mjs'
 
 export class QuotaTracker {
   constructor({
@@ -239,9 +240,10 @@ export async function runCli(argv = process.argv.slice(2)) {
   )
 
   const needsBrowser =
-    cliOptions.source === 'all' ||
-    cliOptions.source === 'lazada' ||
-    cliOptions.source === 'shopee'
+    (cliOptions.source === 'all' ||
+      cliOptions.source === 'lazada' ||
+      cliOptions.source === 'shopee') &&
+    cliOptions.source !== 'uniqlo'
 
   let context = null
   let rl = null
@@ -286,6 +288,9 @@ export async function runCli(argv = process.argv.slice(2)) {
     }
     if (!quotaTracker.isComplete() && (cliOptions.source === 'all' || cliOptions.source === 'shopee')) {
       await scrapeShopee(context, scraperOptions, storage)
+    }
+    if (!quotaTracker.isComplete() && (cliOptions.source === 'all' || cliOptions.source === 'uniqlo')) {
+      await scrapeUniqlo(scraperOptions, storage, quotaTracker)
     }
 
     await storage.flushShops()
