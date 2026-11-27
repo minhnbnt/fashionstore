@@ -883,6 +883,16 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
         if (existingDetail.material() == null && material != null) {
             return true;
         }
+
+        // If existing product has no variant-linked images but target variants have images → upgrade
+        boolean existingHasVariantImages = existingDetail.images().stream()
+            .anyMatch(img -> img.variantId() != null);
+        boolean targetHasVariantImages = targetVariants.stream()
+            .anyMatch(pv -> pv.imageUploadId() != null);
+        if (!existingHasVariantImages && targetHasVariantImages) {
+            return true;
+        }
+
         return !Boolean.TRUE.equals(existingDetail.tryOnEnabled()) && tryOnEnabled;
     }
 
@@ -957,13 +967,10 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
         );
 
         var variantImageItems = new ArrayList<ImageItemRequest>();
-        var attachedUploadIds = new HashSet<UUID>();
-        for (var gImg : galleryImageRequests) {
-            attachedUploadIds.add(gImg.uploadId());
-        }
+        var seenVariantAttachIds = new HashSet<UUID>();
         for (var pv : parsedVariants) {
             var imgUploadId = pv.imageUploadId();
-            if (imgUploadId == null || !attachedUploadIds.add(imgUploadId)) {
+            if (imgUploadId == null || !seenVariantAttachIds.add(imgUploadId)) {
                 continue;
             }
             var matchedVariantId = findVariantIdBySku(updated.variants(), pv.sku());
@@ -1022,7 +1029,10 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
         var rawVariants = new ArrayList<ParsedVariant>();
         var seenColorSize = new HashSet<String>();
         var localSkus = new HashSet<String>();
-        var attachedVariantUploadIds = new HashSet<UUID>(galleryUploadIds);
+        // seenVariantUploadIds deduplicates only across variants (same color different sizes).
+        // We intentionally do NOT seed it from galleryUploadIds: a per-color image may also
+        // appear in the gallery; the gallery dedup is handled separately in upgradeExistingProduct.
+        var seenVariantUploadIds = new HashSet<UUID>();
         var variantsNode = item.get("variants");
 
         if (variantsNode != null && variantsNode.isArray() && !variantsNode.isEmpty()) {
@@ -1076,7 +1086,7 @@ public class BrowserMarketplaceImporter implements ApplicationRunner {
                 var variantImageFile = vNode.path("imageFile").asString("").trim();
                 if (!variantImageFile.isBlank()) {
                     var candidateUploadId = uploadProductMediaFile(variantImageFile, uploadIdByS3Key).uploadId();
-                    if (attachedVariantUploadIds.add(candidateUploadId)) {
+                    if (seenVariantUploadIds.add(candidateUploadId)) {
                         variantImageUploadId = candidateUploadId;
                     }
                 }
