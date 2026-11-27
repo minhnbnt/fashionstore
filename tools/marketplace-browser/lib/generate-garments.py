@@ -576,6 +576,37 @@ def main() -> None:
             product["garmentImageFiles"] = []
             continue
 
+        # Check for per-product downloaded garment (from scrapeUniqlo's downloadGarmentImages)
+        source_id = str(product.get("sourceId") or "")
+        uniqlo_dir = base_dir / "images" / "uniqlo"
+        downloaded_garment_paths: list[Path] = []
+        if source_id:
+            for ext in [".jpg", ".webp", ".png"]:
+                for i in range(1, 10):
+                    candidate = uniqlo_dir / f"{source_id}-garment-{i}{ext}"
+                    if candidate.is_file() and candidate.stat().st_size > 100:
+                        downloaded_garment_paths.append(candidate)
+
+        if downloaded_garment_paths:
+            # Whiten and use per-product garments
+            garment_rel_files: list[str] = []
+            for path in downloaded_garment_paths[:3]:  # max 3 garments
+                out_name = f"{source_id}-garment-{len(garment_rel_files)+1}.jpg"
+                rel_path = f"images/garments/{out_name}"
+                out_file = base_dir / rel_path
+                if not out_file.is_file():
+                    extracted = extract_clean_flatlay_template(path.read_bytes())
+                    if extracted is not None:
+                        tpl_rgb, tpl_mask = extracted
+                        render_colored_garment(tpl_rgb, tpl_mask, None, out_file)  # None = keep original color
+                if out_file.is_file():
+                    garment_rel_files.append(rel_path)
+            if garment_rel_files:
+                product["garmentImageFiles"] = garment_rel_files
+                product["tryOnEnabled"] = True
+                try_on_count += 1
+                continue  # skip template logic below
+
         product["tryOnEnabled"] = True
         try_on_count += 1
 
