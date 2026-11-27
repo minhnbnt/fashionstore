@@ -441,7 +441,7 @@ export async function scrapeUniqlo(options, storage, quotaTracker) {
           const garmentLocalPaths = await downloadGarmentImages(product, flatLayUrls, outputDir, downloadFn)
           if (garmentLocalPaths.length > 0) {
             product.garmentImageFiles = garmentLocalPaths
-          } else {
+          } else if (product.tryOnEnabled) {
             product.garmentImageFiles = [product.imageFiles[0]]
           }
         }
